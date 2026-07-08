@@ -75,7 +75,7 @@ if (isset($_GET['edit'])) {
     if ($row) { $form = array_merge($form, $row); }
 }
 
-$rows         = $db->query('SELECT * FROM exam_results ORDER BY exam_result_id DESC LIMIT 50')->fetchAll();
+$rows         = $db->query('SELECT er.*, e.exam_code, e.title AS exam_title FROM exam_results er INNER JOIN exams e ON e.exam_id = er.exam_id ORDER BY er.exam_result_id DESC LIMIT 50')->fetchAll();
 $attempts     = $db->query('SELECT student_exam_id, exam_id, student_id FROM student_exams ORDER BY student_exam_id DESC')->fetchAll();
 $statusCounts = $db->query('SELECT status, COUNT(*) AS total FROM exam_results GROUP BY status')->fetchAll();
 $passCount    = (int) $db->query("SELECT COUNT(*) FROM exam_results WHERE pass_fail_status = 'pass'")->fetchColumn();
@@ -247,7 +247,10 @@ require __DIR__ . '/includes/header.php';
                     <?php foreach ($rows as $row): ?>
                         <tr>
                             <td class="small">Attempt #<?= (int) $row['student_exam_id'] ?></td>
-                            <td class="small">Exam #<?= (int) $row['exam_id'] ?></td>
+                            <td>
+                                <span class="badge manual"><?= e($row['exam_code']) ?></span>
+                                <div class="small" style="margin-top:3px;"><?= e($row['exam_title']) ?></div>
+                            </td>
                             <td class="small">Student #<?= (int) $row['student_id'] ?></td>
                             <td class="fw-700"><?= e(number_format((float) $row['obtained_marks'], 2)) ?> / <?= e(number_format((float) $row['total_marks'], 2)) ?></td>
                             <td class="fw-700"><?= e(number_format((float) $row['percentage'], 1)) ?>%</td>

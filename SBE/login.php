@@ -74,8 +74,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         
         <!-- Bottom text -->
         <div style="margin-top: auto; color: #fff;">
-            <p style="opacity: 0.85; font-size: 0.95rem; margin-bottom: 8px; font-weight: 500;">You can easily</p>
-            <h2 style="font-size: 1.8rem; font-weight: 700; line-height: 1.35; color: #fff; margin: 0; letter-spacing: -0.02em;">Get access your personal hub for clarity and productivity</h2>
+            <p style="opacity: 0.85; font-size: 0.95rem; margin-bottom: 8px; font-weight: 500;">SBE Portal</p>
+            <h2 style="font-size: 1.8rem; font-weight: 700; line-height: 1.35; color: #fff; margin: 0; letter-spacing: -0.02em;">Secure access to exams, schedules, and results</h2>
         </div>
     </section>
 

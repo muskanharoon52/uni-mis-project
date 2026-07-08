@@ -13,6 +13,8 @@ $pageTitle = 'Student Dashboard';
 $activePage = 'dashboard';
 $student = current_user();
 $studentId = (int) $student['login_id'];
+$message = $_SESSION['message'] ?? null;
+unset($_SESSION['message']);
 
 // Get all schedules
 $availableSchedules = $db->query('SELECT es.schedule_id, es.exam_id, es.class_id, es.exam_date, es.start_time, es.end_time, es.location, e.exam_code, e.title, e.status AS exam_status FROM exam_schedule es INNER JOIN exams e ON e.exam_id = es.exam_id ORDER BY es.exam_date DESC, es.start_time DESC LIMIT 10')->fetchAll();
@@ -57,6 +59,9 @@ require __DIR__ . '/includes/header.php';
 ?>
 
 <div class="page animate-in">
+    <?php if ($message): ?>
+        <div class="alert alert-success" style="margin-bottom:18px;"><?= e($message) ?></div>
+    <?php endif; ?>
 
     <!-- Greeting Card -->
     <div class="greeting-card">
