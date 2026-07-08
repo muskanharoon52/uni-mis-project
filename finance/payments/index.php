@@ -1,4 +1,16 @@
 <?php
+session_start();
+if (!isset($_SESSION['user_id'])) {
+    header('Location: ../auth/login.php');
+    exit();
+}
+// Check if user is Finance Officer (role_id = 3)
+if ($_SESSION['role_id'] != 3) {
+    header('Location: ../auth/login.php?error=Access denied. Finance Officer only.');
+    exit();
+}
+// ... baaki code
+include $_SERVER['DOCUMENT_ROOT'] . '/MIS/finance/includes/header.php';
 include $_SERVER['DOCUMENT_ROOT'] . '/MIS/config/db_connect.php';
 
 $sql = "SELECT 
@@ -42,6 +54,10 @@ $result = mysqli_query($conn, $sql);
 
     <?php if(isset($_GET['msg'])): ?>
         <div class="alert alert-success"><?php echo htmlspecialchars($_GET['msg']); ?></div>
+    <?php endif; ?>
+
+    <?php if(isset($_GET['error'])): ?>
+        <div class="alert alert-danger"><?php echo htmlspecialchars($_GET['error']); ?></div>
     <?php endif; ?>
 
     <div class="card shadow">

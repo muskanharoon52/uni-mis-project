@@ -1,4 +1,16 @@
 <?php
+session_start();
+if (!isset($_SESSION['user_id'])) {
+    header('Location: ../auth/login.php');
+    exit();
+}
+// Check if user is Finance Officer (role_id = 3)
+if ($_SESSION['role_id'] != 3) {
+    header('Location: ../auth/login.php?error=Access denied. Finance Officer only.');
+    exit();
+}
+// ... baaki code
+include $_SERVER['DOCUMENT_ROOT'] . '/MIS/finance/includes/header.php';
 include $_SERVER['DOCUMENT_ROOT'] . '/MIS/config/db_connect.php';
 
 if (!isset($_GET['id']) || empty($_GET['id'])) {
@@ -46,6 +58,14 @@ if (mysqli_num_rows($result) == 0) {
 }
 
 $receipt = mysqli_fetch_assoc($result);
+
+// Check if PDF download requested
+if (isset($_GET['download']) && $_GET['download'] == 'pdf') {
+    // We'll use HTML to PDF conversion via browser print
+    // For now, redirect to print
+    echo "<script>window.print();</script>";
+    exit();
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -66,6 +86,14 @@ $receipt = mysqli_fetch_assoc($result);
             border-radius: 10px;
             padding: 20px;
         }
+        .btn-pdf {
+            background: #dc3545;
+            color: #fff;
+        }
+        .btn-pdf:hover {
+            background: #c82333;
+            color: #fff;
+        }
     </style>
 </head>
 <body>
@@ -74,21 +102,28 @@ $receipt = mysqli_fetch_assoc($result);
     <div class="row justify-content-center">
         <div class="col-md-8">
             
-            <!-- Print & Back Buttons -->
+            <!-- ===== BUTTONS ===== -->
             <div class="no-print mb-3 text-end">
-                <a href="index.php" class="btn btn-secondary"><i class="fas fa-arrow-left"></i> Back to List</a>
-                <button onclick="window.print()" class="btn btn-success"><i class="fas fa-print"></i> Print Receipt</button>
+                <a href="index.php" class="btn btn-secondary">
+                    <i class="fas fa-arrow-left"></i> Back
+                </a>
+                <button onclick="window.print()" class="btn btn-primary">
+                    <i class="fas fa-print"></i> Print
+                </button>
+                <button onclick="downloadPDF()" class="btn btn-pdf">
+                    <i class="fas fa-file-pdf"></i> Download PDF
+                </button>
             </div>
 
-            <!-- Receipt Card -->
-            <div class="card shadow receipt-border">
+            <!-- ===== RECEIPT ===== -->
+            <div class="card shadow receipt-border" id="receiptContent">
                 <div class="card-header bg-success text-white text-center">
                     <h3><i class="fas fa-university"></i> University MIS</h3>
                     <h5>Official Fee Receipt</h5>
                 </div>
                 <div class="card-body">
                     
-                    <!-- Receipt Header -->
+                    <!-- Header -->
                     <div class="row mb-3">
                         <div class="col-md-6">
                             <p><strong>Receipt No:</strong> <span class="badge bg-primary"><?php echo htmlspecialchars($receipt['receipt_no']); ?></span></p>
@@ -168,15 +203,44 @@ $receipt = mysqli_fetch_assoc($result);
                     </div>
 
                 </div>
-                <div class="card-footer text-center no-print">
-                    <button onclick="window.print()" class="btn btn-success">
-                        <i class="fas fa-print"></i> Print Receipt
-                    </button>
-                </div>
             </div>
         </div>
     </div>
 </div>
+
+<script>
+function downloadPDF() {
+    // Open print dialog with PDF option
+    window.print();
+}
+
+// For better PDF download experience
+document.addEventListener('DOMContentLoaded', function() {
+    // Check if URL has download param
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('download') === 'pdf') {
+        setTimeout(function() {
+            window.print();
+        }, 500);
+    }
+});
+</script>
+
+<!-- ===== HTML2PDF Library for better PDF ===== -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js" integrity="sha512-GsLlZN/3F2ErC5ifS5QtgpiJtWd43JWSuIgh7mbzZ8zBps+dvLusV+eNQATqgA/HdeKFVgA5v3S/cIrLF7QnIg==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<script>
+function downloadPDF() {
+    const element = document.getElementById('receiptContent');
+    const opt = {
+        margin:       1,
+        filename:     'receipt-<?php echo htmlspecialchars($receipt['receipt_no']); ?>.pdf',
+        image:        { type: 'jpeg', quality: 0.98 },
+        html2canvas:  { scale: 2 },
+        jsPDF:        { unit: 'in', format: 'a4', orientation: 'portrait' }
+    };
+    html2pdf().set(opt).from(element).save();
+}
+</script>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>

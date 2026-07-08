@@ -1,5 +1,18 @@
+
 <?php
-include '../../config/db_connect.php';
+session_start();
+if (!isset($_SESSION['user_id'])) {
+    header('Location: ../auth/login.php');
+    exit();
+}
+// Check if user is Finance Officer (role_id = 3)
+if ($_SESSION['role_id'] != 3) {
+    header('Location: ../auth/login.php?error=Access denied. Finance Officer only.');
+    exit();
+}
+// ... baaki code
+include '../includes/header.php';
+include $_SERVER['DOCUMENT_ROOT'] . '/MIS/config/db_connect.php';
 
 $error = '';
 $success = '';
@@ -28,6 +41,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $fee_head_name = mysqli_real_escape_string($conn, $_POST['fee_head_name']);
     $description = mysqli_real_escape_string($conn, $_POST['description']);
     $status = mysqli_real_escape_string($conn, $_POST['status']);
+    $updated_by = $_SESSION['user_id'] ?? 1;  // Session se user_id lein
 
     if (empty($fee_head_name)) {
         $error = "Fee Head Name is required!";
@@ -43,7 +57,9 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             $update_sql = "UPDATE fee_heads SET 
                           fee_head_name = '$fee_head_name',
                           description = '$description',
-                          status = '$status'
+                          status = '$status',
+                          updated_by = '$updated_by',
+                          updated_at = NOW()
                           WHERE fee_head_id = '$fee_head_id'";
             
             if (mysqli_query($conn, $update_sql)) {

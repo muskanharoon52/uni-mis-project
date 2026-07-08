@@ -1,5 +1,18 @@
+
 <?php
-include '../../config/db_connect.php';
+session_start();
+if (!isset($_SESSION['user_id'])) {
+    header('Location: ../auth/login.php');
+    exit();
+}
+// Check if user is Finance Officer (role_id = 3)
+if ($_SESSION['role_id'] != 3) {
+    header('Location: ../auth/login.php?error=Access denied. Finance Officer only.');
+    exit();
+}
+// ... baaki code
+include '../includes/header.php';
+include $_SERVER['DOCUMENT_ROOT'] . '/MIS/config/db_connect.php';
 
 $error = '';
 $success = '';
@@ -8,6 +21,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $fee_head_name = mysqli_real_escape_string($conn, $_POST['fee_head_name']);
     $description = mysqli_real_escape_string($conn, $_POST['description']);
     $status = mysqli_real_escape_string($conn, $_POST['status']);
+    $created_by = $_SESSION['user_id'] ?? 1;  // Session se user_id lein
 
     // Validation
     if (empty($fee_head_name)) {
@@ -20,9 +34,9 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         if (mysqli_num_rows($check_result) > 0) {
             $error = "Fee head '$fee_head_name' already exists!";
         } else {
-            // Insert into database
-            $sql = "INSERT INTO fee_heads (fee_head_name, description, status) 
-                    VALUES ('$fee_head_name', '$description', '$status')";
+            // Insert into database with created_by
+            $sql = "INSERT INTO fee_heads (fee_head_name, description, status, created_by) 
+                    VALUES ('$fee_head_name', '$description', '$status', '$created_by')";
             
             if (mysqli_query($conn, $sql)) {
                 $success = "Fee head added successfully!";

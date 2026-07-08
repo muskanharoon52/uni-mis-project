@@ -1,4 +1,16 @@
 <?php
+session_start();
+if (!isset($_SESSION['user_id'])) {
+    header('Location: ../auth/login.php');
+    exit();
+}
+// Check if user is Finance Officer (role_id = 3)
+if ($_SESSION['role_id'] != 3) {
+    header('Location: ../auth/login.php?error=Access denied. Finance Officer only.');
+    exit();
+}
+// ... baaki code
+include $_SERVER['DOCUMENT_ROOT'] . '/MIS/finance/includes/header.php';
 error_reporting(E_ALL);
 ini_set('display_errors', 1);
 

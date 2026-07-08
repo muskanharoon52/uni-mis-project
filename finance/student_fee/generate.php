@@ -1,4 +1,16 @@
 <?php
+session_start();
+if (!isset($_SESSION['user_id'])) {
+    header('Location: ../auth/login.php');
+    exit();
+}
+// Check if user is Finance Officer (role_id = 3)
+if ($_SESSION['role_id'] != 3) {
+    header('Location: ../auth/login.php?error=Access denied. Finance Officer only.');
+    exit();
+}
+// ... baaki code
+include $_SERVER['DOCUMENT_ROOT'] . '/MIS/finance/includes/header.php';
 error_reporting(E_ALL);
 ini_set('display_errors', 1);
 
@@ -13,6 +25,7 @@ $generated_fee_id = 0;
 $search_results = [];
 $search_term = '';
 $selected_student = null;
+$show_payment_form = false;
 
 // --- SEARCH LOGIC ---
 if (isset($_GET['search']) && !empty($_GET['search'])) {
@@ -45,14 +58,22 @@ $semester_result = mysqli_query($conn, $semester_sql);
 $session_sql = "SELECT * FROM sessions WHERE status = 'Active' ORDER BY session_name";
 $session_result = mysqli_query($conn, $session_sql);
 
-// --- GENERATE FEE LOGIC ---
+// Fetch fee heads for dropdown
+$fee_heads_sql = "SELECT fee_head_id, fee_head_name, description FROM fee_heads WHERE status = 'Active' AND deleted_at IS NULL ORDER BY fee_head_name";
+$fee_heads_result = mysqli_query($conn, $fee_heads_sql);
+
+// --- GENERATE FEE + PAYMENT LOGIC ---
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['generate_fee'])) {
     $student_id = mysqli_real_escape_string($conn, $_POST['student_id']);
     $semester_id = mysqli_real_escape_string($conn, $_POST['semester_id']);
     $session_id = mysqli_real_escape_string($conn, $_POST['session_id']);
+    $fee_head_id = isset($_POST['fee_head_id']) ? intval($_POST['fee_head_id']) : 0;
     $payment_type = mysqli_real_escape_string($conn, $_POST['payment_type']);
     $installment_count = isset($_POST['installment_count']) ? intval($_POST['installment_count']) : 1;
-    $generated_by = 1;
+    $amount_paid = isset($_POST['amount_paid']) ? floatval($_POST['amount_paid']) : 0;
+    $payment_method = isset($_POST['payment_method']) ? mysqli_real_escape_string($conn, $_POST['payment_method']) : 'Cash';
+    $transaction_ref = isset($_POST['transaction_ref']) ? mysqli_real_escape_string($conn, $_POST['transaction_ref']) : '';
+    $generated_by = $_SESSION['user_id'] ?? 1;  // Session se user_id lein
 
     // Check if fee already exists
     $check_sql = "SELECT * FROM student_fee WHERE student_id = '$student_id' AND semester_id = '$semester_id'";
@@ -83,71 +104,101 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['generate_fee'])) {
             $fee_structure_id = $fs_row['fee_structure_id'];
             $total_amount = $fs_row['total_amount'];
 
-            // Calculate due date (30 days from now)
-            $due_date = date('Y-m-d', strtotime('+30 days'));
-
-            // Insert into student_fee
-            $insert_sql = "INSERT INTO student_fee 
-                          (student_id, semester_id, session_id, fee_structure_id, 
-                           total_amount, paid_amount, due_date, generated_by) 
-                          VALUES ('$student_id', '$semester_id', '$session_id', 
-                                  '$fee_structure_id', '$total_amount', 0, '$due_date', '$generated_by')";
-            
-            if (mysqli_query($conn, $insert_sql)) {
-                $student_fee_id = mysqli_insert_id($conn);
-                
-                // Insert fee details
-                $detail_sql = "SELECT fee_head_id, amount FROM fee_structure_details 
-                               WHERE fee_structure_id = '$fee_structure_id'";
-                $detail_result = mysqli_query($conn, $detail_sql);
-                
-                while ($detail_row = mysqli_fetch_assoc($detail_result)) {
-                    $sfd_sql = "INSERT INTO student_fee_details 
-                               (student_fee_id, fee_head_id, amount, discount_amount) 
-                               VALUES ('$student_fee_id', '{$detail_row['fee_head_id']}', '{$detail_row['amount']}', 0)";
-                    mysqli_query($conn, $sfd_sql);
+            // Get fee head amount
+            $fee_head_amount = 0;
+            if ($fee_head_id > 0) {
+                $head_sql = "SELECT amount FROM fee_structure_details WHERE fee_structure_id = '$fee_structure_id' AND fee_head_id = '$fee_head_id'";
+                $head_result = mysqli_query($conn, $head_sql);
+                if (mysqli_num_rows($head_result) > 0) {
+                    $head_row = mysqli_fetch_assoc($head_result);
+                    $fee_head_amount = $head_row['amount'];
+                } else {
+                    $error = "Selected fee head not found in this fee structure!";
                 }
+            }
 
-                // --- INSTALLMENT LOGIC (Max 3 Installments) ---
-                if ($payment_type == 'installments' && $installment_count > 1) {
-                    $installment_amount = round($total_amount / $installment_count, 2);
-                    $remainder = round($total_amount - ($installment_amount * $installment_count), 2);
+            if (empty($error)) {
+                // Validate amount paid
+                if ($amount_paid > $fee_head_amount && $fee_head_id > 0) {
+                    $error = "Amount paid cannot exceed fee head amount (PKR " . number_format($fee_head_amount, 2) . ")";
+                } elseif ($amount_paid < 0) {
+                    $error = "Amount paid cannot be negative!";
+                } else {
+                    // Calculate due date (30 days from now)
+                    $due_date = date('Y-m-d', strtotime('+30 days'));
+
+                    // Insert into student_fee
+                    $insert_sql = "INSERT INTO student_fee 
+                                  (student_id, semester_id, session_id, fee_structure_id, 
+                                   total_amount, paid_amount, due_date, generated_by) 
+                                  VALUES ('$student_id', '$semester_id', '$session_id', 
+                                          '$fee_structure_id', '$total_amount', '$amount_paid', '$due_date', '$generated_by')";
                     
-                    // Adjust last installment to include remainder
-                    for ($i = 1; $i <= $installment_count; $i++) {
-                        $amount = $installment_amount;
-                        if ($i == $installment_count) {
-                            $amount += $remainder;
-                        }
-                        $due_date_installment = date('Y-m-d', strtotime("+$i months"));
+                    if (mysqli_query($conn, $insert_sql)) {
+                        $student_fee_id = mysqli_insert_id($conn);
                         
-                        $inst_sql = "INSERT INTO installments 
-                                    (student_fee_id, installment_no, amount, due_date, paid_amount, status) 
-                                    VALUES ('$student_fee_id', '$i', '$amount', '$due_date_installment', 0, 'Pending')";
-                        mysqli_query($conn, $inst_sql);
+                        // Insert fee details
+                        $detail_sql = "SELECT fee_head_id, amount FROM fee_structure_details 
+                                       WHERE fee_structure_id = '$fee_structure_id'";
+                        $detail_result = mysqli_query($conn, $detail_sql);
+                        
+                        while ($detail_row = mysqli_fetch_assoc($detail_result)) {
+                            $sfd_sql = "INSERT INTO student_fee_details 
+                                       (student_fee_id, fee_head_id, amount, discount_amount) 
+                                       VALUES ('$student_fee_id', '{$detail_row['fee_head_id']}', '{$detail_row['amount']}', 0)";
+                            mysqli_query($conn, $sfd_sql);
+                        }
+
+                        // --- INSTALLMENT LOGIC ---
+                        if ($payment_type == 'installments' && $installment_count > 1) {
+                            $installment_amount = round($total_amount / $installment_count, 2);
+                            $remainder = round($total_amount - ($installment_amount * $installment_count), 2);
+                            
+                            for ($i = 1; $i <= $installment_count; $i++) {
+                                $amount = $installment_amount;
+                                if ($i == $installment_count) {
+                                    $amount += $remainder;
+                                }
+                                $due_date_installment = date('Y-m-d', strtotime("+$i months"));
+                                
+                                $inst_sql = "INSERT INTO installments 
+                                            (student_fee_id, installment_no, amount, due_date, paid_amount, status) 
+                                            VALUES ('$student_fee_id', '$i', '$amount', '$due_date_installment', 0, 'Pending')";
+                                mysqli_query($conn, $inst_sql);
+                            }
+                        }
+
+                        // --- PAYMENT LOGIC ---
+                        if ($amount_paid > 0) {
+                            $payment_sql = "INSERT INTO payments 
+                                           (student_fee_id, student_id, amount_paid, payment_method, transaction_ref, received_by) 
+                                           VALUES ('$student_fee_id', '$student_id', '$amount_paid', '$payment_method', '$transaction_ref', '$generated_by')";
+                            mysqli_query($conn, $payment_sql);
+                        }
+
+                        $generated_fee_id = $student_fee_id;
+                        $success = "Fee generated successfully!";
+                        $show_payment_form = true;
+                        
+                        // Get student name
+                        $name_sql = "SELECT full_name FROM students WHERE student_id = '$student_id'";
+                        $name_result = mysqli_query($conn, $name_sql);
+                        $name_row = mysqli_fetch_assoc($name_result);
+                        $student_name = $name_row['full_name'];
+                        
+                        // Get fee structure details
+                        $fs_detail_sql = "SELECT fh.fee_head_name, fsd.amount 
+                                          FROM fee_structure_details fsd
+                                          JOIN fee_heads fh ON fh.fee_head_id = fsd.fee_head_id
+                                          WHERE fsd.fee_structure_id = '$fee_structure_id'";
+                        $fs_detail_result = mysqli_query($conn, $fs_detail_sql);
+                        while ($row = mysqli_fetch_assoc($fs_detail_result)) {
+                            $fee_structure[] = $row;
+                        }
+                    } else {
+                        $error = "Error: " . mysqli_error($conn);
                     }
                 }
-
-                $generated_fee_id = $student_fee_id;
-                $success = "Fee generated successfully!";
-                
-                // Get student name
-                $name_sql = "SELECT full_name FROM students WHERE student_id = '$student_id'";
-                $name_result = mysqli_query($conn, $name_sql);
-                $name_row = mysqli_fetch_assoc($name_result);
-                $student_name = $name_row['full_name'];
-                
-                // Get fee structure details
-                $fs_detail_sql = "SELECT fh.fee_head_name, fsd.amount 
-                                  FROM fee_structure_details fsd
-                                  JOIN fee_heads fh ON fh.fee_head_id = fsd.fee_head_id
-                                  WHERE fsd.fee_structure_id = '$fee_structure_id'";
-                $fs_detail_result = mysqli_query($conn, $fs_detail_sql);
-                while ($row = mysqli_fetch_assoc($fs_detail_result)) {
-                    $fee_structure[] = $row;
-                }
-            } else {
-                $error = "Error: " . mysqli_error($conn);
             }
         }
     }
@@ -168,7 +219,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['generate_fee'])) {
     <div class="row justify-content-center">
         <div class="col-md-10">
             <div class="card shadow">
-                <!-- ===== CARD HEADER WITH CROSS BUTTON ===== -->
                 <div class="card-header bg-success text-white d-flex justify-content-between align-items-center">
                     <h4 class="mb-0"><i class="fas fa-file-invoice"></i> Generate Student Fee</h4>
                     <a href="index.php" class="btn btn-light btn-sm" title="Close">
@@ -186,8 +236,10 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['generate_fee'])) {
                             <h5><i class="fas fa-check-circle"></i> <?php echo $success; ?></h5>
                             <p>Student: <strong><?php echo htmlspecialchars($student_name); ?></strong></p>
                             <p>Total Amount: <strong>PKR <?php echo number_format($total_amount, 2); ?></strong></p>
+                            <p>Amount Paid: <strong>PKR <?php echo number_format($amount_paid ?? 0, 2); ?></strong></p>
+                            <p>Remaining: <strong>PKR <?php echo number_format($total_amount - ($amount_paid ?? 0), 2); ?></strong></p>
                             <hr>
-                            <h6>Fee Breakdown:</h6>
+                            <h6>Fee Breakdown (Fee Heads):</h6>
                             <ul>
                                 <?php foreach($fee_structure as $item): ?>
                                     <li><?php echo htmlspecialchars($item['fee_head_name']); ?>: PKR <?php echo number_format($item['amount'], 2); ?></li>
@@ -212,7 +264,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['generate_fee'])) {
 
                     <?php if(empty($success)): ?>
                     
-                    <!-- ===== SEARCH SECTION ===== -->
+                    <!-- SEARCH SECTION -->
                     <div class="card mb-4 bg-light">
                         <div class="card-header bg-info text-white d-flex justify-content-between align-items-center">
                             <span><i class="fas fa-search"></i> Search Student</span>
@@ -281,7 +333,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['generate_fee'])) {
                         </div>
                     </div>
 
-                    <!-- ===== SELECTED STUDENT ===== -->
+                    <!-- SELECTED STUDENT -->
                     <?php if($selected_student): ?>
                         <div class="alert alert-success d-flex justify-content-between align-items-center">
                             <div>
@@ -298,7 +350,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['generate_fee'])) {
                         </div>
                     <?php endif; ?>
 
-                    <!-- ===== FEE GENERATION FORM ===== -->
+                    <!-- FEE GENERATION FORM -->
                     <form method="POST" action="" id="feeForm">
                         <div class="row">
                             <div class="col-md-6 mb-3">
@@ -347,6 +399,27 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['generate_fee'])) {
                                     <?php endwhile; ?>
                                 </select>
                             </div>
+                            <!-- ===== FEE HEAD DROPDOWN ===== -->
+                            <div class="col-md-6 mb-3">
+                                <label class="form-label">Select Fee Head <span class="text-danger">*</span></label>
+                                <select class="form-select" name="fee_head_id" required>
+                                    <option value="">-- Select Fee Head --</option>
+                                    <?php 
+                                    mysqli_data_seek($fee_heads_result, 0);
+                                    while($row = mysqli_fetch_assoc($fee_heads_result)): 
+                                    ?>
+                                        <option value="<?php echo $row['fee_head_id']; ?>">
+                                            <?php echo htmlspecialchars($row['fee_head_name']); ?>
+                                            <?php if($row['description']): ?>
+                                                (<?php echo htmlspecialchars($row['description']); ?>)
+                                            <?php endif; ?>
+                                        </option>
+                                    <?php endwhile; ?>
+                                </select>
+                                <small class="text-muted">Select which fee head to charge</small>
+                            </div>
+                        </div>
+                        <div class="row">
                             <div class="col-md-6 mb-3">
                                 <label class="form-label">Payment Type <span class="text-danger">*</span></label>
                                 <select class="form-select" name="payment_type" id="payment_type" required onchange="toggleInstallments()">
@@ -356,7 +429,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['generate_fee'])) {
                             </div>
                         </div>
 
-                        <!-- Installment Options (Hidden by default) - MAX 3 INSTALLMENTS -->
+                        <!-- Installment Options -->
                         <div class="row" id="installment_options" style="display: none;">
                             <div class="col-md-6 mb-3">
                                 <label class="form-label">Number of Installments <span class="text-danger">*</span></label>
@@ -372,6 +445,41 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['generate_fee'])) {
                                     <strong>Installment Plan:</strong> Total fee will be divided into equal installments.
                                     <br>First installment due immediately, remaining monthly.
                                 </div>
+                            </div>
+                        </div>
+
+                        <!-- ===== PAYMENT DETAILS ===== -->
+                        <hr>
+                        <h5><i class="fas fa-money-bill-wave text-success"></i> Payment Details</h5>
+                        <p class="text-muted">Enter payment information (optional — can be done later from Payments module)</p>
+
+                        <div class="row">
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label">Amount Paying Now <span class="text-danger">*</span></label>
+                                <div class="input-group">
+                                    <span class="input-group-text">PKR</span>
+                                    <input type="number" 
+                                           class="form-control" 
+                                           name="amount_paid" 
+                                           placeholder="0.00" 
+                                           step="0.01" 
+                                           min="0"
+                                           value="0">
+                                </div>
+                                <small class="text-muted">Enter 0 if no payment now</small>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label">Payment Method</label>
+                                <select class="form-select" name="payment_method">
+                                    <option value="Cash">Cash</option>
+                                    <option value="Bank">Bank Transfer</option>
+                                    <option value="Card">Card</option>
+                                    <option value="Online">Online</option>
+                                </select>
+                            </div>
+                            <div class="col-md-4 mb-3">
+                                <label class="form-label">Transaction Reference</label>
+                                <input type="text" class="form-control" name="transaction_ref" placeholder="e.g. Txn-12345">
                             </div>
                         </div>
 
