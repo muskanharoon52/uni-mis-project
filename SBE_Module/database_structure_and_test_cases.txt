@@ -1,0 +1,372 @@
+SYSTEM BASED EXAMINATION (SBE) DATABASE STRUCTURE AND TEST CASES
+===============================================================
+
+Project Database
+----------------
+Database name: university_sbe
+Purpose: Store all SBE module data for the university ERP system.
+
+Database Structure Overview
+---------------------------
+The SBE database follows a layered structure:
+
+1. Authentication Layer
+	- auth_users
+	- Handles teacher and student logins.
+
+2. Question Layer
+	- question_bank
+	- Stores reusable MCQ content created by teachers.
+
+3. Exam Definition Layer
+	- exams
+	- Stores exam rules, timing, type, and settings.
+
+4. Scheduling Layer
+	- exam_schedule
+	- Stores class-based dates, times, and locations.
+
+5. Exam Composition Layer
+	- exam_questions
+	- Stores manual paper mappings only.
+
+6. Attempt Layer
+	- student_exams
+	- Stores each student attempt.
+
+7. Response Layer
+	- student_answers
+	- Stores question-level student responses.
+
+8. Result Layer
+	- exam_results
+	- Stores final published snapshot results.
+
+Relationship Structure
+----------------------
+auth_users
+	-> teacher or student login account
+
+question_bank
+	-> used by exams and exam_questions
+
+exams
+	-> parent table for exam_schedule and exam_questions
+
+exam_schedule
+	-> linked to exams and used by student_exams
+
+exam_questions
+	-> linked to exams and question_bank
+
+student_exams
+	-> linked to exam_schedule and exams
+
+student_answers
+	-> linked to student_exams and question_bank
+
+exam_results
+	-> linked to student_exams and exams
+
+Simple ERD Style View
+---------------------
+auth_users
+	|
+	+-- teacher login
+	+-- student login
+
+question_bank -----------+
+								  |
+								  v
+								exams ---------> exam_schedule ---------> student_exams ---------> student_answers
+								  |
+								  +------------> exam_questions --------> question_bank
+								  |
+								  +------------> exam_results
+
+Current Tables
+--------------
+1. auth_users
+2. question_bank
+3. exams
+4. exam_schedule
+5. exam_questions
+6. student_exams
+7. student_answers
+8. exam_results
+
+1) auth_users
+-------------
+Purpose:
+Stores application login accounts for teachers and students.
+
+Main Columns:
+- auth_id: Primary key
+- role: Identifies whether the user is a teacher or student
+- login_id: ID used for login
+- password_hash: Hashed password value
+- display_name: User name shown in the UI
+- status: active/inactive
+- created_at / updated_at: Timestamps
+
+Notes:
+- This table is local to SBE for now.
+- No foreign keys to SSO tables are used.
+- Teachers and students log in from this table.
+
+2) question_bank
+---------------
+Purpose:
+Stores reusable MCQ questions created by teachers.
+
+Main Columns:
+- question_id: Primary key
+- course_id: Course reference ID
+- teacher_id: Teacher reference ID
+- topic: Subject/topic/chapter name
+- question_text: MCQ text
+- option_a / option_b / option_c / option_d: Four answer choices
+- correct_option: A, B, C, or D
+- explanation: Optional answer explanation
+- marks: Marks for the question
+- difficulty_level: Easy / Medium / Hard
+- status: active/inactive
+- created_at / updated_at: Timestamps
+
+Notes:
+- Teachers can add, edit, or deactivate questions.
+- This table is used for manual exams and random exam generation.
+
+3) exams
+--------
+Purpose:
+Stores exam definitions created by teachers.
+
+Main Columns:
+- exam_id: Primary key
+- exam_code: Unique human-readable exam code
+- course_id: Course reference ID
+- teacher_id: Teacher reference ID
+- title: Exam title
+- exam_type: Quiz / Mid / Final / Practice / Assignment Test
+- instructions: Exam instructions
+- duration_minutes: Time allowed
+- total_questions: Number of questions
+- total_marks: Maximum marks
+- passing_marks: Passing score
+- selection_mode: manual / random
+- negative_marking: Negative mark value if used
+- shuffle_questions: 0 or 1
+- shuffle_options: 0 or 1
+- allow_review: 0 or 1
+- status: draft / published / closed / archived
+- created_at / updated_at: Timestamps
+
+Notes:
+- This is the exam definition layer only.
+- No class_id is stored here.
+- One exam can have multiple schedules.
+
+4) exam_schedule
+----------------
+Purpose:
+Stores class-specific exam scheduling information.
+
+Main Columns:
+- schedule_id: Primary key
+- exam_id: Local reference to exams
+- class_id: Class/section reference ID
+- exam_date: Exam date
+- start_time: Start time
+- end_time: End time
+- late_submission_grace_minutes: Optional grace period
+- location: Lab/room name
+- remarks: Optional notes
+- status: scheduled / ongoing / completed / cancelled
+- created_at / updated_at: Timestamps
+
+Notes:
+- One exam can have multiple schedules for different classes.
+- No foreign keys to SSO are used.
+- The same exam can run for BSCS-5A, BSCS-5B, BSSE-5A, etc.
+
+5) exam_questions
+-----------------
+Purpose:
+Stores manual exam question mapping.
+
+Main Columns:
+- exam_question_id: Primary key
+- exam_id: Exam reference
+- question_id: Question reference
+- question_order: Order of the question in the exam
+- created_at / updated_at: Timestamps
+
+Notes:
+- Used only when selection_mode = manual.
+- A unique constraint prevents duplicate question mapping.
+- Random exams do not store rows in this table.
+
+6) student_exams
+----------------
+Purpose:
+Stores each student's exam attempt.
+
+Main Columns:
+- student_exam_id: Primary key
+- schedule_id: Schedule reference
+- exam_id: Exam reference for fast reporting
+- student_id: Student ID
+- attempt_no: Attempt number
+- status: in_progress / submitted / auto_submitted / expired / cancelled
+- started_at: Start timestamp
+- expires_at: Auto-submit deadline
+- submitted_at: Submission timestamp
+- time_taken_seconds: Final elapsed time
+- obtained_marks: Score earned
+- percentage: Percentage score
+- pass_fail_status: pass / fail
+- created_at / updated_at: Timestamps
+
+Notes:
+- One row per student attempt.
+- Unique constraint on schedule_id + student_id + attempt_no.
+- Supports auto-submit and scoring snapshots.
+
+7) student_answers
+------------------
+Purpose:
+Stores each answer chosen by a student for each question in an attempt.
+
+Main Columns:
+- student_answer_id: Primary key
+- student_exam_id: Attempt reference
+- question_id: Question reference
+- question_order: Question order in the attempt
+- question_snapshot: JSON snapshot of the question shown to the student
+- selected_option: A, B, C, or D
+- answered_at: Answer time
+- is_correct: 0 or 1
+- marks_awarded: Marks earned for this answer
+- created_at / updated_at: Timestamps
+
+Notes:
+- One row per question per student attempt.
+- Unique constraint prevents duplicate answer rows.
+- Snapshot keeps the delivered question frozen for review.
+
+8) exam_results
+--------------
+Purpose:
+Stores the final published result snapshot.
+
+Main Columns:
+- exam_result_id: Primary key
+- student_exam_id: Attempt reference
+- exam_id: Exam reference
+- student_id: Student ID
+- obtained_marks: Final marks obtained
+- total_marks: Total marks for the exam
+- percentage: Final percentage
+- pass_fail_status: pass / fail
+- rank_position: Optional ranking
+- remarks: Optional result notes
+- status: draft / published / archived
+- published_at: Publication timestamp
+- created_at / updated_at: Timestamps
+
+Notes:
+- One result row per completed attempt.
+- Stored as a snapshot so history does not change when exam settings change.
+
+Database Relationship Summary
+-----------------------------
+- auth_users logs into the system.
+- Teachers manage question_bank and exams.
+- exams defines the exam.
+- exam_schedule assigns the exam to a class.
+- exam_questions stores manual exam composition.
+- student_exams stores each attempt.
+- student_answers stores the detailed question responses.
+- exam_results stores the final published result.
+
+Test Cases
+----------
+
+A. Authentication
+1. Teacher login succeeds with valid teacher ID and password.
+Expected: Teacher is redirected to teacher portal.
+
+2. Student login succeeds with valid student ID and password.
+Expected: Student is redirected to student portal.
+
+3. Invalid login credentials are used.
+Expected: Access denied message is shown.
+
+B. Question Bank
+4. Teacher adds a new question.
+Expected: Question is saved in question_bank.
+
+5. Teacher edits an existing question.
+Expected: Question record is updated.
+
+6. Teacher deactivates a question.
+Expected: Status changes from active to inactive.
+
+C. Exams
+7. Teacher creates a new exam.
+Expected: Exam is saved in exams.
+
+8. Teacher switches exam status from draft to published.
+Expected: Exam status updates correctly.
+
+9. Teacher uses manual selection mode.
+Expected: Questions can be mapped in exam_questions.
+
+D. Exam Schedule
+10. Teacher schedules the same exam for two classes.
+Expected: Two schedule rows are saved with different class_id values.
+
+11. Schedule end time is earlier than start time.
+Expected: Database rejects the record.
+
+E. Exam Questions
+12. Teacher adds the same question twice to the same exam.
+Expected: Unique constraint prevents duplicate mapping.
+
+13. Teacher assigns two questions with the same order in one exam.
+Expected: Unique constraint prevents duplicate question_order.
+
+F. Student Exams
+14. Student starts an exam.
+Expected: A row is created in student_exams with status in_progress.
+
+15. Student submits the exam.
+Expected: Status changes to submitted and submitted_at is saved.
+
+16. Auto-submit occurs after time expires.
+Expected: Status changes to auto_submitted.
+
+G. Student Answers
+17. Student answers a question.
+Expected: A row is saved in student_answers.
+
+18. Same question is inserted twice for the same attempt.
+Expected: Unique constraint blocks duplicate answer row.
+
+19. Question snapshot is stored.
+Expected: JSON snapshot contains the exact options shown to the student.
+
+H. Exam Results
+20. Final result is published.
+Expected: Row is inserted or updated in exam_results with status published.
+
+21. Result marks exceed total marks.
+Expected: Database check or application rule prevents invalid data.
+
+22. Result is archived.
+Expected: Status becomes archived and history remains preserved.
+
+End of Document
+---------------
+This document summarizes the current SBE database structure and the main functional test cases for the application.
