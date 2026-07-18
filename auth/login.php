@@ -4,11 +4,11 @@ include $_SERVER['DOCUMENT_ROOT'] . '/MIS/config/db_connect.php';
 
 $error = '';
 
-// If already logged in, redirect to dashboard
-if (isset($_SESSION['user_id'])) {
-    header('Location: ../finance/dashboard.php');
-    exit();
-}
+// // If already logged in, redirect to dashboard
+// if (isset($_SESSION['user_id'])) {
+//     header('Location: ../finance/dashboard.php');
+//     exit();
+// }
 
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $username = mysqli_real_escape_string($conn, $_POST['username']);
@@ -56,7 +56,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         body {
-            
             background: linear-gradient(135deg, #2c3e50, #3498db);
             height: 100vh;
             display: flex;

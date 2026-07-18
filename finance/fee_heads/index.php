@@ -4,7 +4,7 @@ if (!isset($_SESSION['user_id'])) {
     header('Location: ../auth/login.php');
     exit();
 }
-if ($_SESSION['role_id'] != 3) {
+if ($_SESSION['role_id'] != 3 && $_SESSION['role_id'] != 1) {
     header('Location: ../auth/login.php?error=Access denied. Finance Officer only.');
     exit();
 }

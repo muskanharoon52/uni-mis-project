@@ -4,14 +4,13 @@ if (!isset($_SESSION['user_id'])) {
     header('Location: ../auth/login.php');
     exit();
 }
-if ($_SESSION['role_id'] != 3) {
+if ($_SESSION['role_id'] != 3 && $_SESSION['role_id'] != 1) {
     header('Location: ../auth/login.php?error=Access denied. Finance Officer only.');
     exit();
 }
 
 include $_SERVER['DOCUMENT_ROOT'] . '/MIS/finance/includes/header.php';
 
-// Fetch all fee structures (read-only)
 $sql = "SELECT fs.*, 
         d.department_name, 
         s.session_name, 
@@ -23,20 +22,15 @@ $sql = "SELECT fs.*,
         WHERE fs.status = 'Active'
         ORDER BY fs.fee_structure_id DESC";
 $result = mysqli_query($conn, $sql);
-
-// Check if query failed
-if (!$result) {
-    $error = "Query failed: " . mysqli_error($conn);
-}
 ?>
 
 <div class="d-flex justify-content-between align-items-center mb-3">
     <h2><i class="fas fa-layer-group text-primary"></i> Fee Structures</h2>
-    <p class="text-muted">View pre-defined fee structures (Read-Only)</p>
+    <span class="badge bg-secondary"><i class="fas fa-lock"></i> Read-Only</span>
 </div>
 
-<?php if(isset($error)): ?>
-    <div class="alert alert-danger"><?php echo $error; ?></div>
+<?php if(isset($_GET['msg'])): ?>
+    <div class="alert alert-success"><?php echo htmlspecialchars($_GET['msg']); ?></div>
 <?php endif; ?>
 
 <div class="card shadow">
@@ -60,7 +54,7 @@ if (!$result) {
                 <tbody>
                     <?php 
                     $count = 1;
-                    if(isset($result) && mysqli_num_rows($result) > 0): 
+                    if(mysqli_num_rows($result) > 0): 
                         while($row = mysqli_fetch_assoc($result)): 
                     ?>
                     <tr>

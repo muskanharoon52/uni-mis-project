@@ -13,8 +13,8 @@ if (!isset($_SESSION['user_id'])) {
     exit();
 }
 
-// Check if user is Finance Officer (role_id = 3)
-if ($_SESSION['role_id'] != 3) {
+// Check if user is Finance Officer (role_id = 3) or Admin (role_id = 1)
+if ($_SESSION['role_id'] != 3 && $_SESSION['role_id'] != 1) {
     header('Location: ../auth/login.php?error=Access denied. Finance Officer only.');
     exit();
 }
@@ -22,7 +22,6 @@ if ($_SESSION['role_id'] != 3) {
 // Get current page name for active link
 $current_page = basename($_SERVER['PHP_SELF']);
 $current_folder = basename(dirname($_SERVER['PHP_SELF']));
-$base_path = $_SERVER['DOCUMENT_ROOT'] . '/MIS/finance';
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -33,7 +32,7 @@ $base_path = $_SERVER['DOCUMENT_ROOT'] . '/MIS/finance';
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
-        body { background: #f4f6f9; }
+        body { background: #f4f6f9; font-family: 'Segoe UI', sans-serif; }
         .sidebar {
             height: 100vh;
             background: #2c3e50;
@@ -42,6 +41,7 @@ $base_path = $_SERVER['DOCUMENT_ROOT'] . '/MIS/finance';
             position: fixed;
             width: 250px;
             overflow-y: auto;
+            z-index: 1000;
         }
         .sidebar .brand {
             text-align: center;
@@ -72,10 +72,7 @@ $base_path = $_SERVER['DOCUMENT_ROOT'] . '/MIS/finance';
             display: none;
         }
         .sidebar .sub-menu.show { display: block; }
-        .sidebar .sub-menu .nav-link {
-            padding: 8px 20px;
-            font-size: 0.85rem;
-        }
+        .sidebar .sub-menu .nav-link { padding: 8px 20px; font-size: 0.85rem; }
         .sidebar .logout-btn {
             background: #e74c3c;
             color: #fff;

@@ -4,14 +4,12 @@ if (!isset($_SESSION['user_id'])) {
     header('Location: ../auth/login.php');
     exit();
 }
-// Check if user is Finance Officer (role_id = 3)
-if ($_SESSION['role_id'] != 3) {
+if ($_SESSION['role_id'] != 3 && $_SESSION['role_id'] != 1) {
     header('Location: ../auth/login.php?error=Access denied. Finance Officer only.');
     exit();
 }
-// ... baaki code
+
 include $_SERVER['DOCUMENT_ROOT'] . '/MIS/finance/includes/header.php';
-include $_SERVER['DOCUMENT_ROOT'] . '/MIS/config/db_connect.php';
 
 $error = '';
 $success = '';
@@ -89,101 +87,106 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['receive_payment'])) {
     }
 }
 ?>
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Receive Payment</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-</head>
-<body>
-<div class="container mt-4">
-    <div class="row justify-content-center">
-        <div class="col-md-10">
-            <div class="card shadow">
-                <div class="card-header bg-success text-white">
-                    <h4><i class="fas fa-money-bill-wave"></i> Receive Payment</h4>
-                </div>
-                <div class="card-body">
-                    <?php if(!empty($error)): ?>
-                        <div class="alert alert-danger"><?php echo $error; ?></div>
-                    <?php endif; ?>
-                    <?php if(!empty($success)): ?>
-                        <div class="alert alert-success"><?php echo $success; ?></div>
-                    <?php endif; ?>
 
-                    <div class="card mb-4 bg-light">
-                        <div class="card-header bg-info text-white">
-                            <i class="fas fa-search"></i> Search Student with Pending Fee
-                        </div>
-                        <div class="card-body">
-                            <form method="GET" action="">
-                                <div class="input-group">
-                                    <input type="text" class="form-control" name="search" placeholder="Search by Student Name or Roll No..." value="<?php echo htmlspecialchars($search_term); ?>">
-                                    <button class="btn btn-primary" type="submit"><i class="fas fa-search"></i> Search</button>
-                                </div>
-                            </form>
-                            <?php if(isset($_GET['search']) && !empty($_GET['search']) && mysqli_num_rows($search_results) > 0): ?>
-                                <div class="mt-3">
-                                    <table class="table table-sm table-hover">
-                                        <thead><tr><th>Student</th><th>Roll No</th><th class="text-end">Remaining</th><th>Action</th></tr></thead>
-                                        <tbody>
-                                            <?php while($row = mysqli_fetch_assoc($search_results)): ?>
-                                            <tr>
-                                                <td><?php echo htmlspecialchars($row['full_name']); ?></td>
-                                                <td><?php echo htmlspecialchars($row['roll_no'] ?? 'N/A'); ?></td>
-                                                <td class="text-end">PKR <?php echo number_format($row['remaining_amount'], 2); ?></td>
-                                                <td><a href="add.php?fee_id=<?php echo $row['student_fee_id']; ?>" class="btn btn-sm btn-success">Select</a></td>
-                                            </tr>
-                                            <?php endwhile; ?>
-                                        </tbody>
-                                    </table>
-                                </div>
-                            <?php endif; ?>
-                        </div>
-                    </div>
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h2><i class="fas fa-money-bill-wave text-success"></i> Receive Payment</h2>
+    <a href="index.php" class="btn btn-secondary"><i class="fas fa-arrow-left"></i> Back to List</a>
+</div>
 
-                    <?php if($selected_fee): ?>
-                        <div class="alert alert-success">
-                            <h5><i class="fas fa-user-check"></i> Selected Student: <?php echo htmlspecialchars($selected_fee['full_name']); ?></h5>
-                            <p>Roll No: <?php echo htmlspecialchars($selected_fee['roll_no'] ?? 'N/A'); ?><br>
-                            Remaining: <strong>PKR <?php echo number_format($selected_fee['remaining_amount'], 2); ?></strong></p>
-                        </div>
-                        <form method="POST" action="">
-                            <input type="hidden" name="student_fee_id" value="<?php echo $selected_fee['student_fee_id']; ?>">
-                            <input type="hidden" name="student_id" value="<?php echo $selected_fee['student_id']; ?>">
-                            <div class="row">
-                                <div class="col-md-6 mb-3">
-                                    <label class="form-label">Amount to Pay</label>
-                                    <input type="number" class="form-control" name="amount_paid" placeholder="Enter amount" max="<?php echo $selected_fee['remaining_amount']; ?>" step="0.01" required>
-                                </div>
-                                <div class="col-md-6 mb-3">
-                                    <label class="form-label">Payment Method</label>
-                                    <select class="form-select" name="payment_method" required>
-                                        <option value="Cash">Cash</option>
-                                        <option value="Bank">Bank Transfer</option>
-                                        <option value="Card">Card</option>
-                                        <option value="Online">Online</option>
-                                    </select>
-                                </div>
-                            </div>
-                            <div class="row">
-                                <div class="col-md-6 mb-3">
-                                    <label class="form-label">Transaction Reference</label>
-                                    <input type="text" class="form-control" name="transaction_ref" placeholder="e.g. Txn-12345">
-                                </div>
-                            </div>
-                            <button type="submit" name="receive_payment" class="btn btn-success">Receive Payment</button>
-                            <a href="add.php" class="btn btn-secondary">Cancel</a>
-                        </form>
-                    <?php endif; ?>
-                </div>
+<?php if(!empty($error)): ?>
+    <div class="alert alert-danger"><?php echo $error; ?></div>
+<?php endif; ?>
+
+<?php if(!empty($success)): ?>
+    <div class="alert alert-success"><?php echo $success; ?></div>
+<?php endif; ?>
+
+<!-- SEARCH SECTION -->
+<div class="card mb-4">
+    <div class="card-header bg-info text-white">
+        <i class="fas fa-search"></i> Search Student with Pending Fee
+    </div>
+    <div class="card-body">
+        <form method="GET" action="">
+            <div class="input-group">
+                <input type="text" class="form-control" name="search" 
+                       placeholder="Search by Student Name or Roll No..." 
+                       value="<?php echo htmlspecialchars($search_term); ?>">
+                <button class="btn btn-primary" type="submit"><i class="fas fa-search"></i> Search</button>
+                <?php if(isset($_GET['search']) && !empty($_GET['search'])): ?>
+                    <a href="add.php" class="btn btn-secondary"><i class="fas fa-times"></i> Clear</a>
+                <?php endif; ?>
             </div>
-        </div>
+        </form>
+
+        <?php if(isset($_GET['search']) && !empty($_GET['search']) && mysqli_num_rows($search_results) > 0): ?>
+            <div class="mt-3">
+                <table class="table table-sm table-hover">
+                    <thead class="table-light">
+                        <tr><th>Student</th><th>Roll No</th><th class="text-end">Remaining</th><th>Action</th></tr>
+                    </thead>
+                    <tbody>
+                        <?php while($row = mysqli_fetch_assoc($search_results)): ?>
+                        <tr>
+                            <td><?php echo htmlspecialchars($row['full_name']); ?></td>
+                            <td><?php echo htmlspecialchars($row['roll_no'] ?? 'N/A'); ?></td>
+                            <td class="text-end">PKR <?php echo number_format($row['remaining_amount'], 2); ?></td>
+                            <td><a href="add.php?fee_id=<?php echo $row['student_fee_id']; ?>" class="btn btn-sm btn-success">Select</a></td>
+                        </tr>
+                        <?php endwhile; ?>
+                    </tbody>
+                </table>
+            </div>
+        <?php endif; ?>
     </div>
 </div>
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-</body>
-</html>
+
+<!-- SELECTED STUDENT & PAYMENT FORM -->
+<?php if($selected_fee): ?>
+    <div class="alert alert-success">
+        <h5><i class="fas fa-user-check"></i> Selected Student</h5>
+        <p>
+            <strong>Name:</strong> <?php echo htmlspecialchars($selected_fee['full_name']); ?><br>
+            <strong>Roll No:</strong> <?php echo htmlspecialchars($selected_fee['roll_no'] ?? 'N/A'); ?><br>
+            <strong>Remaining:</strong> <strong>PKR <?php echo number_format($selected_fee['remaining_amount'], 2); ?></strong>
+        </p>
+        <a href="add.php" class="btn btn-light btn-sm"><i class="fas fa-times"></i> Clear Selection</a>
+    </div>
+
+    <form method="POST" action="">
+        <input type="hidden" name="student_fee_id" value="<?php echo $selected_fee['student_fee_id']; ?>">
+        <input type="hidden" name="student_id" value="<?php echo $selected_fee['student_id']; ?>">
+
+        <div class="row">
+            <div class="col-md-4 mb-3">
+                <label class="form-label">Amount to Pay <span class="text-danger">*</span></label>
+                <input type="number" class="form-control" name="amount_paid" placeholder="Enter amount" 
+                       max="<?php echo $selected_fee['remaining_amount']; ?>" step="0.01" required>
+            </div>
+            <div class="col-md-4 mb-3">
+                <label class="form-label">Payment Method <span class="text-danger">*</span></label>
+                <select class="form-select" name="payment_method" required>
+                    <option value="Cash">Cash</option>
+                    <option value="Bank">Bank Transfer</option>
+                    <option value="Card">Card</option>
+                    <option value="Online">Online</option>
+                </select>
+            </div>
+            <div class="col-md-4 mb-3">
+                <label class="form-label">Transaction Reference</label>
+                <input type="text" class="form-control" name="transaction_ref" placeholder="e.g. Txn-12345">
+            </div>
+        </div>
+
+        <button type="submit" name="receive_payment" class="btn btn-success"><i class="fas fa-check-circle"></i> Receive Payment</button>
+        <a href="add.php" class="btn btn-secondary"><i class="fas fa-times"></i> Cancel</a>
+    </form>
+<?php endif; ?>
+
+<?php if(!$selected_fee && !isset($_GET['search'])): ?>
+    <div class="alert alert-info">
+        <i class="fas fa-info-circle"></i> Use the search box above to find a student with pending fee.
+    </div>
+<?php endif; ?>
+
+<?php include $_SERVER['DOCUMENT_ROOT'] . '/MIS/finance/includes/footer.php'; ?>

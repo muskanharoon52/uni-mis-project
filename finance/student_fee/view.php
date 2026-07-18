@@ -4,23 +4,20 @@ if (!isset($_SESSION['user_id'])) {
     header('Location: ../auth/login.php');
     exit();
 }
-if ($_SESSION['role_id'] != 3) {
+if ($_SESSION['role_id'] != 3 && $_SESSION['role_id'] != 1) {
     header('Location: ../auth/login.php?error=Access denied. Finance Officer only.');
     exit();
 }
 
 include $_SERVER['DOCUMENT_ROOT'] . '/MIS/finance/includes/header.php';
 
-// Check if ID is provided
 if (!isset($_GET['id']) || empty($_GET['id'])) {
-    // Redirect to index with error
     echo '<script>window.location.href="index.php?error=Invalid fee record ID";</script>';
     exit();
 }
 
 $student_fee_id = mysqli_real_escape_string($conn, $_GET['id']);
 
-// Fetch main fee record
 $sql = "SELECT 
         sf.student_fee_id,
         sf.total_amount,
@@ -52,7 +49,6 @@ if (mysqli_num_rows($result) == 0) {
 
 $fee = mysqli_fetch_assoc($result);
 
-// Fetch fee details (head-wise breakdown)
 $detail_sql = "SELECT 
                fh.fee_head_name,
                sfd.amount,
@@ -69,14 +65,6 @@ $detail_result = mysqli_query($conn, $detail_sql);
     <a href="index.php" class="btn btn-secondary"><i class="fas fa-arrow-left"></i> Back to List</a>
 </div>
 
-<?php if(isset($_GET['msg'])): ?>
-    <div class="alert alert-success"><?php echo htmlspecialchars($_GET['msg']); ?></div>
-<?php endif; ?>
-
-<?php if(isset($_GET['error'])): ?>
-    <div class="alert alert-danger"><?php echo htmlspecialchars($_GET['error']); ?></div>
-<?php endif; ?>
-
 <!-- Student Info -->
 <div class="row">
     <div class="col-md-6">
@@ -92,14 +80,11 @@ $detail_result = mysqli_query($conn, $detail_sql);
                     <tr><th>Program</th><td><?php echo htmlspecialchars($fee['department_name']); ?></td></tr>
                     <tr><th>Semester</th><td><?php echo htmlspecialchars($fee['semester_name']); ?></td></tr>
                     <tr><th>Session</th><td><?php echo htmlspecialchars($fee['session_name']); ?></td></tr>
-                    <tr><th>Email</th><td><?php echo htmlspecialchars($fee['email'] ?? 'N/A'); ?></td></tr>
-                    <tr><th>Contact</th><td><?php echo htmlspecialchars($fee['contact_no'] ?? 'N/A'); ?></td></tr>
                 </table>
             </div>
         </div>
     </div>
 
-    <!-- Fee Summary -->
     <div class="col-md-6">
         <div class="card shadow mb-4">
             <div class="card-header bg-info text-white">
