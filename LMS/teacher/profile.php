@@ -1,0 +1,60 @@
+<?php
+
+declare(strict_types=1);
+
+require_once __DIR__ . '/../includes/auth.php';
+
+$user = require_role('teacher');
+$active = 'profile';
+$pageTitle = 'Profile';
+$message = '';
+$error = '';
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    try {
+        verify_csrf();
+        $photoPath = save_uploaded_file('profile_photo', 'profiles', ['jpg', 'jpeg', 'png', 'webp']);
+        $stmt = db()->prepare(
+            'UPDATE users
+             SET name = ?, department = ?, profile_photo = COALESCE(?, profile_photo)
+             WHERE id = ?'
+        );
+        $stmt->execute([
+            trim((string) ($_POST['name'] ?? '')),
+            trim((string) ($_POST['department'] ?? '')),
+            $photoPath,
+            $user['id'],
+        ]);
+        $message = 'Profile updated.';
+        $user = current_user() ?: $user;
+    } catch (RuntimeException $exception) {
+        $error = $exception->getMessage();
+    }
+}
+
+require_once __DIR__ . '/../includes/header.php';
+?>
+<?php if ($message): ?><div class="alert alert-success"><?= e($message) ?></div><?php endif; ?>
+<?php if ($error): ?><div class="alert alert-error"><?= e($error) ?></div><?php endif; ?>
+<form class="profile-form" method="post" enctype="multipart/form-data">
+    <?= csrf_field() ?>
+    <div class="profile-preview">
+        <?php if ($user['profile_photo']): ?>
+            <img class="profile-photo" src="<?= app_url($user['profile_photo']) ?>" alt="">
+        <?php else: ?>
+            <div class="student-avatar"><?= e(strtoupper(substr((string) $user['name'], 0, 1))) ?></div>
+        <?php endif; ?>
+        <label for="profile_photo">Profile Picture</label>
+        <input id="profile_photo" name="profile_photo" type="file" accept=".jpg,.jpeg,.png,.webp">
+    </div>
+    <div class="card">
+        <label for="name">Name</label>
+        <input id="name" name="name" value="<?= e($user['name']) ?>" required>
+        <label for="email">Email</label>
+        <input id="email" value="<?= e($user['email']) ?>" disabled>
+        <label for="department">Department</label>
+        <input id="department" name="department" value="<?= e((string) $user['department']) ?>">
+        <button class="btn btn-primary" type="submit">Save Profile</button>
+    </div>
+</form>
+<?php require_once __DIR__ . '/../includes/footer.php'; ?>
