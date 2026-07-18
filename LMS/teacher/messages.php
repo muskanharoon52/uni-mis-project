@@ -73,20 +73,13 @@ $messages = $messagesStmt->fetchAll();
 
 require_once __DIR__ . '/../includes/header.php';
 ?>
-<div class="page-head">
-    <div>
-        <h1>Messages</h1>
-        <p class="muted">Send short notes to students and let them appear in the header inbox.</p>
-    </div>
-</div>
+<?php if ($message): ?><div class="alert alert-success"><?= e($message) ?></div><?php endif; ?>
+<?php if ($error): ?><div class="alert alert-error"><?= e($error) ?></div><?php endif; ?>
 
-<?php if ($message): ?><div class="alert success"><?= e($message) ?></div><?php endif; ?>
-<?php if ($error): ?><div class="alert error"><?= e($error) ?></div><?php endif; ?>
-
-<section class="grid">
+<section class="grid-2">
     <form class="card" method="post">
         <?= csrf_field() ?>
-        <h2>Compose Message</h2>
+        <h3>Compose Message</h3>
         <label for="scope">Recipients</label>
         <select id="scope" name="scope">
             <option value="all">All my students</option>
@@ -103,11 +96,12 @@ require_once __DIR__ . '/../includes/header.php';
         <input id="subject" name="subject" maxlength="160" required>
         <label for="body">Message</label>
         <textarea id="body" name="body" placeholder="Write a concise message for your students." required></textarea>
-        <button class="btn" type="submit">Send Message</button>
+        <button class="btn btn-primary" type="submit">Send Message</button>
     </form>
 
-    <div class="table-card">
-        <h2>Recent Messages</h2>
+    <div class="card">
+        <div class="card-header"><h3>Recent Messages</h3></div>
+        <div class="table-responsive">
         <table>
             <tr>
                 <th>Subject</th>
@@ -128,7 +122,8 @@ require_once __DIR__ . '/../includes/header.php';
                     <td colspan="4" class="muted">No messages sent yet.</td>
                 </tr>
             <?php endif; ?>
-        </table>
+            </table>
+        </div>
     </div>
 </section>
 <?php require_once __DIR__ . '/../includes/footer.php'; ?>

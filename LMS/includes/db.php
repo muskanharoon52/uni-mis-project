@@ -28,7 +28,10 @@ function db(): PDO
         PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
     ]);
 
-    initialize_database($pdo);
+    $tableCount = (int) $pdo->query("SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = '" . DB_NAME . "' AND TABLE_NAME = 'users'")->fetchColumn();
+    if ($tableCount === 0) {
+        initialize_database($pdo);
+    }
 
     return $pdo;
 }
@@ -38,6 +41,7 @@ function initialize_database(PDO $pdo): void
     $pdo->exec(
         "CREATE TABLE IF NOT EXISTS users (
             id INT AUTO_INCREMENT PRIMARY KEY,
+            login_id VARCHAR(20) NOT NULL UNIQUE,
             name VARCHAR(120) NOT NULL,
             email VARCHAR(160) NOT NULL UNIQUE,
             password_hash VARCHAR(255) NOT NULL,
@@ -48,7 +52,9 @@ function initialize_database(PDO $pdo): void
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         ) ENGINE=InnoDB"
     );
+    ensure_column($pdo, 'users', 'login_id', "VARCHAR(20) NOT NULL DEFAULT ''");
     ensure_column($pdo, 'users', 'profile_photo', 'VARCHAR(255) NULL');
+    $pdo->exec("UPDATE users SET login_id = CASE role WHEN 'teacher' THEN CONCAT('5', LPAD(id, 3, '0')) WHEN 'student' THEN CONCAT('9', LPAD(id - 1, 3, '0')) END WHERE login_id = '' OR login_id IS NULL");
 
     $pdo->exec(
         "CREATE TABLE IF NOT EXISTS courses (
@@ -249,30 +255,35 @@ function seed_database(PDO $pdo): void
         return;
     }
 
-    $password = password_hash('password123', PASSWORD_DEFAULT);
+    $password = password_hash('teacher123', PASSWORD_DEFAULT);
+    $studentPassword = password_hash('student123', PASSWORD_DEFAULT);
 
-    $insertUser = $pdo->prepare(
-        'INSERT INTO users (name, email, password_hash, role, department, program) VALUES (?, ?, ?, ?, ?, ?)'
+    $insertTeacher = $pdo->prepare(
+        'INSERT INTO users (login_id, name, email, password_hash, role, department, program) VALUES (?, ?, ?, ?, ?, ?, ?)'
     );
-    $insertUser->execute(['Dr. Sara Khan', 'teacher@lms.test', $password, 'teacher', 'Computer Science', null]);
+    $insertTeacher->execute(['5001', 'Dr. Sara Khan', 'teacher@lms.test', $password, 'teacher', 'Computer Science', null]);
     $teacherId = (int) $pdo->lastInsertId();
+    $insertTeacher->execute(['5002', 'Dr. Ahmed Ali', 'teacher2@lms.test', $password, 'teacher', 'Computer Science', null]);
 
+    $insertStudent = $pdo->prepare(
+        'INSERT INTO users (login_id, name, email, password_hash, role, department, program) VALUES (?, ?, ?, ?, ?, ?, ?)'
+    );
     $students = [
-        ['Ali Raza', 'student@lms.test', 'BS Software Engineering'],
-        ['Amina Noor', 'amina.noor@lms.test', 'BS Software Engineering'],
-        ['Bilal Ahmed', 'bilal.ahmed@lms.test', 'BS Information Technology'],
-        ['Hira Khan', 'hira.khan@lms.test', 'BS Computer Science'],
-        ['Hassan Ali', 'hassan.ali@lms.test', 'BS Software Engineering'],
-        ['Maryam Iqbal', 'maryam.iqbal@lms.test', 'BS Data Science'],
-        ['Usman Tariq', 'usman.tariq@lms.test', 'BS Computer Science'],
-        ['Sana Raza', 'sana.raza@lms.test', 'BS Information Technology'],
-        ['Zain Malik', 'zain.malik@lms.test', 'BS Software Engineering'],
-        ['Iqra Javed', 'iqra.javed@lms.test', 'BS Data Science'],
+        ['9001', 'Ali Raza', 'student@lms.test', 'BS Software Engineering'],
+        ['9002', 'Amina Noor', 'amina.noor@lms.test', 'BS Software Engineering'],
+        ['9003', 'Bilal Ahmed', 'bilal.ahmed@lms.test', 'BS Information Technology'],
+        ['9004', 'Hira Khan', 'hira.khan@lms.test', 'BS Computer Science'],
+        ['9005', 'Hassan Ali', 'hassan.ali@lms.test', 'BS Software Engineering'],
+        ['9006', 'Maryam Iqbal', 'maryam.iqbal@lms.test', 'BS Data Science'],
+        ['9007', 'Usman Tariq', 'usman.tariq@lms.test', 'BS Computer Science'],
+        ['9008', 'Sana Raza', 'sana.raza@lms.test', 'BS Information Technology'],
+        ['9009', 'Zain Malik', 'zain.malik@lms.test', 'BS Software Engineering'],
+        ['9010', 'Iqra Javed', 'iqra.javed@lms.test', 'BS Data Science'],
     ];
 
     $studentIds = [];
-    foreach ($students as [$name, $email, $program]) {
-        $insertUser->execute([$name, $email, $password, 'student', 'Computer Science', $program]);
+    foreach ($students as [$loginId, $name, $email, $program]) {
+        $insertStudent->execute([$loginId, $name, $email, $studentPassword, 'student', 'Computer Science', $program]);
         $studentIds[] = (int) $pdo->lastInsertId();
     }
 

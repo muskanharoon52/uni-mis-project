@@ -79,18 +79,11 @@ $initials = strtoupper(substr((string) $user['name'], 0, 2));
 require_once __DIR__ . '/../includes/header.php';
 ?>
 
-<div class="page-head">
-    <div>
-        <h1>Settings</h1>
-        <p class="muted">Manage your faculty profile, account security, and preferences.</p>
-    </div>
-</div>
-
 <?php if ($message): ?>
-    <div class="alert success"><?= e($message) ?></div>
+    <div class="alert alert-success"><?= e($message) ?></div>
 <?php endif; ?>
 <?php if ($error): ?>
-    <div class="alert error"><?= e($error) ?></div>
+    <div class="alert alert-error"><?= e($error) ?></div>
 <?php endif; ?>
 
 <div class="settings-layout">
@@ -127,7 +120,7 @@ require_once __DIR__ . '/../includes/header.php';
             </div>
             <div class="settings-meta-row">
                 <span class="settings-meta-key">Role</span>
-                <span class="settings-meta-val"><span class="badge approved"><?= e(ucfirst($user['role'])) ?></span></span>
+                <span class="settings-meta-val"><span class="badge badge-active"><?= e(ucfirst($user['role'])) ?></span></span>
             </div>
             <div class="settings-meta-row">
                 <span class="settings-meta-key">Member since</span>
@@ -190,7 +183,7 @@ require_once __DIR__ . '/../includes/header.php';
                 </div>
 
                 <div class="settings-form-footer">
-                    <button class="btn" type="submit">Save Profile Changes</button>
+                    <button class="btn btn-primary" type="submit">Save Profile Changes</button>
                 </div>
             </form>
         </div>
@@ -227,7 +220,7 @@ require_once __DIR__ . '/../includes/header.php';
                 </div>
 
                 <div class="settings-form-footer">
-                    <button class="btn" type="submit">Update Password</button>
+                    <button class="btn btn-primary" type="submit">Update Password</button>
                     <p class="settings-security-tip">
                         <svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
                         After updating your password you'll remain logged in on this device.

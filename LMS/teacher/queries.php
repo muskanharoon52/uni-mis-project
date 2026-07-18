@@ -51,28 +51,29 @@ $queries = $queriesStmt->fetchAll();
 
 require_once __DIR__ . '/../includes/header.php';
 ?>
-<div class="page-head"><h1>Student Queries</h1></div>
-<?php if ($message): ?><div class="alert success"><?= e($message) ?></div><?php endif; ?>
-<?php if ($error): ?><div class="alert error"><?= e($error) ?></div><?php endif; ?>
-<div class="table-card">
-    <table>
-        <tr><th>Student</th><th>Subject</th><th>Message</th><th>Status</th><th>Reply</th></tr>
-        <?php foreach ($queries as $query): ?>
-            <tr>
-                <td><?= e($query['name']) ?><br><span class="muted"><?= e($query['email']) ?></span></td>
-                <td><?= e($query['subject']) ?></td>
-                <td><?= e($query['message']) ?></td>
-                <td><span class="badge <?= e($query['status']) ?>"><?= e($query['status']) ?></span></td>
+<?php if ($message): ?><div class="alert alert-success"><?= e($message) ?></div><?php endif; ?>
+<?php if ($error): ?><div class="alert alert-error"><?= e($error) ?></div><?php endif; ?>
+<div class="card">
+    <div class="card-header"><h3>Student Queries</h3></div>
+    <div class="table-responsive">
+        <table>
+            <tr><th>Student</th><th>Subject</th><th>Message</th><th>Status</th><th>Reply</th></tr>
+            <?php foreach ($queries as $query): ?>
+                <tr>
+                    <td><?= e($query['name']) ?><br><span class="muted"><?= e($query['email']) ?></span></td>
+                    <td><?= e($query['subject']) ?></td>
+                    <td><?= e($query['message']) ?></td>
+                    <td><span class="badge badge-<?= $query['status'] === 'answered' ? 'active' : 'draft' ?>"><?= e($query['status']) ?></span></td>
                 <td>
                     <form method="post">
                         <?= csrf_field() ?>
                         <input type="hidden" name="query_id" value="<?= (int) $query['id'] ?>">
                         <textarea name="reply"><?= e($query['reply']) ?></textarea>
-                        <button class="btn" type="submit">Reply</button>
+                        <button class="btn btn-primary btn-sm" type="submit">Reply</button>
                     </form>
                 </td>
             </tr>
         <?php endforeach; ?>
-    </table>
+    </div>
 </div>
 <?php require_once __DIR__ . '/../includes/footer.php'; ?>

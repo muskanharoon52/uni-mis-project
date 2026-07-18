@@ -59,13 +59,12 @@ $assignments = $assignmentsStmt->fetchAll();
 
 require_once __DIR__ . '/../includes/header.php';
 ?>
-<div class="page-head"><h1>Assignments</h1></div>
-<?php if ($message): ?><div class="alert success"><?= e($message) ?></div><?php endif; ?>
-<?php if ($error): ?><div class="alert error"><?= e($error) ?></div><?php endif; ?>
-<section class="grid">
+<?php if ($message): ?><div class="alert alert-success"><?= e($message) ?></div><?php endif; ?>
+<?php if ($error): ?><div class="alert alert-error"><?= e($error) ?></div><?php endif; ?>
+<section class="grid-2">
     <form class="card" method="post" enctype="multipart/form-data">
         <?= csrf_field() ?>
-        <h2>Create Assignment</h2>
+        <h3>Create Assignment</h3>
         <label for="course_id">Course</label>
         <select id="course_id" name="course_id" required>
             <?php foreach ($courses as $course): ?><option value="<?= (int) $course['id'] ?>"><?= e($course['code'] . ' - ' . $course['title']) ?></option><?php endforeach; ?>
@@ -78,10 +77,11 @@ require_once __DIR__ . '/../includes/header.php';
         <input id="assignment_file" name="assignment_file" type="file" accept=".pdf,.doc,.docx,.zip">
         <label for="due_date">Due Date</label>
         <input id="due_date" name="due_date" type="date" required>
-        <button class="btn" type="submit">Create</button>
+        <button class="btn btn-primary" type="submit">Create</button>
     </form>
-    <div class="table-card">
-        <h2>Assignment List</h2>
+    <div class="card">
+        <div class="card-header"><h3>Assignment List</h3></div>
+        <div class="table-responsive">
         <table>
             <tr><th>Course</th><th>Title</th><th>Submissions</th><th>Ungraded</th><th>File</th><th>Due</th></tr>
             <?php foreach ($assignments as $assignment): ?>
@@ -99,7 +99,8 @@ require_once __DIR__ . '/../includes/header.php';
             <?php if (!$assignments): ?>
                 <tr><td colspan="6" class="muted text-center">No assignments created yet.</td></tr>
             <?php endif; ?>
-        </table>
+            </table>
+        </div>
     </div>
 </section>
 <?php require_once __DIR__ . '/../includes/footer.php'; ?>

@@ -17,14 +17,13 @@ $balance = $totalAmount - $paidAmount;
 
 require_once __DIR__ . '/../includes/header.php';
 ?>
-<div class="page-head"><h1>Fees</h1></div>
-<section class="grid">
-    <div class="card"><h2>Total Fee</h2><div class="stat">PKR <?= number_format($totalAmount) ?></div></div>
-    <div class="card"><h2>Balance</h2><div class="stat">PKR <?= number_format($balance) ?></div><p><span class="badge <?= $balance <= 0 ? 'approved' : 'pending' ?>"><?= $balance <= 0 ? 'Cleared' : 'Pending' ?></span></p></div>
-</section>
-<section class="dashboard-section">
-    <header>Fee Record</header>
-    <div class="table-card compact-table">
+<div class="stat-row">
+    <div class="stat-card-v2"><div class="stat-label">Total Fee</div><div class="stat-number">PKR <?= number_format($totalAmount) ?></div></div>
+    <div class="stat-card-v2"><div class="stat-label">Balance</div><div class="stat-number <?= $balance > 0 ? 'warning-text' : 'success-text' ?>">PKR <?= number_format($balance) ?></div><div class="stat-hint"><span class="badge badge-<?= $balance <= 0 ? 'active' : 'draft' ?>"><?= $balance <= 0 ? 'Cleared' : 'Pending' ?></span></div></div>
+</div>
+<div class="card">
+    <div class="card-header"><h3>Fee Records</h3></div>
+    <div class="table-responsive">
         <table>
             <tr><th>Semester</th><th>Description</th><th>Amount</th><th>Paid</th><th>Due Date</th><th>Status</th></tr>
             <?php foreach ($feeRows as $fee): ?>
@@ -34,10 +33,10 @@ require_once __DIR__ . '/../includes/header.php';
                     <td>PKR <?= number_format((float) $fee['amount']) ?></td>
                     <td>PKR <?= number_format((float) $fee['paid_amount']) ?></td>
                     <td><?= e($fee['due_date']) ?></td>
-                    <td><span class="mini-badge <?= $fee['status'] === 'paid' ? 'green' : 'yellow' ?>"><?= e($fee['status']) ?></span></td>
+                    <td><span class="badge badge-<?= $fee['status'] === 'paid' ? 'active' : 'draft' ?>"><?= e($fee['status']) ?></span></td>
                 </tr>
             <?php endforeach; ?>
         </table>
     </div>
-</section>
+</div>
 <?php require_once __DIR__ . '/../includes/footer.php'; ?>

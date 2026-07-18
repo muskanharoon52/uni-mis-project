@@ -5,7 +5,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/../includes/auth.php';
 
 $user = require_role('teacher');
-$active = 'marks';
+$active = 'internal_marks';
 $pageTitle = 'Internal Marks';
 $message = '';
 $error = '';
@@ -29,7 +29,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         if ($action === 'finalize') {
             [$courseId, $studentId] = array_map('intval', explode(':', (string) $_POST['finalize_row']));
-            if (!teacher_can_access_student_course((int) $user['id'], $studentId, $courseId)) {
+                    if (!teacher_owns_course((int) $user['id'], $courseId)) {
                 throw new RuntimeException('You cannot finalize this marks row.');
             }
             $stmt = db()->prepare(
@@ -50,7 +50,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 foreach ($courseRows as $courseId => $componentValues) {
                     $studentId = (int) $studentId;
                     $courseId = (int) $courseId;
-                    if (!teacher_can_access_student_course((int) $user['id'], $studentId, $courseId)) {
+            if (!teacher_owns_course((int) $user['id'], $courseId)) {
                         continue;
                     }
                     $finalizedStmt = db()->prepare('SELECT COUNT(*) FROM mark_finalizations WHERE course_id = ? AND student_id = ? AND is_finalized = 1');
@@ -80,16 +80,12 @@ $rows = internal_mark_rows_for_teacher((int) $user['id']);
 
 require_once __DIR__ . '/../includes/header.php';
 ?>
-<div class="page-head">
-    <div>
-        <h1>Internal Marks - 2026 Spring</h1>
-        <p class="muted">Edit marks in table form, then finalize each student course record.</p>
-    </div>
-</div>
-<?php if ($message): ?><div class="alert success"><?= e($message) ?></div><?php endif; ?>
-<?php if ($error): ?><div class="alert error"><?= e($error) ?></div><?php endif; ?>
+<?php if ($message): ?><div class="alert alert-success"><?= e($message) ?></div><?php endif; ?>
+<?php if ($error): ?><div class="alert alert-error"><?= e($error) ?></div><?php endif; ?>
 
-<div class="table-card compact-table">
+<div class="card">
+    <div class="card-header"><h3>Internal Marks — Spring 2026</h3></div>
+    <div class="table-responsive">
     <form method="post">
         <?= csrf_field() ?>
         <input type="hidden" name="action" value="save_marks">
@@ -130,10 +126,10 @@ require_once __DIR__ . '/../includes/header.php';
                         </td>
                     <?php endforeach; ?>
                     <td><?= e((string) internal_mark_total($row)) ?></td>
-                    <td><span class="mini-badge <?= $row['is_finalized'] ? 'red' : 'green' ?>"><?= $row['is_finalized'] ? 'Finalized' : 'Not Finalized' ?></span></td>
+                    <td><span class="badge <?= $row['is_finalized'] ? 'badge-inactive' : 'badge-active' ?>"><?= $row['is_finalized'] ? 'Finalized' : 'Not Finalized' ?></span></td>
                     <td>
                         <?php if (!$row['is_finalized']): ?>
-                            <button class="btn secondary" type="submit" name="finalize_row" value="<?= (int) $row['course_id'] ?>:<?= (int) $row['student_id'] ?>">Finalize</button>
+                            <button class="btn btn-outline btn-sm" type="submit" name="finalize_row" value="<?= (int) $row['course_id'] ?>:<?= (int) $row['student_id'] ?>">Finalize</button>
                         <?php else: ?>
                             <span class="muted">Done</span>
                         <?php endif; ?>
@@ -141,7 +137,8 @@ require_once __DIR__ . '/../includes/header.php';
                 </tr>
             <?php endforeach; ?>
         </table>
-        <button class="btn" type="submit">Save Marks</button>
+        <button class="btn btn-primary" type="submit">Save Marks</button>
     </form>
+    </div>
 </div>
 <?php require_once __DIR__ . '/../includes/footer.php'; ?>

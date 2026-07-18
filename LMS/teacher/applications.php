@@ -31,18 +31,19 @@ $applications = db()->query(
 
 require_once __DIR__ . '/../includes/header.php';
 ?>
-<div class="page-head"><h1>Applications</h1></div>
-<?php if ($message): ?><div class="alert success"><?= e($message) ?></div><?php endif; ?>
-<?php if ($error): ?><div class="alert error"><?= e($error) ?></div><?php endif; ?>
-<div class="table-card">
-    <table>
-        <tr><th>Student</th><th>Type</th><th>Details</th><th>Status</th><th>Action</th></tr>
-        <?php foreach ($applications as $application): ?>
-            <tr>
-                <td><?= e($application['name']) ?><br><span class="muted"><?= e($application['email']) ?></span></td>
-                <td><?= e($application['type']) ?></td>
-                <td><?= e($application['details']) ?></td>
-                <td><span class="badge <?= e($application['status']) ?>"><?= e($application['status']) ?></span></td>
+<?php if ($message): ?><div class="alert alert-success"><?= e($message) ?></div><?php endif; ?>
+<?php if ($error): ?><div class="alert alert-error"><?= e($error) ?></div><?php endif; ?>
+<div class="card">
+    <div class="card-header"><h3>Applications</h3></div>
+    <div class="table-responsive">
+        <table>
+            <tr><th>Student</th><th>Type</th><th>Details</th><th>Status</th><th>Action</th></tr>
+            <?php foreach ($applications as $application): ?>
+                <tr>
+                    <td><?= e($application['name']) ?><br><span class="muted"><?= e($application['email']) ?></span></td>
+                    <td><?= e($application['type']) ?></td>
+                    <td><?= e($application['details']) ?></td>
+                    <td><span class="badge badge-<?= $application['status'] === 'approved' ? 'active' : ($application['status'] === 'rejected' ? 'inactive' : 'draft') ?>"><?= e($application['status']) ?></span></td>
                 <td>
                     <form method="post">
                         <?= csrf_field() ?>
@@ -52,11 +53,11 @@ require_once __DIR__ . '/../includes/header.php';
                             <option value="approved" <?= $application['status'] === 'approved' ? 'selected' : '' ?>>Approved</option>
                             <option value="rejected" <?= $application['status'] === 'rejected' ? 'selected' : '' ?>>Rejected</option>
                         </select>
-                        <button class="btn" type="submit">Update</button>
+                        <button class="btn btn-primary btn-sm" type="submit">Update</button>
                     </form>
                 </td>
             </tr>
         <?php endforeach; ?>
-    </table>
+    </div>
 </div>
 <?php require_once __DIR__ . '/../includes/footer.php'; ?>

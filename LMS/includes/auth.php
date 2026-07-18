@@ -10,15 +10,30 @@ if (session_status() === PHP_SESSION_NONE) {
 
 function current_user(): ?array
 {
-    if (empty($_SESSION['user_id'])) {
-        return null;
+    return $_SESSION['auth_user'] ?? null;
+}
+
+function auth_login(array $user): void
+{
+    session_regenerate_id(true);
+    $_SESSION['auth_user'] = [
+        'id'           => (int) ($user['id'] ?? 0),
+        'login_id'     => (string) ($user['login_id'] ?? ''),
+        'role'         => (string) ($user['role'] ?? ''),
+        'name'         => (string) ($user['name'] ?? ''),
+        'department'   => (string) ($user['department'] ?? ''),
+        'program'      => (string) ($user['program'] ?? ''),
+        'profile_photo'=> (string) ($user['profile_photo'] ?? ''),
+    ];
+}
+
+function auth_logout(): void
+{
+    $_SESSION = [];
+    if (session_status() === PHP_SESSION_ACTIVE) {
+        session_regenerate_id(true);
     }
-
-    $stmt = db()->prepare('SELECT id, name, email, role, department, program, profile_photo, created_at FROM users WHERE id = ?');
-    $stmt->execute([$_SESSION['user_id']]);
-    $user = $stmt->fetch();
-
-    return $user ?: null;
+    session_destroy();
 }
 
 function require_login(): array
@@ -38,84 +53,17 @@ function require_role(string $role): array
     $user = require_login();
 
     if ($user['role'] !== $role) {
-        header('Location: ' . dashboard_url($user['role']));
+        header('Location: ' . app_url('public/login.php'));
         exit;
     }
 
     return $user;
 }
 
-function dashboard_url(string $role): string
-{
-    return $role === 'teacher'
-        ? app_url('teacher/dashboard.php')
-        : app_url('student/dashboard.php');
-}
-
-function redirect_to_dashboard(array $user): void
-{
-    header('Location: ' . dashboard_url($user['role']));
-    exit;
-}
-
-function login_user(array $user): void
-{
-    session_regenerate_id(true);
-    $_SESSION['user_id'] = (int) $user['id'];
-    $_SESSION['name'] = (string) ($user['name'] ?? '');
-    $_SESSION['role'] = (string) ($user['role'] ?? '');
-}
-
-function logout_user(): void
-{
-    $_SESSION = [];
-
-    if (ini_get('session.use_cookies')) {
-        $params = session_get_cookie_params();
-        setcookie(session_name(), '', time() - 42000, $params['path'], $params['domain'], $params['secure'], $params['httponly']);
-    }
-
-    session_destroy();
-}
-
-function old(string $key, string $default = ''): string
-{
-    return htmlspecialchars((string) ($_POST[$key] ?? $default), ENT_QUOTES, 'UTF-8');
-}
-
-function e(?string $value): string
-{
-    return htmlspecialchars((string) $value, ENT_QUOTES, 'UTF-8');
-}
-
-function csrf_token(): string
-{
-    if (empty($_SESSION['csrf_token'])) {
-        $_SESSION['csrf_token'] = bin2hex(random_bytes(32));
-    }
-
-    return (string) $_SESSION['csrf_token'];
-}
-
-function csrf_field(): string
-{
-    return '<input type="hidden" name="csrf_token" value="' . e(csrf_token()) . '">';
-}
-
-function verify_csrf(): void
-{
-    $postedToken = (string) ($_POST['csrf_token'] ?? '');
-
-    if ($postedToken === '' || !hash_equals(csrf_token(), $postedToken)) {
-        throw new RuntimeException('Your session expired. Please refresh and try again.');
-    }
-}
-
 function teacher_owns_course(int $teacherId, int $courseId): bool
 {
     $stmt = db()->prepare('SELECT COUNT(*) FROM courses WHERE id = ? AND teacher_id = ?');
     $stmt->execute([$courseId, $teacherId]);
-
     return (int) $stmt->fetchColumn() > 0;
 }
 
@@ -123,30 +71,18 @@ function student_enrolled_in_course(int $studentId, int $courseId): bool
 {
     $stmt = db()->prepare('SELECT COUNT(*) FROM enrollments WHERE student_id = ? AND course_id = ?');
     $stmt->execute([$studentId, $courseId]);
-
     return (int) $stmt->fetchColumn() > 0;
-}
-
-function teacher_can_access_student_course(int $teacherId, int $studentId, int $courseId): bool
-{
-    if (!teacher_owns_course($teacherId, $courseId)) {
-        return false;
-    }
-
-    return student_enrolled_in_course($studentId, $courseId);
 }
 
 function teacher_owns_submission(int $teacherId, int $submissionId): bool
 {
     $stmt = db()->prepare(
-        'SELECT COUNT(*)
-         FROM submissions s
+        'SELECT COUNT(*) FROM submissions s
          JOIN assignments a ON a.id = s.assignment_id
          JOIN courses c ON c.id = a.course_id
          WHERE s.id = ? AND c.teacher_id = ?'
     );
     $stmt->execute([$submissionId, $teacherId]);
-
     return (int) $stmt->fetchColumn() > 0;
 }
 
@@ -155,24 +91,20 @@ function save_uploaded_file(string $field, string $folder, array $allowedExtensi
     if (empty($_FILES[$field]) || $_FILES[$field]['error'] === UPLOAD_ERR_NO_FILE) {
         return null;
     }
-
     if ($_FILES[$field]['error'] !== UPLOAD_ERR_OK) {
         throw new RuntimeException('File upload failed. Please try again.');
     }
-
     if ((int) $_FILES[$field]['size'] > 10 * 1024 * 1024) {
         throw new RuntimeException('File is too large. Maximum size is 10 MB.');
     }
 
     $originalName = (string) $_FILES[$field]['name'];
     $extension = strtolower(pathinfo($originalName, PATHINFO_EXTENSION));
-
     if (!in_array($extension, $allowedExtensions, true)) {
-        throw new RuntimeException('Invalid file type. Allowed types: ' . implode(', ', $allowedExtensions) . '.');
+        throw new RuntimeException('Invalid file type. Allowed: ' . implode(', ', $allowedExtensions));
     }
 
     $uploadRoot = dirname(__DIR__) . DIRECTORY_SEPARATOR . 'uploads' . DIRECTORY_SEPARATOR . $folder;
-
     if (!is_dir($uploadRoot)) {
         mkdir($uploadRoot, 0775, true);
     }
@@ -184,22 +116,15 @@ function save_uploaded_file(string $field, string $folder, array $allowedExtensi
     if (!move_uploaded_file((string) $_FILES[$field]['tmp_name'], $target)) {
         throw new RuntimeException('Could not save uploaded file.');
     }
-
     return 'uploads/' . $folder . '/' . $fileName;
 }
 
 function internal_mark_components(): array
 {
     return [
-        'assignment_1' => 'A1',
-        'assignment_2' => 'A2',
-        'assignment_3' => 'A3',
-        'test_1' => 'T1',
-        'test_2' => 'T2',
-        'test_3' => 'T3',
-        'presentation' => 'Presentation',
-        'major_assignment' => 'Major Assignment',
-        'mid_term' => 'Mid Term',
+        'assignment_1' => 'A1', 'assignment_2' => 'A2', 'assignment_3' => 'A3',
+        'test_1' => 'T1', 'test_2' => 'T2', 'test_3' => 'T3',
+        'presentation' => 'Presentation', 'major_assignment' => 'Major Assignment', 'mid_term' => 'Mid Term',
     ];
 }
 
@@ -217,7 +142,6 @@ function internal_mark_rows_for_student(int $studentId): array
          ORDER BY c.code'
     );
     $stmt->execute([$studentId]);
-
     return build_internal_mark_rows($stmt->fetchAll());
 }
 
@@ -237,7 +161,6 @@ function internal_mark_rows_for_teacher(int $teacherId): array
          ORDER BY c.code, u.name'
     );
     $stmt->execute([$teacherId]);
-
     return build_internal_mark_rows($stmt->fetchAll());
 }
 
@@ -245,10 +168,8 @@ function build_internal_mark_rows(array $records): array
 {
     $components = internal_mark_components();
     $rows = [];
-
     foreach ($records as $record) {
         $key = (int) $record['course_id'] . ':' . (int) ($record['student_id'] ?? 0);
-
         if (!isset($rows[$key])) {
             $rows[$key] = [
                 'course_id' => (int) $record['course_id'],
@@ -260,12 +181,10 @@ function build_internal_mark_rows(array $records): array
                 'marks' => array_fill_keys(array_keys($components), 0.0),
             ];
         }
-
         if ($record['component'] && array_key_exists($record['component'], $components)) {
             $rows[$key]['marks'][$record['component']] = (float) $record['marks_obtained'];
         }
     }
-
     return array_values($rows);
 }
 
@@ -278,15 +197,12 @@ function unread_notification_count(int $userId, ?string $category = null): int
 {
     $sql = 'SELECT COUNT(*) FROM notifications WHERE recipient_user_id = ? AND is_read = 0';
     $params = [$userId];
-
     if ($category !== null) {
         $sql .= ' AND category = ?';
         $params[] = $category;
     }
-
     $stmt = db()->prepare($sql);
     $stmt->execute($params);
-
     return (int) $stmt->fetchColumn();
 }
 
@@ -294,51 +210,33 @@ function recent_notifications(int $userId, ?string $category = null, int $limit 
 {
     $sql = 'SELECT * FROM notifications WHERE recipient_user_id = ?';
     $params = [$userId];
-
     if ($category !== null) {
         $sql .= ' AND category = ?';
         $params[] = $category;
     }
-
     $sql .= ' ORDER BY created_at DESC LIMIT ' . (int) $limit;
-
     $stmt = db()->prepare($sql);
     $stmt->execute($params);
-
     return $stmt->fetchAll();
 }
 
 function create_notification(int $recipientId, string $title, string $body, ?string $linkUrl = null, string $category = 'notification', ?int $senderId = null): void
 {
     $stmt = db()->prepare(
-        'INSERT INTO notifications (recipient_user_id, sender_user_id, category, title, body, link_url)
-         VALUES (?, ?, ?, ?, ?, ?)'
+        'INSERT INTO notifications (recipient_user_id, sender_user_id, category, title, body, link_url) VALUES (?, ?, ?, ?, ?, ?)'
     );
     $stmt->execute([$recipientId, $senderId, $category, $title, $body, $linkUrl]);
 }
 
 function teacher_course_student_ids(int $teacherId, ?int $courseId = null): array
 {
-    $stmt = db()->prepare(
-        'SELECT DISTINCT e.student_id
-         FROM enrollments e
-         JOIN courses c ON c.id = e.course_id
-         WHERE c.teacher_id = ?'
-    );
-    $params = [$teacherId];
-
     if ($courseId !== null) {
-        $stmt = db()->prepare(
-            'SELECT DISTINCT e.student_id
-             FROM enrollments e
-             JOIN courses c ON c.id = e.course_id
-             WHERE c.teacher_id = ? AND c.id = ?'
-        );
-        $params[] = $courseId;
+        $stmt = db()->prepare('SELECT DISTINCT e.student_id FROM enrollments e JOIN courses c ON c.id = e.course_id WHERE c.teacher_id = ? AND c.id = ?');
+        $stmt->execute([$teacherId, $courseId]);
+    } else {
+        $stmt = db()->prepare('SELECT DISTINCT e.student_id FROM enrollments e JOIN courses c ON c.id = e.course_id WHERE c.teacher_id = ?');
+        $stmt->execute([$teacherId]);
     }
-
-    $stmt->execute($params);
-
     return array_map('intval', $stmt->fetchAll(PDO::FETCH_COLUMN));
 }
 
@@ -347,14 +245,8 @@ function notify_course_students(int $courseId, string $title, string $body, ?str
     $teacherStmt = db()->prepare('SELECT teacher_id FROM courses WHERE id = ? LIMIT 1');
     $teacherStmt->execute([$courseId]);
     $teacherId = (int) $teacherStmt->fetchColumn();
-
-    if ($teacherId <= 0) {
-        return;
-    }
-
-    $studentIds = teacher_course_student_ids($teacherId, $courseId);
-
-    foreach ($studentIds as $studentId) {
+    if ($teacherId <= 0) return;
+    foreach (teacher_course_student_ids($teacherId, $courseId) as $studentId) {
         create_notification($studentId, $title, $body, $linkUrl, $category, $senderId);
     }
 }

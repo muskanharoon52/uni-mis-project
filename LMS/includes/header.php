@@ -1,148 +1,173 @@
 <?php
 
+declare(strict_types=1);
+
 $pageTitle = $pageTitle ?? APP_NAME;
 $active = $active ?? '';
 $user = $user ?? current_user();
 $role = $user['role'] ?? null;
-$brandLabel = $role ? APP_NAME . ' | ' . ucfirst($role) : APP_NAME;
-$notificationCount = $user ? unread_notification_count((int) $user['id']) : 0;
-$messageCount = $user ? unread_notification_count((int) $user['id'], 'message') : 0;
-$notifications = $user ? recent_notifications((int) $user['id'], null, 4) : [];
-$messages = $user ? recent_notifications((int) $user['id'], 'message', 4) : [];
+$userInitial = strtoupper(substr($user['name'] ?? 'G', 0, 1));
 
 $teacherLinks = [
-    'dashboard' => ['Dashboard', app_url('teacher/dashboard.php')],
-    'courses' => ['My Courses', app_url('teacher/courses.php')],
-    'students' => ['Students', app_url('teacher/students.php')],
-    'attendance' => ['Attendance', app_url('teacher/attendance.php')],
-    'assignments' => ['Assignments', app_url('teacher/assignments.php')],
-    'quizzes' => ['Quizzes', app_url('teacher/quizzes.php')],
-    'examination' => ['Exams', app_url('teacher/examination.php')],
-    'marks' => ['Grades', app_url('teacher/internal_marks.php')],
-    'materials' => ['Course Materials', app_url('teacher/course_materials.php')],
-    'calendar' => ['Academic Calendar', app_url('teacher/academic_calendar.php')],
-    'messages' => ['Messages', app_url('teacher/messages.php')],
-    'announcements' => ['Announcements', app_url('teacher/announcements.php')],
-    'reports' => ['Reports', app_url('teacher/reports.php')],
-    'settings' => ['Settings', app_url('teacher/settings.php')],
-    'timetable' => ['Timetable', app_url('teacher/timetable.php')],
+    'dashboard'    => ['Dashboard', 'teacher/dashboard.php', '&#127968;'],
+    'courses'      => ['My Courses', 'teacher/courses.php', '&#128218;'],
+    'students'     => ['Students', 'teacher/students.php', '&#128101;'],
+    'attendance'   => ['Attendance', 'teacher/attendance.php', '&#128197;'],
+    'assignments'  => ['Assignments', 'teacher/assignments.php', '&#128221;'],
+    'grading'      => ['Grading', 'teacher/grading.php', '&#9997;'],
+    'internal_marks' => ['Internal Marks', 'teacher/internal_marks.php', '&#128200;'],
+    'materials'    => ['Course Materials', 'teacher/course_materials.php', '&#128214;'],
+    'announcements'=> ['Announcements', 'teacher/announcements.php', '&#128227;'],
+    'messages'     => ['Messages', 'teacher/messages.php', '&#128172;'],
+    'queries'      => ['Queries', 'teacher/queries.php', '&#10067;'],
+    'applications' => ['Applications', 'teacher/applications.php', '&#128203;'],
+    'settings'     => ['Settings', 'teacher/settings.php', '&#9881;'],
 ];
 
 $studentLinks = [
-    'dashboard' => ['Dashboard', app_url('student/dashboard.php')],
-    'courses' => ['Courses', app_url('student/courses.php')],
-    'attendance' => ['Attendance', app_url('student/attendance.php')],
-    'marks' => ['Internal Marks', app_url('student/marks.php')],
-    'timetable' => ['Timetable', app_url('student/timetable.php')],
-    'examination' => ['Examination', app_url('student/examination.php')],
-    'fees' => ['Fees', app_url('student/fees.php')],
-    'queries' => ['Queries', app_url('student/queries.php')],
-    'applications' => ['Applications', app_url('student/applications.php')],
-    'profile' => ['Profile', app_url('student/profile.php')],
+    'dashboard'    => ['Dashboard', 'student/dashboard.php', '&#127968;'],
+    'courses'      => ['Courses', 'student/courses.php', '&#128218;'],
+    'attendance'   => ['Attendance', 'student/attendance.php', '&#128197;'],
+    'marks'        => ['Internal Marks', 'student/marks.php', '&#128200;'],
+    'fees'         => ['Fees', 'student/fees.php', '&#128176;'],
+    'queries'      => ['Queries', 'student/queries.php', '&#10067;'],
+    'applications' => ['Applications', 'student/applications.php', '&#128203;'],
+    'profile'      => ['Profile', 'student/profile.php', '&#128100;'],
 ];
 
 $links = $role === 'teacher' ? $teacherLinks : ($role === 'student' ? $studentLinks : []);
-$examActive = in_array($active, ['examination', 'datesheet', 'transcripts'], true);
 ?>
 <!doctype html>
 <html lang="en">
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title><?= e($pageTitle) ?> - <?= APP_NAME ?></title>
+    <title><?= e($pageTitle) ?> | <?= APP_NAME ?></title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="<?= asset_url('style.css') ?>">
 </head>
 <body>
-<header class="topbar">
-    <a class="brand" href="<?= app_url('public/index.php') ?>"><?= e($brandLabel) ?></a>
-    <?php if ($user): ?>
-        <div class="topbar-actions">
-            <details class="topbar-popover">
-                <summary class="topbar-button">Messages <span class="count-badge"><?= $messageCount ?></span></summary>
-                <div class="popover-panel">
-                    <div class="popover-head">Messages from teacher</div>
-                    <?php if ($messages): ?>
-                        <?php foreach ($messages as $msg): ?>
-                            <div class="popover-item">
-                                <?php if (!empty($msg['link_url'])): ?>
-                                    <a href="<?= app_url($msg['link_url']) ?>">
-                                        <strong><?= e($msg['title']) ?></strong>
-                                    </a>
-                                <?php else: ?>
-                                    <strong><?= e($msg['title']) ?></strong>
-                                <?php endif; ?>
-                                <p><?= e($msg['body']) ?></p>
-                            </div>
-                        <?php endforeach; ?>
-                    <?php else: ?>
-                        <div class="popover-empty">No messages yet.</div>
-                    <?php endif; ?>
-                </div>
-            </details>
+<button class="menu-toggle" id="menu-toggle">&#9776;</button>
+<div class="sidebar-overlay" id="sidebar-overlay"></div>
 
-            <details class="topbar-popover">
-                <summary class="topbar-button">Notifications <span class="count-badge"><?= $notificationCount ?></span></summary>
-                <div class="popover-panel">
-                    <div class="popover-head">
-                        <?php if ($role === 'teacher'): ?>
-                            Teacher notifications
-                        <?php else: ?>
-                            Student updates
-                        <?php endif; ?>
-                    </div>
-                    <?php if ($notifications): ?>
-                        <?php foreach ($notifications as $notif): ?>
-                            <div class="popover-item">
-                                <?php if (!empty($notif['link_url'])): ?>
-                                    <a href="<?= app_url($notif['link_url']) ?>">
-                                        <strong><?= e($notif['title']) ?></strong>
-                                    </a>
-                                <?php else: ?>
-                                    <strong><?= e($notif['title']) ?></strong>
-                                <?php endif; ?>
-                                <p><?= e($notif['body']) ?></p>
-                            </div>
-                        <?php endforeach; ?>
-                    <?php else: ?>
-                        <div class="popover-empty">Nothing new right now.</div>
-                    <?php endif; ?>
-                    <?php if ($role === 'teacher'): ?>
-                        <div class="popover-separator"></div>
-                        <a class="btn secondary popover-action" href="<?= app_url('teacher/announcements.php') ?>">Open Announcements</a>
-                        <a class="btn secondary popover-action" href="<?= app_url('teacher/messages.php') ?>">Open Messages</a>
-                    <?php endif; ?>
-                </div>
-            </details>
-
-            <?php if (!empty($user['profile_photo'])): ?>
-                <img class="profile-photo-sm" src="<?= app_url($user['profile_photo']) ?>" alt="">
-            <?php endif; ?>
-            <div class="user-pill">
-                <span><?= e($user['name']) ?></span>
-                <small><?= e(ucfirst($user['role'])) ?></small>
+<div class="app-shell">
+    <aside class="sidebar" id="sidebar">
+        <div class="brand">
+            <div class="brand-mark">LMS</div>
+            <div>
+                <h1><?= APP_NAME ?></h1>
+                <p>University ERP</p>
             </div>
         </div>
-    <?php endif; ?>
-</header>
 
-<?php if ($links): ?>
-    <nav class="sidebar">
-        <?php foreach ($links as $key => [$label, $href]): ?>
-            <?php if ($key === 'examination'): ?>
-                <details class="sidebar-group" <?= $examActive ? 'open' : '' ?>>
-                    <summary class="sidebar-group-summary <?= $examActive ? 'active' : '' ?>"><?= e($label) ?></summary>
-                    <div class="sidebar-subnav">
-                        <a class="<?= $active === 'examination' ? 'active' : '' ?>" href="<?= $href ?>"><?= e($label) ?></a>
-                        <a class="<?= $active === 'datesheet' ? 'active' : '' ?>" href="<?= app_url($role === 'teacher' ? 'teacher/datesheet.php' : 'student/datesheet.php') ?>">Datesheet</a>
-                        <a class="<?= $active === 'transcripts' ? 'active' : '' ?>" href="<?= app_url($role === 'teacher' ? 'teacher/transcripts.php' : 'student/transcripts.php') ?>">Transcripts</a>
-                    </div>
-                </details>
-                <?php continue; ?>
+        <nav class="nav">
+            <?php if ($role === 'teacher'): ?>
+                <span class="nav-section-label">Overview</span>
+                <a class="<?= $active === 'dashboard' ? 'active' : '' ?>" href="<?= app_url('teacher/dashboard.php') ?>">
+                    <span class="nav-icon">&#127968;</span> Dashboard
+                </a>
+
+                <span class="nav-section-label">Academics</span>
+                <a class="<?= $active === 'courses' ? 'active' : '' ?>" href="<?= app_url('teacher/courses.php') ?>">
+                    <span class="nav-icon">&#128218;</span> My Courses
+                </a>
+                <a class="<?= $active === 'students' ? 'active' : '' ?>" href="<?= app_url('teacher/students.php') ?>">
+                    <span class="nav-icon">&#128101;</span> Students
+                </a>
+                <a class="<?= $active === 'attendance' ? 'active' : '' ?>" href="<?= app_url('teacher/attendance.php') ?>">
+                    <span class="nav-icon">&#128197;</span> Attendance
+                </a>
+                <a class="<?= $active === 'assignments' ? 'active' : '' ?>" href="<?= app_url('teacher/assignments.php') ?>">
+                    <span class="nav-icon">&#128221;</span> Assignments
+                </a>
+
+                <span class="nav-section-label">Grading</span>
+                <a class="<?= $active === 'grading' ? 'active' : '' ?>" href="<?= app_url('teacher/grading.php') ?>">
+                    <span class="nav-icon">&#9997;</span> Grading
+                </a>
+                <a class="<?= $active === 'internal_marks' ? 'active' : '' ?>" href="<?= app_url('teacher/internal_marks.php') ?>">
+                    <span class="nav-icon">&#128200;</span> Internal Marks
+                </a>
+
+                <span class="nav-section-label">Communication</span>
+                <a class="<?= $active === 'announcements' ? 'active' : '' ?>" href="<?= app_url('teacher/announcements.php') ?>">
+                    <span class="nav-icon">&#128227;</span> Announcements
+                </a>
+                <a class="<?= $active === 'messages' ? 'active' : '' ?>" href="<?= app_url('teacher/messages.php') ?>">
+                    <span class="nav-icon">&#128172;</span> Messages
+                </a>
+                <a class="<?= $active === 'queries' ? 'active' : '' ?>" href="<?= app_url('teacher/queries.php') ?>">
+                    <span class="nav-icon">&#10067;</span> Queries
+                </a>
+                <a class="<?= $active === 'applications' ? 'active' : '' ?>" href="<?= app_url('teacher/applications.php') ?>">
+                    <span class="nav-icon">&#128203;</span> Applications
+                </a>
+            <?php elseif ($role === 'student'): ?>
+                <span class="nav-section-label">Overview</span>
+                <a class="<?= $active === 'dashboard' ? 'active' : '' ?>" href="<?= app_url('student/dashboard.php') ?>">
+                    <span class="nav-icon">&#127968;</span> Dashboard
+                </a>
+
+                <span class="nav-section-label">Academics</span>
+                <a class="<?= $active === 'courses' ? 'active' : '' ?>" href="<?= app_url('student/courses.php') ?>">
+                    <span class="nav-icon">&#128218;</span> Courses
+                </a>
+                <a class="<?= $active === 'attendance' ? 'active' : '' ?>" href="<?= app_url('student/attendance.php') ?>">
+                    <span class="nav-icon">&#128197;</span> Attendance
+                </a>
+                <a class="<?= $active === 'marks' ? 'active' : '' ?>" href="<?= app_url('student/marks.php') ?>">
+                    <span class="nav-icon">&#128200;</span> Internal Marks
+                </a>
+
+                <span class="nav-section-label">Finance</span>
+                <a class="<?= $active === 'fees' ? 'active' : '' ?>" href="<?= app_url('student/fees.php') ?>">
+                    <span class="nav-icon">&#128176;</span> Fees
+                </a>
+
+                <span class="nav-section-label">Communication</span>
+                <a class="<?= $active === 'queries' ? 'active' : '' ?>" href="<?= app_url('student/queries.php') ?>">
+                    <span class="nav-icon">&#10067;</span> Queries
+                </a>
+                <a class="<?= $active === 'applications' ? 'active' : '' ?>" href="<?= app_url('student/applications.php') ?>">
+                    <span class="nav-icon">&#128203;</span> Applications
+                </a>
+                <a class="<?= $active === 'profile' ? 'active' : '' ?>" href="<?= app_url('student/profile.php') ?>">
+                    <span class="nav-icon">&#128100;</span> Profile
+                </a>
             <?php endif; ?>
-            <a class="<?= $active === $key ? 'active' : '' ?>" href="<?= $href ?>"><?= e($label) ?></a>
-        <?php endforeach; ?>
-        <a class="sidebar-logout" href="<?= app_url('public/assets/logout.php') ?>">Logout</a>
-    </nav>
-<?php endif; ?>
+        </nav>
 
-<main class="<?= $links ? 'app-main' : 'public-main' ?>">
+        <div class="sidebar-user">
+            <?php if ($user): ?>
+                <div class="user-strip">
+                    <div class="user-strip-avatar"><?= e($userInitial) ?></div>
+                    <div class="user-strip-info">
+                        <span class="user-strip-name"><?= e($user['name']) ?></span>
+                        <span class="user-strip-role"><?= e(ucfirst($role)) ?> &middot; <?= e($user['login_id'] ?? '') ?></span>
+                    </div>
+                </div>
+                <div class="actions">
+                    <a class="btn btn-ghost btn-sm" href="<?= app_url(($role === 'teacher' ? 'teacher' : 'student') . '/profile.php') ?>"><?= $role === 'teacher' ? '&#9881; Profile' : '&#128100; Profile' ?></a>
+                    <a class="btn btn-ghost btn-sm" href="<?= app_url('public/assets/logout.php') ?>">Logout</a>
+                </div>
+            <?php else: ?>
+                <a class="btn btn-primary btn-sm" href="<?= app_url('public/login.php') ?>" style="width:100%;justify-content:center;">Sign In</a>
+            <?php endif; ?>
+        </div>
+    </aside>
+
+    <main class="content">
+        <div class="topbar">
+            <div>
+                <span class="eyebrow"><?= APP_NAME ?></span>
+                <h2><?= e($pageTitle) ?></h2>
+            </div>
+            <div class="topbar-actions">
+                <?php if ($user): ?>
+                    <span class="badge badge-<?= e(strtolower($role)) ?>"><?= e(ucfirst($role)) ?></span>
+                    <span class="topbar-user"><?= e($user['name']) ?></span>
+                <?php endif; ?>
+            </div>
+        </div>

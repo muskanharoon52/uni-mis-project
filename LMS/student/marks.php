@@ -12,14 +12,9 @@ $rows = internal_mark_rows_for_student((int) $user['id']);
 
 require_once __DIR__ . '/../includes/header.php';
 ?>
-<div class="page-head">
-    <div>
-        <h1>Internal Marks</h1>
-        <p class="muted">Full breakdown for each course.</p>
-    </div>
-</div>
-
-<div class="table-card compact-table">
+<div class="card">
+    <div class="card-header"><h3>Internal Marks</h3></div>
+    <div class="table-responsive">
     <table class="marks-table">
         <tr>
             <th rowspan="2">Course ID</th>
@@ -41,9 +36,10 @@ require_once __DIR__ . '/../includes/header.php';
                     <td><?= e((string) $row['marks'][$component]) ?></td>
                 <?php endforeach; ?>
                 <td><?= e(number_format((float) internal_mark_total($row), 2)) ?></td>
-                <td><span class="mini-badge <?= $row['is_finalized'] ? 'red' : 'green' ?>"><?= $row['is_finalized'] ? 'Finalized' : 'Not Finalized' ?></span></td>
+                <td><span class="badge <?= $row['is_finalized'] ? 'badge-inactive' : 'badge-active' ?>"><?= $row['is_finalized'] ? 'Finalized' : 'Not Finalized' ?></span></td>
             </tr>
         <?php endforeach; ?>
     </table>
+    </div>
 </div>
 <?php require_once __DIR__ . '/../includes/footer.php'; ?>

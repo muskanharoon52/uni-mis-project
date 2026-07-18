@@ -96,121 +96,147 @@ $greeting = $greetingHour < 12 ? 'Good Morning' : ($greetingHour < 17 ? 'Good Af
 
 require_once __DIR__ . '/../includes/header.php';
 ?>
-<section class="faculty-dashboard">
-    <div class="faculty-hero">
-        <div>
-            <p class="faculty-kicker"><?= e($semester) ?> | Academic Year <?= e($academicYear) ?></p>
-            <h1><?= e($greeting . ', ' . $user['name']) ?></h1>
-            <p class="muted"><?= e($now->format('l, F j, Y h:i A')) ?></p>
-        </div>
-        <form class="faculty-search" method="get">
-            <input name="q" placeholder="Search courses or students">
-        </form>
-        <details class="faculty-profile-menu">
-            <summary>
-                <?php if ($user['profile_photo']): ?>
-                    <img class="profile-photo-sm" src="<?= app_url($user['profile_photo']) ?>" alt="">
-                <?php else: ?>
-                    <span class="faculty-avatar"><?= e($initials) ?></span>
-                <?php endif; ?>
-                <span><?= e($teacherCode) ?></span>
-            </summary>
-            <div>
-                <a href="<?= app_url('teacher/profile.php') ?>">Profile</a>
-                <a href="<?= app_url('public/assets/logout.php') ?>">Logout</a>
-            </div>
-        </details>
-    </div>
 
-    <div class="faculty-kpis">
-        <div class="faculty-kpi"><span>Students</span><strong><?= $studentCount ?></strong><small>Total enrolled</small></div>
-        <div class="faculty-kpi"><span>Courses</span><strong><?= $courseCount ?></strong><small>Active courses</small></div>
-        <div class="faculty-kpi"><span>Classes</span><strong><?= count($schedule) ?></strong><small>Scheduled today</small></div>
-        <div class="faculty-kpi"><span>Submissions</span><strong><?= $pendingSubmissions ?></strong><small>Awaiting grading</small></div>
-        <div class="faculty-kpi"><span>Attendance</span><strong><?= $averageAttendance ?>%</strong><small>Overall average</small></div>
+<div class="greeting-card">
+    <div class="greeting-card-body">
+        <span class="eyebrow"><?= e($semester) ?> &middot; Academic Year <?= e($academicYear) ?></span>
+        <h1><?= e($greeting . ', ' . $user['name']) ?></h1>
+        <p class="muted" style="margin-top:4px;"><?= e($now->format('l, F j, Y')) ?> &middot; <?= e($teacherCode) ?></p>
     </div>
+    <div class="greeting-card-avatar"><?= e($initials) ?></div>
+</div>
 
-    <section class="faculty-card">
-        <header><h2>Today's Schedule</h2><a href="<?= app_url('teacher/attendance.php') ?>">Attendance</a></header>
-        <div class="faculty-schedule">
+<div class="stat-row">
+    <div class="stat-card-v2"><div class="stat-label">Students</div><div class="stat-number"><?= $studentCount ?></div><div class="stat-hint">Total enrolled</div></div>
+    <div class="stat-card-v2"><div class="stat-label">Courses</div><div class="stat-number"><?= $courseCount ?></div><div class="stat-hint">Active courses</div></div>
+    <div class="stat-card-v2"><div class="stat-label">Pending</div><div class="stat-number"><?= $pendingSubmissions ?></div><div class="stat-hint">Submissions to grade</div></div>
+    <div class="stat-card-v2"><div class="stat-label">Attendance</div><div class="stat-number"><?= $averageAttendance ?>%</div><div class="stat-hint">Overall average</div></div>
+</div>
+
+<div class="action-cards">
+    <a class="action-card" href="<?= app_url('teacher/courses.php') ?>">
+        <span class="action-card-icon">&#128218;</span>
+        <div class="action-card-title">My Courses</div>
+        <div class="action-card-desc"><?= $courseCount ?> active course<?= $courseCount !== 1 ? 's' : '' ?></div>
+    </a>
+    <a class="action-card" href="<?= app_url('teacher/students.php') ?>">
+        <span class="action-card-icon">&#128101;</span>
+        <div class="action-card-title">Students</div>
+        <div class="action-card-desc">View &amp; manage enrolled students</div>
+    </a>
+    <a class="action-card" href="<?= app_url('teacher/grading.php') ?>">
+        <span class="action-card-icon">&#9997;</span>
+        <div class="action-card-title">Grading</div>
+        <div class="action-card-desc"><?= $pendingSubmissions ?> pending submission<?= $pendingSubmissions !== 1 ? 's' : '' ?></div>
+    </a>
+    <a class="action-card" href="<?= app_url('teacher/attendance.php') ?>">
+        <span class="action-card-icon">&#128197;</span>
+        <div class="action-card-title">Attendance</div>
+        <div class="action-card-desc">Mark or review attendance</div>
+    </a>
+    <a class="action-card" href="<?= app_url('teacher/assignments.php') ?>">
+        <span class="action-card-icon">&#128221;</span>
+        <div class="action-card-title">Assignments</div>
+        <div class="action-card-desc">Create &amp; manage assignments</div>
+    </a>
+    <a class="action-card" href="<?= app_url('teacher/announcements.php') ?>">
+        <span class="action-card-icon">&#128227;</span>
+        <div class="action-card-title">Announcements</div>
+        <div class="action-card-desc">Post class announcements</div>
+    </a>
+</div>
+
+<?php if ($schedule): ?>
+<div class="card mt-4">
+    <div class="card-header">
+        <h3>Today's Schedule</h3>
+        <a class="btn btn-sm btn-outline" href="<?= app_url('teacher/attendance.php') ?>">Attendance</a>
+    </div>
+    <table class="table">
+        <thead>
+            <tr><th>Time</th><th>Course</th><th>Section</th><th>Room</th><th>Status</th><th>Action</th></tr>
+        </thead>
+        <tbody>
             <?php foreach ($schedule as $item): ?>
-                <div class="faculty-schedule-row <?= $item['status'] === 'Ongoing' ? 'is-active' : '' ?>">
-                    <span><?= e($item['time']) ?></span>
-                    <strong><?= e($item['course']) ?><small><?= e($item['code'] . ' | Section ' . $item['section']) ?></small></strong>
-                    <span><?= e($item['room']) ?></span>
-                    <em class="faculty-status <?= strtolower($item['status']) ?>"><?= e($item['status']) ?></em>
-                    <a class="faculty-mini-action" href="<?= app_url('teacher/attendance.php') ?>">Mark</a>
-                </div>
+                <tr>
+                    <td><strong><?= e($item['time']) ?></strong></td>
+                    <td><?= e($item['course']) ?><div class="muted" style="font-size:.75rem;"><?= e($item['code']) ?></div></td>
+                    <td><?= e($item['section']) ?></td>
+                    <td><?= e($item['room']) ?></td>
+                    <td><span class="badge badge-<?= $item['status'] === 'Ongoing' ? 'active' : ($item['status'] === 'Upcoming' ? 'draft' : 'inactive') ?>"><?= e($item['status']) ?></span></td>
+                    <td><a class="btn btn-sm btn-outline" href="<?= app_url('teacher/attendance.php') ?>">Mark</a></td>
+                </tr>
             <?php endforeach; ?>
-            <?php if (!$schedule): ?><p class="muted">No courses assigned yet.</p><?php endif; ?>
-        </div>
-    </section>
+        </tbody>
+    </table>
+</div>
+<?php endif; ?>
 
-    <section class="faculty-card">
-        <header><h2>My Courses</h2><a href="<?= app_url('teacher/courses.php') ?>">Manage courses</a></header>
-        <div class="faculty-table-wrap">
-            <table class="faculty-course-table">
-                <thead>
-                    <tr>
-                        <th>Course</th>
-                        <th>Code</th>
-                        <th>Semester</th>
-                        <th>Credit Hours</th>
-                        <th>Students</th>
-                        <th>Assignments</th>
-                        <th>Lectures</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <?php foreach ($courses as $course): ?>
-                        <tr>
-                            <td><strong><?= e($course['title']) ?></strong></td>
-                            <td><?= e($course['code']) ?></td>
-                            <td><?= e($course['semester']) ?></td>
-                            <td><?= (int) $course['credit_hours'] ?></td>
-                            <td><?= (int) $course['student_count'] ?></td>
-                            <td><?= (int) $course['assignment_count'] ?></td>
-                            <td><?= (int) $course['lecture_count'] ?></td>
-                            <td>
-                                <div class="faculty-table-actions">
-                                    <a href="<?= app_url('teacher/courses.php?course_id=' . (int) $course['id']) ?>">View</a>
-                                    <a href="<?= app_url('teacher/attendance.php?course_id=' . (int) $course['id']) ?>">Attendance</a>
-                                </div>
-                            </td>
-                        </tr>
-                    <?php endforeach; ?>
-                    <?php if (!$courses): ?>
-                        <tr><td colspan="8" class="muted">No courses assigned yet.</td></tr>
-                    <?php endif; ?>
-                </tbody>
-            </table>
-        </div>
-    </section>
-
-    <div class="faculty-grid">
-        <section class="faculty-card">
-            <header><h2>Recent Student Activity</h2></header>
-            <?php foreach ($studentActivities as $activity): ?>
-                <div class="faculty-activity">
-                    <strong><?= e($activity['student_name']) ?></strong>
-                    <span><?= e($activity['activity'] . ' | ' . $activity['code']) ?></span>
-                    <small><?= e($activity['activity_time']) ?></small>
-                </div>
-            <?php endforeach; ?>
-            <?php if (!$studentActivities): ?><p class="muted">No recent student activity yet.</p><?php endif; ?>
-        </section>
-
-        <section class="faculty-card">
-            <header><h2>Academic Calendar</h2></header>
-            <?php foreach ($calendarEvents as $event): ?>
-                <a class="faculty-calendar-item" href="<?= app_url('teacher/academic_calendar.php') ?>">
-                    <strong><?= e($event['date']) ?></strong>
-                    <span><?= e($event['title']) ?></span>
-                    <em class="priority <?= strtolower($event['type']) ?>"><?= e($event['type']) ?></em>
-                </a>
-            <?php endforeach; ?>
-        </section>
+<div class="card mt-4">
+    <div class="card-header">
+        <h3>My Courses</h3>
+        <a class="btn btn-sm btn-outline" href="<?= app_url('teacher/courses.php') ?>">Manage</a>
     </div>
-</section>
+    <div class="table-responsive">
+        <table class="table">
+            <thead>
+                <tr><th>Course</th><th>Code</th><th>Semester</th><th>Credits</th><th>Students</th><th>Assignments</th><th>Lectures</th><th>Actions</th></tr>
+            </thead>
+            <tbody>
+                <?php foreach ($courses as $course): ?>
+                    <tr>
+                        <td><strong><?= e($course['title']) ?></strong></td>
+                        <td><span class="badge badge-outline"><?= e($course['code']) ?></span></td>
+                        <td><?= e($course['semester']) ?></td>
+                        <td><?= (int) $course['credit_hours'] ?></td>
+                        <td><?= (int) $course['student_count'] ?></td>
+                        <td><?= (int) $course['assignment_count'] ?></td>
+                        <td><?= (int) $course['lecture_count'] ?></td>
+                        <td>
+                            <a class="btn btn-sm btn-outline" href="<?= app_url('teacher/courses.php?course_id=' . (int) $course['id']) ?>">View</a>
+                        </td>
+                    </tr>
+                <?php endforeach; ?>
+                <?php if (!$courses): ?>
+                    <tr><td colspan="8" class="muted" style="text-align:center;">No courses assigned yet.</td></tr>
+                <?php endif; ?>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="grid-2 mt-4">
+    <div class="card">
+        <div class="card-header"><h3>Recent Activity</h3></div>
+        <?php if ($studentActivities): ?>
+            <?php foreach ($studentActivities as $activity): ?>
+                <div class="activity-row">
+                    <span class="activity-dot"></span>
+                    <div>
+                        <strong><?= e($activity['student_name']) ?></strong>
+                        <div class="muted" style="font-size:.75rem;"><?= e($activity['activity'] . ' &middot; ' . $activity['code']) ?></div>
+                    </div>
+                    <small class="muted" style="margin-left:auto;white-space:nowrap;"><?= e($activity['activity_time']) ?></small>
+                </div>
+            <?php endforeach; ?>
+        <?php else: ?>
+            <p class="muted" style="padding:1rem;">No recent activity yet.</p>
+        <?php endif; ?>
+    </div>
+
+    <div class="card">
+        <div class="card-header"><h3>Upcoming</h3></div>
+        <?php foreach ($calendarEvents as $event): ?>
+            <div class="activity-row">
+                <span class="activity-dot" style="background:<?= $event['type'] === 'High' ? 'var(--red)' : ($event['type'] === 'Medium' ? 'var(--amber)' : 'var(--green)') ?>;"></span>
+                <div>
+                    <strong><?= e($event['title']) ?></strong>
+                    <div class="muted" style="font-size:.75rem;"><?= e($event['date']) ?></div>
+                </div>
+                <span class="badge badge-<?= $event['type'] === 'High' ? 'active' : ($event['type'] === 'Medium' ? 'draft' : 'inactive') ?>" style="margin-left:auto;"><?= e($event['type']) ?></span>
+            </div>
+        <?php endforeach; ?>
+    </div>
+</div>
+
 <?php require_once __DIR__ . '/../includes/footer.php'; ?>

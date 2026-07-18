@@ -43,11 +43,11 @@ $submissions = $submissionsStmt->fetchAll();
 
 require_once __DIR__ . '/../includes/header.php';
 ?>
-<div class="page-head"><h1>Grading</h1></div>
-<?php if ($message): ?><div class="alert success"><?= e($message) ?></div><?php endif; ?>
-<?php if ($error): ?><div class="alert error"><?= e($error) ?></div><?php endif; ?>
-<div class="table-card">
-    <table>
+<?php if ($message): ?><div class="alert alert-success"><?= e($message) ?></div><?php endif; ?>
+<?php if ($error): ?><div class="alert alert-error"><?= e($error) ?></div><?php endif; ?>
+<div class="card">
+    <div class="card-header"><h3>Submissions</h3></div>
+    <div class="table-responsive">
         <tr><th>Course</th><th>Assignment</th><th>Student</th><th>Submission</th><th>Grade</th></tr>
         <?php foreach ($submissions as $submission): ?>
             <tr>
@@ -72,6 +72,6 @@ require_once __DIR__ . '/../includes/header.php';
         <?php if (!$submissions): ?>
             <tr><td colspan="5" class="muted text-center">No assignment submissions uploaded yet.</td></tr>
         <?php endif; ?>
-    </table>
+    </div>
 </div>
 <?php require_once __DIR__ . '/../includes/footer.php'; ?>

@@ -109,8 +109,8 @@ require_once __DIR__ . '/../includes/header.php';
                 <a class="course-tab <?= $view === 'assignment' ? 'active' : '' ?>" href="<?= app_url('student/courses.php?course_id=' . (int) $currentCourse['id'] . '&view=assignment') ?>">Assignment</a>
             </div>
 
-            <?php if ($message): ?><div class="alert success"><?= e($message) ?></div><?php endif; ?>
-            <?php if ($error): ?><div class="alert error"><?= e($error) ?></div><?php endif; ?>
+            <?php if ($message): ?><div class="alert alert-success"><?= e($message) ?></div><?php endif; ?>
+            <?php if ($error): ?><div class="alert alert-error"><?= e($error) ?></div><?php endif; ?>
 
             <?php if ($view === 'overview'): ?>
                 <div class="card">
@@ -118,7 +118,9 @@ require_once __DIR__ . '/../includes/header.php';
                     <p class="muted">Use the tabs above to view lectures or submit assignments.</p>
                 </div>
             <?php elseif ($view === 'lectures'): ?>
-                <div class="table-card compact-table">
+                <div class="card">
+                    <div class="card-header"><h3>Lectures</h3></div>
+                    <div class="table-responsive">
                     <table>
                         <tr><th>Lecture</th><th>Date</th><th>File</th></tr>
                         <?php $lectureStmt = db()->prepare('SELECT * FROM lectures WHERE course_id = ? ORDER BY id DESC'); $lectureStmt->execute([(int) $currentCourse['id']]); $lectures = $lectureStmt->fetchAll(); ?>
@@ -129,9 +131,12 @@ require_once __DIR__ . '/../includes/header.php';
                             <tr><td colspan="3" class="muted text-center">No lectures uploaded for this course yet.</td></tr>
                         <?php endif; ?>
                     </table>
+                    </div>
                 </div>
             <?php else: ?>
-                <div class="table-card compact-table">
+                <div class="card">
+                    <div class="card-header"><h3>Assignments</h3></div>
+                    <div class="table-responsive">
                     <table>
                         <tr><th>Assignment</th><th>Due</th><th>Status</th><th>Grade</th><th>Feedback</th><th>Teacher File</th><th>Upload</th></tr>
                         <?php
@@ -151,7 +156,7 @@ require_once __DIR__ . '/../includes/header.php';
                                 <td><?= e($assignment['title']) ?></td>
                                 <td><?= e($assignment['due_date']) ?></td>
                                 <td>
-                                    <?php if ($hasSubmission): ?><span class="badge approved">Submitted</span><?php elseif ($isLate): ?><span class="badge rejected">Missing</span><?php else: ?><span class="badge pending">Pending</span><?php endif; ?>
+                                    <?php if ($hasSubmission): ?><span class="badge badge-active">Submitted</span><?php elseif ($isLate): ?><span class="badge badge-inactive">Missing</span><?php else: ?><span class="badge badge-draft">Pending</span><?php endif; ?>
                                 </td>
                                 <td><?= $assignment['grade'] !== null ? e((string) $assignment['grade']) : e('Not graded') ?></td>
                                 <td><?= e($assignment['feedback'] ?: 'No feedback yet') ?></td>
@@ -162,7 +167,7 @@ require_once __DIR__ . '/../includes/header.php';
                                         <input type="hidden" name="assignment_id" value="<?= (int) $assignment['id'] ?>">
                                         <input type="hidden" name="course_id" value="<?= (int) $currentCourse['id'] ?>">
                                         <input name="submission_file" type="file" accept=".pdf,.doc,.docx,.zip" required>
-                                        <button class="btn" type="submit"><?= $assignment['submission_file'] ? 'Update' : 'Upload' ?></button>
+                                        <button class="btn btn-primary btn-sm" type="submit"><?= $assignment['submission_file'] ? 'Update' : 'Upload' ?></button>
                                         <?php if ($assignment['submission_file']): ?><a href="<?= app_url($assignment['submission_file']) ?>" target="_blank">Current file</a><?php endif; ?>
                                     </form>
                                 </td>
@@ -172,6 +177,7 @@ require_once __DIR__ . '/../includes/header.php';
                             <tr><td colspan="7" class="muted text-center">No assignments assigned for this course.</td></tr>
                         <?php endif; ?>
                     </table>
+                    </div>
                 </div>
             <?php endif; ?>
         <?php endif; ?>

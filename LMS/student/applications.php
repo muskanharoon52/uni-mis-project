@@ -34,43 +34,38 @@ $applications = $applicationsStmt->fetchAll();
 
 require_once __DIR__ . '/../includes/header.php';
 ?>
-<div class="page-head">
-    <div>
-        <h1>Applications</h1>
-        <p class="muted">Submit leave or support applications to the department.</p>
-    </div>
-</div>
+<?php if ($message): ?><div class="alert alert-success"><?= e($message) ?></div><?php endif; ?>
+<?php if ($error): ?><div class="alert alert-error"><?= e($error) ?></div><?php endif; ?>
 
-<?php if ($message): ?><div class="alert success"><?= e($message) ?></div><?php endif; ?>
-<?php if ($error): ?><div class="alert error"><?= e($error) ?></div><?php endif; ?>
-
-<section class="grid">
+<section class="grid-2">
     <form class="card" method="post">
         <?= csrf_field() ?>
-        <h2>Submit Application</h2>
+        <h3>Submit Application</h3>
         <label for="type">Type</label>
         <input id="type" name="type" placeholder="Leave Request" required>
         <label for="details">Details</label>
         <textarea id="details" name="details" required></textarea>
-        <button class="btn" type="submit">Submit</button>
+        <button class="btn btn-primary" type="submit">Submit</button>
     </form>
 
-    <div class="table-card">
-        <h2>My Applications</h2>
+    <div class="card">
+        <div class="card-header"><h3>My Applications</h3></div>
+        <div class="table-responsive">
         <table>
             <tr><th>Type</th><th>Details</th><th>Status</th><th>Date</th></tr>
             <?php foreach ($applications as $application): ?>
                 <tr>
                     <td><?= e($application['type']) ?></td>
                     <td><?= e($application['details']) ?></td>
-                    <td><span class="badge <?= e($application['status']) ?>"><?= e($application['status']) ?></span></td>
+                    <td><span class="badge badge-<?= $application['status'] === 'approved' ? 'active' : ($application['status'] === 'rejected' ? 'inactive' : 'draft') ?>"><?= e($application['status']) ?></span></td>
                     <td><?= e($application['created_at']) ?></td>
                 </tr>
             <?php endforeach; ?>
             <?php if (!$applications): ?>
                 <tr><td colspan="4" class="muted">No applications submitted yet.</td></tr>
             <?php endif; ?>
-        </table>
+            </table>
+        </div>
     </div>
 </section>
 <?php require_once __DIR__ . '/../includes/footer.php'; ?>

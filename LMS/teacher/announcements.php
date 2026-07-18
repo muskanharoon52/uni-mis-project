@@ -74,20 +74,13 @@ $announcements = $announcementsStmt->fetchAll();
 
 require_once __DIR__ . '/../includes/header.php';
 ?>
-<div class="page-head">
-    <div>
-        <h1>Announcements</h1>
-        <p class="muted">Broadcast notices to your students and have them surface in their notification feed.</p>
-    </div>
-</div>
+<?php if ($message): ?><div class="alert alert-success"><?= e($message) ?></div><?php endif; ?>
+<?php if ($error): ?><div class="alert alert-error"><?= e($error) ?></div><?php endif; ?>
 
-<?php if ($message): ?><div class="alert success"><?= e($message) ?></div><?php endif; ?>
-<?php if ($error): ?><div class="alert error"><?= e($error) ?></div><?php endif; ?>
-
-<section class="grid">
+<section class="grid-2">
     <form class="card" method="post">
         <?= csrf_field() ?>
-        <h2>Send Announcement</h2>
+        <h3>Send Announcement</h3>
         <label for="scope">Recipients</label>
         <select id="scope" name="scope">
             <option value="all">All my students</option>
@@ -104,11 +97,12 @@ require_once __DIR__ . '/../includes/header.php';
         <input id="title" name="title" maxlength="160" required>
         <label for="body">Announcement</label>
         <textarea id="body" name="body" placeholder="Write a clear update for your students." required></textarea>
-        <button class="btn" type="submit">Publish Announcement</button>
+        <button class="btn btn-primary" type="submit">Publish Announcement</button>
     </form>
 
-    <div class="table-card">
-        <h2>Recent Broadcasts</h2>
+    <div class="card">
+        <div class="card-header"><h3>Recent Broadcasts</h3></div>
+        <div class="table-responsive">
         <table>
             <tr>
                 <th>Title</th>
@@ -129,7 +123,8 @@ require_once __DIR__ . '/../includes/header.php';
                     <td colspan="4" class="muted">No announcements sent yet.</td>
                 </tr>
             <?php endif; ?>
-        </table>
+            </table>
+        </div>
     </div>
 </section>
 <?php require_once __DIR__ . '/../includes/footer.php'; ?>

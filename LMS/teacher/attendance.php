@@ -73,19 +73,13 @@ $records->execute([$user['id']]);
 
 require_once __DIR__ . '/../includes/header.php';
 ?>
-<div class="page-head">
-    <div>
-        <h1>Attendance</h1>
-        <p class="muted">Mark attendance by course and class date.</p>
-    </div>
-</div>
-<?php if ($message): ?><div class="alert success"><?= e($message) ?></div><?php endif; ?>
-<?php if ($error): ?><div class="alert error"><?= e($error) ?></div><?php endif; ?>
+<?php if ($message): ?><div class="alert alert-success"><?= e($message) ?></div><?php endif; ?>
+<?php if ($error): ?><div class="alert alert-error"><?= e($error) ?></div><?php endif; ?>
 
-<section class="dashboard-section">
-    <header>Class Attendance</header>
-    <div class="table-card compact-table">
-        <form class="inline-form-row" method="get">
+<div class="card">
+    <div class="card-header"><h3>Class Attendance</h3></div>
+    <div class="inline-form-row" style="padding:0 0 0 0;">
+        <form class="inline-form-row" method="get" style="width:100%;">
             <div>
                 <label for="course_id">Course</label>
                 <select id="course_id" name="course_id" required>
@@ -100,11 +94,13 @@ require_once __DIR__ . '/../includes/header.php';
                 <label for="class_date">Date</label>
                 <input id="class_date" name="class_date" type="date" value="<?= e($selectedDate) ?>" required>
             </div>
-            <button class="btn secondary" type="submit">Load Roster</button>
+            <button class="btn btn-outline" type="submit">Load Roster</button>
         </form>
     </div>
+</div>
 
-    <form class="table-card compact-table" method="post">
+<div class="card mt-4">
+    <form method="post">
         <?= csrf_field() ?>
         <input type="hidden" name="course_id" value="<?= (int) $selectedCourseId ?>">
         <input type="hidden" name="class_date" value="<?= e($selectedDate) ?>">
@@ -125,13 +121,13 @@ require_once __DIR__ . '/../includes/header.php';
             <?php endforeach; ?>
             <?php if (!$roster): ?><tr><td colspan="3" class="muted">No students are enrolled in this course yet.</td></tr><?php endif; ?>
         </table>
-        <?php if ($roster): ?><button class="btn" type="submit">Save Attendance</button><?php endif; ?>
+        <?php if ($roster): ?><button class="btn btn-primary" type="submit">Save Attendance</button><?php endif; ?>
     </form>
-</section>
+</div>
 
-<section class="dashboard-section dashboard-block">
-    <header>Recent Records</header>
-    <div class="table-card compact-table">
+<div class="card mt-4">
+    <div class="card-header"><h3>Recent Records</h3></div>
+    <div class="table-responsive">
         <table>
             <tr><th>Date</th><th>Course</th><th>Student</th><th>Status</th></tr>
             <?php foreach ($records as $record): ?>
@@ -139,10 +135,10 @@ require_once __DIR__ . '/../includes/header.php';
                     <td><?= e($record['class_date']) ?></td>
                     <td><?= e($record['code']) ?></td>
                     <td><?= e($record['student_name']) ?></td>
-                    <td><span class="badge <?= e($record['status']) ?>"><?= e($record['status']) ?></span></td>
+                    <td><span class="badge badge-<?= $record['status'] === 'present' ? 'active' : ($record['status'] === 'late' ? 'draft' : 'inactive') ?>"><?= e($record['status']) ?></span></td>
                 </tr>
             <?php endforeach; ?>
         </table>
     </div>
-</section>
+</div>
 <?php require_once __DIR__ . '/../includes/footer.php'; ?>

@@ -35,13 +35,6 @@ if ($courseId > 0 && student_enrolled_in_course((int) $user['id'], $courseId)) {
 
 require_once __DIR__ . '/../includes/header.php';
 ?>
-<div class="page-head">
-    <div>
-        <h1>Attendance</h1>
-        <p class="muted">View your attendance by course.</p>
-    </div>
-</div>
-
 <section class="course-layout">
     <aside class="course-list-panel">
         <div class="course-list-head">Courses</div>
@@ -54,14 +47,15 @@ require_once __DIR__ . '/../includes/header.php';
     </aside>
 
     <section class="course-detail-panel">
-        <div class="table-card">
-            <h2>Attendance Record</h2>
+        <div class="card">
+            <div class="card-header"><h3>Attendance Record</h3></div>
+            <div class="table-responsive">
             <table>
                 <tr><th>Date</th><th>Status</th><th>Course</th><th>Semester</th></tr>
                 <?php foreach ($attendanceRows as $row): ?>
                     <tr>
                         <td><?= e($row['class_date']) ?></td>
-                        <td><span class="badge <?= e($row['status']) ?>"><?= e($row['status']) ?></span></td>
+                        <td><span class="badge badge-<?= $row['status'] === 'present' ? 'active' : ($row['status'] === 'late' ? 'draft' : 'inactive') ?>"><?= e($row['status']) ?></span></td>
                         <td><?= e($row['code'] . ' - ' . $row['title']) ?></td>
                         <td><?= e($row['semester']) ?></td>
                     </tr>
@@ -70,6 +64,7 @@ require_once __DIR__ . '/../includes/header.php';
                     <tr><td colspan="4" class="muted">No attendance records found for this course.</td></tr>
                 <?php endif; ?>
             </table>
+        </div>
         </div>
     </section>
 </section>

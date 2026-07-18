@@ -35,9 +35,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 require_once __DIR__ . '/../includes/header.php';
 ?>
-<div class="page-head"><h1>Profile</h1></div>
-<?php if ($message): ?><div class="alert success"><?= e($message) ?></div><?php endif; ?>
-<?php if ($error): ?><div class="alert error"><?= e($error) ?></div><?php endif; ?>
+<?php if ($message): ?><div class="alert alert-success"><?= e($message) ?></div><?php endif; ?>
+<?php if ($error): ?><div class="alert alert-error"><?= e($error) ?></div><?php endif; ?>
 <form class="profile-form" method="post" enctype="multipart/form-data">
     <?= csrf_field() ?>
     <div class="profile-preview">
@@ -49,7 +48,7 @@ require_once __DIR__ . '/../includes/header.php';
         <label for="profile_photo">Profile Picture</label>
         <input id="profile_photo" name="profile_photo" type="file" accept=".jpg,.jpeg,.png,.webp">
     </div>
-    <div class="form-card">
+    <div class="card">
         <label for="name">Name</label>
         <input id="name" name="name" value="<?= e($user['name']) ?>" required>
         <label for="email">Email</label>
@@ -58,7 +57,7 @@ require_once __DIR__ . '/../includes/header.php';
         <input id="department" name="department" value="<?= e((string) $user['department']) ?>">
         <label for="program">Program</label>
         <input id="program" name="program" value="<?= e((string) $user['program']) ?>">
-        <button class="btn" type="submit">Save Profile</button>
+        <button class="btn btn-primary" type="submit">Save Profile</button>
     </div>
 </form>
 <?php require_once __DIR__ . '/../includes/footer.php'; ?>

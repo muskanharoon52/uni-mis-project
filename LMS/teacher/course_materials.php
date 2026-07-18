@@ -20,9 +20,9 @@ $materials = $stmt->fetchAll();
 
 require_once __DIR__ . '/../includes/header.php';
 ?>
-<section class="dashboard-section">
-    <header>Course Materials</header>
-    <div class="table-card compact-table">
+<div class="card">
+    <div class="card-header"><h3>Course Materials</h3></div>
+    <div class="table-responsive">
         <table>
             <tr><th>Course</th><th>Title</th><th>Date</th><th>File</th></tr>
             <?php foreach ($materials as $material): ?>
@@ -30,5 +30,5 @@ require_once __DIR__ . '/../includes/header.php';
             <?php endforeach; ?>
         </table>
     </div>
-</section>
+</div>
 <?php require_once __DIR__ . '/../includes/footer.php'; ?>
