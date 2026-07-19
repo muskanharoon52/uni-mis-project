@@ -1,0 +1,700 @@
+/* ============================================
+   EXAMINATION MODULE STYLES
+   ============================================ */
+
+/* ---------- GLOBAL STYLES ---------- */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background-color: #f4f6f9;
+    padding-top: 56px; /* Height of fixed navbar */
+}
+
+/* ---------- FIXED NAVBAR ---------- */
+.navbar-fixed {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 1030;
+    height: 56px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+}
+
+.navbar-fixed .navbar-brand {
+    font-weight: 600;
+}
+
+.navbar-brand i {
+    margin-right: 8px;
+}
+
+/* ---------- HAMBURGER MENU BUTTON ---------- */
+.hamburger-btn {
+    background: transparent;
+    border: none;
+    color: white;
+    font-size: 1.5rem;
+    padding: 0 10px;
+    cursor: pointer;
+    transition: all 0.3s;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.hamburger-btn:hover {
+    color: #e0e0e0;
+}
+
+.hamburger-btn .bar {
+    display: block;
+    width: 25px;
+    height: 3px;
+    margin: 4px 0;
+    background: white;
+    transition: all 0.3s;
+}
+
+.hamburger-btn .bar-container {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+
+/* ---------- SIDEBAR OVERLAY ---------- */
+.sidebar-overlay {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 1040;
+}
+
+.sidebar-overlay.active {
+    display: block;
+}
+
+/* ---------- SLIDEABLE SIDEBAR ---------- */
+.sidebar {
+    position: fixed;
+    top: 56px;
+    left: -280px;
+    width: 280px;
+    height: calc(100vh - 56px);
+    background: #2c3e50;
+    padding: 20px 0;
+    overflow-y: auto;
+    transition: left 0.3s ease-in-out;
+    z-index: 1050;
+    box-shadow: 2px 0 10px rgba(0, 0, 0, 0.1);
+}
+
+.sidebar.open {
+    left: 0;
+}
+
+.sidebar .sidebar-header {
+    padding: 0 20px 20px;
+    border-bottom: 1px solid #34495e;
+    margin-bottom: 10px;
+}
+
+.sidebar .sidebar-header h5 {
+    color: #ecf0f1;
+    font-weight: 600;
+    margin: 0;
+}
+
+.sidebar .sidebar-header small {
+    color: #95a5a6;
+}
+
+.sidebar .list-group-item {
+    background: transparent;
+    border: none;
+    color: #ecf0f1;
+    padding: 12px 20px;
+    transition: all 0.3s;
+    border-radius: 0;
+    margin: 2px 0;
+}
+
+.sidebar .list-group-item:hover {
+    background: #34495e;
+    color: #fff;
+    padding-left: 25px;
+}
+
+.sidebar .list-group-item.active {
+    background: #3498db;
+    color: #fff;
+}
+
+.sidebar .list-group-item i {
+    margin-right: 10px;
+    width: 20px;
+    text-align: center;
+}
+
+.sidebar .list-group-item .badge {
+    float: right;
+    margin-top: 2px;
+}
+
+/* Sidebar Submenu */
+.sidebar .list-group-item.has-submenu {
+    cursor: pointer;
+}
+
+.sidebar .submenu {
+    display: none;
+    padding-left: 20px;
+}
+
+.sidebar .submenu.open {
+    display: block;
+}
+
+.sidebar .submenu .list-group-item {
+    padding-left: 45px;
+    font-size: 0.9rem;
+}
+
+.sidebar .submenu .list-group-item i {
+    margin-right: 8px;
+    font-size: 0.8rem;
+}
+
+/* Sidebar Scrollbar */
+.sidebar::-webkit-scrollbar {
+    width: 5px;
+}
+
+.sidebar::-webkit-scrollbar-track {
+    background: #2c3e50;
+}
+
+.sidebar::-webkit-scrollbar-thumb {
+    background: #34495e;
+    border-radius: 5px;
+}
+
+.sidebar::-webkit-scrollbar-thumb:hover {
+    background: #4a6a8a;
+}
+
+/* ---------- MAIN CONTENT AREA ---------- */
+.main-container {
+    display: flex;
+    min-height: calc(100vh - 56px);
+}
+
+.content-area {
+    margin-left: 0;
+    flex: 1;
+    padding: 20px;
+    min-height: calc(100vh - 56px);
+    transition: margin-left 0.3s ease-in-out;
+}
+
+.content-area.shifted {
+    margin-left: 280px;
+}
+
+/* ---------- CARDS ---------- */
+.card {
+    border: none;
+    border-radius: 10px;
+    box-shadow: 0 0 20px rgba(0, 0, 0, 0.05);
+    transition: all 0.3s;
+    margin-bottom: 20px;
+}
+
+.card:hover {
+    box-shadow: 0 5px 25px rgba(0, 0, 0, 0.1);
+}
+
+.card-header {
+    background: #f8f9fa;
+    border-bottom: 1px solid #e9ecef;
+    padding: 15px 20px;
+    font-weight: 600;
+    border-radius: 10px 10px 0 0 !important;
+}
+
+.card-body {
+    padding: 20px;
+}
+
+/* ---------- STATS CARDS ---------- */
+.stat-card {
+    border-radius: 10px;
+    padding: 20px;
+    color: white;
+    position: relative;
+    overflow: hidden;
+    transition: transform 0.3s;
+    cursor: default;
+}
+
+.stat-card:hover {
+    transform: translateY(-5px);
+}
+
+.stat-card .stat-icon {
+    font-size: 3rem;
+    opacity: 0.2;
+    position: absolute;
+    right: 15px;
+    top: 15px;
+}
+
+.stat-card .stat-number {
+    font-size: 2.5rem;
+    font-weight: 700;
+    margin: 0;
+}
+
+.stat-card .stat-label {
+    font-size: 1rem;
+    opacity: 0.9;
+    margin: 0;
+}
+
+.stat-card-primary {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+.stat-card-success {
+    background: linear-gradient(135deg, #84fab0 0%, #8fd3f4 100%);
+}
+
+.stat-card-warning {
+    background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+}
+
+.stat-card-info {
+    background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+}
+
+/* ---------- TABLES ---------- */
+.table {
+    margin-bottom: 0;
+}
+
+.table th {
+    font-weight: 600;
+    color: #495057;
+    border-top: none;
+    background: #f8f9fa;
+}
+
+.table td {
+    vertical-align: middle;
+}
+
+.table-hover tbody tr:hover {
+    background-color: #f8f9fa;
+}
+
+/* ---------- BADGES ---------- */
+.badge {
+    padding: 0.5em 0.75em;
+    font-weight: 500;
+    border-radius: 6px;
+}
+
+/* Exam Type Badges */
+.badge-exam-final {
+    background: #dc3545;
+    color: white;
+}
+
+.badge-exam-mid {
+    background: #ffc107;
+    color: #212529;
+}
+
+.badge-exam-quiz {
+    background: #17a2b8;
+    color: white;
+}
+
+.badge-exam-lab {
+    background: #6f42c1;
+    color: white;
+}
+
+/* Grade Badges */
+.badge-grade-a {
+    background-color: #28a745;
+    color: white;
+}
+
+.badge-grade-b {
+    background-color: #17a2b8;
+    color: white;
+}
+
+.badge-grade-c {
+    background-color: #ffc107;
+    color: #212529;
+}
+
+.badge-grade-d {
+    background-color: #fd7e14;
+    color: white;
+}
+
+.badge-grade-f {
+    background-color: #dc3545;
+    color: white;
+}
+
+/* Status Colors */
+.status-active {
+    color: #28a745;
+}
+
+.status-inactive {
+    color: #dc3545;
+}
+
+.status-pending {
+    color: #ffc107;
+}
+
+/* ---------- BUTTONS ---------- */
+.btn {
+    border-radius: 6px;
+    padding: 8px 20px;
+    font-weight: 500;
+    transition: all 0.3s;
+}
+
+.btn-sm {
+    padding: 5px 12px;
+}
+
+.btn-primary {
+    background: #667eea;
+    border-color: #667eea;
+}
+
+.btn-primary:hover {
+    background: #5a67d8;
+    border-color: #5a67d8;
+}
+
+/* ---------- FORMS ---------- */
+.form-control,
+.form-select {
+    border-radius: 6px;
+    border: 1px solid #e2e8f0;
+    padding: 10px 15px;
+    transition: all 0.3s;
+}
+
+.form-control:focus,
+.form-select:focus {
+    border-color: #667eea;
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+.form-label {
+    font-weight: 500;
+    color: #4a5568;
+    margin-bottom: 8px;
+}
+
+/* ---------- ALERTS ---------- */
+.alert {
+    border: none;
+    border-radius: 10px;
+    padding: 15px 20px;
+    animation: slideDown 0.3s ease-in;
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* ---------- SCHEDULE CARDS ---------- */
+.schedule-card {
+    border-left: 4px solid;
+    transition: transform 0.3s;
+}
+
+.schedule-card:hover {
+    transform: translateX(5px);
+}
+
+.schedule-card-final {
+    border-left-color: #dc3545;
+}
+
+.schedule-card-mid {
+    border-left-color: #ffc107;
+}
+
+.schedule-card-quiz {
+    border-left-color: #17a2b8;
+}
+
+.schedule-card-lab {
+    border-left-color: #6f42c1;
+}
+
+/* ---------- RESULT CARDS ---------- */
+.result-card {
+    border-radius: 10px;
+    padding: 15px;
+    margin-bottom: 15px;
+    background: #f8f9fa;
+}
+
+.result-card .student-name {
+    font-weight: 600;
+    font-size: 1.1rem;
+}
+
+.result-card .course-name {
+    color: #6c757d;
+    font-size: 0.9rem;
+}
+
+.result-card .marks {
+    font-size: 1.2rem;
+    font-weight: 600;
+}
+
+/* ---------- PROMOTION LIST ---------- */
+.promotion-list .student-item {
+    padding: 10px 15px;
+    border-bottom: 1px solid #dee2e6;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.promotion-list .student-item:last-child {
+    border-bottom: none;
+}
+
+.promotion-list .student-info {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+.promotion-list .student-info .avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: #667eea;
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 600;
+}
+
+/* ---------- DATA TABLES ---------- */
+.dataTables_wrapper .dataTables_filter input {
+    border: 1px solid #ced4da;
+    border-radius: 4px;
+    padding: 5px 10px;
+    margin-left: 5px;
+}
+
+.dataTables_wrapper .dataTables_length select {
+    border: 1px solid #ced4da;
+    border-radius: 4px;
+    padding: 5px 10px;
+}
+
+/* ---------- QUICK ACTIONS ---------- */
+.quick-actions .btn {
+    width: 100%;
+    margin-bottom: 10px;
+    text-align: left;
+    padding: 12px 20px;
+}
+
+.quick-actions .btn i {
+    margin-right: 10px;
+}
+
+/* ---------- TIMELINE ---------- */
+.timeline {
+    position: relative;
+    padding-left: 30px;
+}
+
+.timeline::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background: #dee2e6;
+}
+
+.timeline-item {
+    position: relative;
+    margin-bottom: 30px;
+}
+
+.timeline-item::before {
+    content: '';
+    position: absolute;
+    left: -34px;
+    top: 5px;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: #667eea;
+    border: 3px solid white;
+    box-shadow: 0 0 0 3px #667eea;
+}
+
+.timeline-item .time {
+    font-size: 0.85rem;
+    color: #6c757d;
+    font-weight: 500;
+}
+
+.timeline-item .title {
+    font-weight: 600;
+    margin-bottom: 5px;
+}
+
+.timeline-item .description {
+    color: #6c757d;
+    font-size: 0.95rem;
+}
+
+/* ---------- FOOTER ---------- */
+.footer {
+    margin-top: auto;
+}
+
+/* ---------- ANIMATIONS ---------- */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.fade-in {
+    animation: fadeIn 0.5s ease-in;
+}
+
+/* ---------- CUSTOM SCROLLBAR ---------- */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: #f1f1f1;
+}
+
+::-webkit-scrollbar-thumb {
+    background: #888;
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: #555;
+}
+
+/* ---------- RESPONSIVE ---------- */
+@media (max-width: 768px) {
+    .sidebar {
+        width: 280px;
+        left: -280px;
+    }
+    
+    .sidebar.open {
+        left: 0;
+    }
+    
+    .content-area.shifted {
+        margin-left: 0;
+    }
+    
+    .stat-card .stat-number {
+        font-size: 1.8rem;
+    }
+    
+    .stat-card .stat-icon {
+        font-size: 2rem;
+    }
+    
+    .timeline {
+        padding-left: 20px;
+    }
+    
+    .timeline-item::before {
+        left: -24px;
+        width: 8px;
+        height: 8px;
+    }
+}
+
+/* ---------- PRINT STYLES ---------- */
+@media print {
+    .sidebar,
+    .navbar-fixed,
+    .hamburger-btn,
+    .btn,
+    .no-print {
+        display: none !important;
+    }
+    
+    .content-area {
+        margin-left: 0 !important;
+        padding: 0 !important;
+    }
+    
+    .card {
+        box-shadow: none !important;
+        border: 1px solid #ddd !important;
+    }
+    
+    .stat-card {
+        border: 1px solid #ddd !important;
+        color: #333 !important;
+        background: white !important;
+    }
+    
+    .stat-card .stat-icon {
+        display: none !important;
+    }
+}
