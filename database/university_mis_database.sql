@@ -851,5 +851,62 @@ WHERE application_status IN ('Submitted','Under Review')
 ORDER BY submitted_at ASC;
 
 -- =====================================================================
+-- 10. SBE MODULE SEED DATA
+-- =====================================================================
+
+-- SBE Auth Users (teachers and students for SBE portal login)
+INSERT INTO sbe_auth_users (role, login_id, password_hash, display_name, teacher_id, student_id, status) VALUES
+    ('Teacher', '5001', '$2y$10$k8/5TEYHKt4qecH5vqVeoOG3SZEPKCr/0jvffQIh/YQjteBHpjarq', 'Teacher 5001', 1, NULL, 'Active'),
+    ('Teacher', '5002', '$2y$10$k8/5TEYHKt4qecH5vqVeoOG3SZEPKCr/0jvffQIh/YQjteBHpjarq', 'Teacher 5002', 2, NULL, 'Active'),
+    ('Student', '9001', '$2y$10$k8/5TEYHKt4qecH5vqVeoOG3SZEPKCr/0jvffQIh/YQjteBHpjarq', 'Student 9001', NULL, 9001, 'Active'),
+    ('Student', '9002', '$2y$10$k8/5TEYHKt4qecH5vqVeoOG3SZEPKCr/0jvffQIh/YQjteBHpjarq', 'Student 9002', NULL, 9002, 'Active');
+
+-- SBE Demo Exam for Student 9001
+INSERT INTO sbe_exams (
+    exam_code, course_id, teacher_id, title, exam_type, instructions,
+    duration_minutes, total_questions, total_marks, passing_marks,
+    selection_mode, negative_marking, shuffle_questions, shuffle_options,
+    allow_review, status
+)
+SELECT 'SBE-9001-TEST', 1, 1, 'SBE Demo Test for Student 9001', 'Practice',
+    'Read each MCQ carefully and select the best answer.',
+    30, 3, 3.00, 2.00, 'Manual', 0.00, 0, 0, 1, 'Published'
+WHERE NOT EXISTS (SELECT 1 FROM sbe_exams WHERE exam_code = 'SBE-9001-TEST');
+
+SET @sbe_exam_id := (SELECT exam_id FROM sbe_exams WHERE exam_code = 'SBE-9001-TEST' LIMIT 1);
+
+INSERT INTO sbe_question_bank (course_id, teacher_id, topic, question_text, option_a, option_b, option_c, option_d, correct_option, explanation, marks, difficulty_level, status)
+SELECT 1, 1, 'SBE Demo Test', 'What does SBE stand for in this module?', 'System Based Examination', 'Student Billing Entry', 'Semester Batch Evaluation', 'Subject Book Exchange', 'A', 'SBE is the System Based Examination module.', 1.00, 'Easy', 'Active'
+WHERE NOT EXISTS (SELECT 1 FROM sbe_question_bank WHERE topic = 'SBE Demo Test' AND question_text LIKE '%SBE stand for%');
+
+INSERT INTO sbe_question_bank (course_id, teacher_id, topic, question_text, option_a, option_b, option_c, option_d, correct_option, explanation, marks, difficulty_level, status)
+SELECT 1, 1, 'SBE Demo Test', 'Which user role attempts exams from the exam room?', 'Teacher', 'Student', 'Admin', 'Guest', 'B', 'Students attempt exams from the student exam room.', 1.00, 'Easy', 'Active'
+WHERE NOT EXISTS (SELECT 1 FROM sbe_question_bank WHERE topic = 'SBE Demo Test' AND question_text LIKE '%user role attempts%');
+
+INSERT INTO sbe_question_bank (course_id, teacher_id, topic, question_text, option_a, option_b, option_c, option_d, correct_option, explanation, marks, difficulty_level, status)
+SELECT 1, 1, 'SBE Demo Test', 'What must be true before a student can launch an exam?', 'The exam is archived', 'The schedule is ongoing', 'The account is inactive', 'The exam has no questions', 'B', 'The student launch page only shows ongoing schedules for published exams.', 1.00, 'Medium', 'Active'
+WHERE NOT EXISTS (SELECT 1 FROM sbe_question_bank WHERE topic = 'SBE Demo Test' AND question_text LIKE '%before a student can launch%');
+
+SET @sbe_q1 := (SELECT question_id FROM sbe_question_bank WHERE topic = 'SBE Demo Test' AND question_text LIKE '%SBE stand for%' LIMIT 1);
+SET @sbe_q2 := (SELECT question_id FROM sbe_question_bank WHERE topic = 'SBE Demo Test' AND question_text LIKE '%user role attempts%' LIMIT 1);
+SET @sbe_q3 := (SELECT question_id FROM sbe_question_bank WHERE topic = 'SBE Demo Test' AND question_text LIKE '%before a student can launch%' LIMIT 1);
+
+INSERT INTO sbe_exam_questions (exam_id, question_id, question_order)
+SELECT @sbe_exam_id, @sbe_q1, 1
+WHERE NOT EXISTS (SELECT 1 FROM sbe_exam_questions WHERE exam_id = @sbe_exam_id AND question_order = 1);
+
+INSERT INTO sbe_exam_questions (exam_id, question_id, question_order)
+SELECT @sbe_exam_id, @sbe_q2, 2
+WHERE NOT EXISTS (SELECT 1 FROM sbe_exam_questions WHERE exam_id = @sbe_exam_id AND question_order = 2);
+
+INSERT INTO sbe_exam_questions (exam_id, question_id, question_order)
+SELECT @sbe_exam_id, @sbe_q3, 3
+WHERE NOT EXISTS (SELECT 1 FROM sbe_exam_questions WHERE exam_id = @sbe_exam_id AND question_order = 3);
+
+INSERT INTO sbe_exam_schedule (exam_id, section, semester_id, exam_date, start_time, end_time, late_submission_grace_minutes, location, remarks, status)
+SELECT @sbe_exam_id, 'CS-A', 1, CURDATE(), '08:00:00', '23:59:00', 10, 'SBE Demo Lab', '9001 demo test schedule', 'Ongoing'
+WHERE NOT EXISTS (SELECT 1 FROM sbe_exam_schedule WHERE exam_id = @sbe_exam_id AND remarks = '9001 demo test schedule');
+
+-- =====================================================================
 -- END OF SCRIPT
 -- =====================================================================
