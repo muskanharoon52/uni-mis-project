@@ -22,7 +22,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $dbUser = null;
 
     try {
-        $stmt = db()->prepare('SELECT * FROM users WHERE role = ? AND login_id = ? LIMIT 1');
+        $stmt = db()->prepare('SELECT u.*, r.role_name AS role FROM users u JOIN roles r ON r.role_id = u.role_id WHERE r.role_name = ? AND u.login_id = ? LIMIT 1');
         $stmt->execute([$role, $loginId]);
         $dbUser = $stmt->fetch();
     } catch (Throwable $e) {

@@ -19,8 +19,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $photoPath = save_uploaded_file('profile_photo', 'profiles', ['jpg', 'jpeg', 'png', 'webp']);
             $stmt = db()->prepare(
                 'UPDATE users
-                 SET name = ?, department = ?, profile_photo = COALESCE(?, profile_photo)
-                 WHERE id = ?'
+                 SET full_name = ?, department_id = ?, profile_photo = COALESCE(?, profile_photo)
+                 WHERE user_id = ?'
             );
             $stmt->execute([
                 trim((string) ($_POST['name'] ?? '')),
@@ -42,7 +42,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 throw new RuntimeException('Passwords do not match.');
             }
 
-            $verifyStmt = db()->prepare('SELECT password_hash FROM users WHERE id = ? LIMIT 1');
+            $verifyStmt = db()->prepare('SELECT password_hash FROM users WHERE user_id = ? LIMIT 1');
             $verifyStmt->execute([$user['id']]);
             $passwordHash = (string) $verifyStmt->fetchColumn();
 
@@ -50,7 +50,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 throw new RuntimeException('Current password is incorrect.');
             }
 
-            $updateStmt = db()->prepare('UPDATE users SET password_hash = ? WHERE id = ?');
+            $updateStmt = db()->prepare('UPDATE users SET password_hash = ? WHERE user_id = ?');
             $updateStmt->execute([password_hash($newPassword, PASSWORD_DEFAULT), $user['id']]);
             $message = 'Password updated successfully.';
         }
@@ -66,9 +66,9 @@ $courseStmt->execute([$user['id']]);
 $courseCount = (int) $courseStmt->fetchColumn();
 
 $studentStmt = db()->prepare(
-    'SELECT COUNT(DISTINCT e.student_id)
-     FROM enrollments e
-     JOIN courses c ON c.id = e.course_id
+    'SELECT COUNT(DISTINCT e.student_user_id)
+     FROM lms_enrollments e
+     JOIN courses c ON c.course_id = e.course_id
      WHERE c.teacher_id = ?'
 );
 $studentStmt->execute([$user['id']]);

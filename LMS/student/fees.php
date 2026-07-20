@@ -8,7 +8,7 @@ $user = require_role('student');
 $active = 'fees';
 $pageTitle = 'Fees';
 
-$feesStmt = db()->prepare('SELECT * FROM fee_records WHERE student_id = ? ORDER BY due_date DESC');
+$feesStmt = db()->prepare('SELECT * FROM lms_fee_records WHERE student_user_id = ? ORDER BY due_date DESC');
 $feesStmt->execute([$user['id']]);
 $feeRows = $feesStmt->fetchAll();
 $totalAmount = array_sum(array_map(static fn (array $row): float => (float) $row['amount'], $feeRows));

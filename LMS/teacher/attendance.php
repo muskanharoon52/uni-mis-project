@@ -10,14 +10,14 @@ $pageTitle = 'Attendance';
 $message = '';
 $error = '';
 
-$coursesStmt = db()->prepare('SELECT * FROM courses WHERE teacher_id = ? ORDER BY code');
+$coursesStmt = db()->prepare('SELECT * FROM courses WHERE teacher_id = ? ORDER BY course_code');
 $coursesStmt->execute([$user['id']]);
 $courses = $coursesStmt->fetchAll();
-$selectedCourseId = (int) ($_POST['course_id'] ?? $_GET['course_id'] ?? ($courses[0]['id'] ?? 0));
+$selectedCourseId = (int) ($_POST['course_id'] ?? $_GET['course_id'] ?? ($courses[0]['course_id'] ?? 0));
 $selectedDate = (string) ($_POST['class_date'] ?? $_GET['class_date'] ?? date('Y-m-d'));
 
 if ($selectedCourseId && !teacher_owns_course((int) $user['id'], $selectedCourseId)) {
-    $selectedCourseId = (int) ($courses[0]['id'] ?? 0);
+    $selectedCourseId = (int) ($courses[0]['course_id'] ?? 0);
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -36,7 +36,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         foreach (($_POST['status'] ?? []) as $studentId => $status) {
             $studentId = (int) $studentId;
             $status = (string) $status;
-            if (in_array($status, ['present', 'late', 'absent'], true) && student_enrolled_in_course($studentId, $selectedCourseId)) {
+            if (in_array($status, ['Present', 'Late', 'Absent'], true) && student_enrolled_in_course($studentId, $selectedCourseId)) {
                 $stmt->execute([$selectedCourseId, $studentId, $selectedDate, $status]);
             }
         }
@@ -49,24 +49,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 $roster = [];
 if ($selectedCourseId) {
     $rosterStmt = db()->prepare(
-        'SELECT u.id, u.name, u.email, COALESCE(a.status, "present") AS status
-         FROM enrollments e
-         JOIN users u ON u.id = e.student_id
-         LEFT JOIN attendance a ON a.course_id = e.course_id AND a.student_id = e.student_id AND a.class_date = ?
+        'SELECT u.user_id, u.full_name, u.email, COALESCE(a.status, "Present") AS status
+         FROM lms_enrollments e
+         JOIN users u ON u.user_id = e.student_user_id
+         LEFT JOIN attendance a ON a.course_id = e.course_id AND a.student_id = e.student_user_id AND a.class_date = ?
          WHERE e.course_id = ?
-         ORDER BY u.name'
+         ORDER BY u.full_name'
     );
     $rosterStmt->execute([$selectedDate, $selectedCourseId]);
     $roster = $rosterStmt->fetchAll();
 }
 
 $records = db()->prepare(
-    'SELECT a.*, c.code, u.name AS student_name
+    'SELECT a.*, c.course_code, u.full_name AS student_name
      FROM attendance a
-     JOIN courses c ON c.id = a.course_id
-     JOIN users u ON u.id = a.student_id
+     JOIN courses c ON c.course_id = a.course_id
+     JOIN users u ON u.user_id = a.student_id
      WHERE c.teacher_id = ?
-     ORDER BY a.class_date DESC, c.code, u.name
+     ORDER BY a.class_date DESC, c.course_code, u.full_name
      LIMIT 40'
 );
 $records->execute([$user['id']]);
@@ -84,8 +84,8 @@ require_once __DIR__ . '/../includes/header.php';
                 <label for="course_id">Course</label>
                 <select id="course_id" name="course_id" required>
                     <?php foreach ($courses as $course): ?>
-                        <option value="<?= (int) $course['id'] ?>" <?= (int) $course['id'] === $selectedCourseId ? 'selected' : '' ?>>
-                            <?= e($course['code'] . ' - ' . $course['title']) ?>
+                    <option value="<?= (int) $course['course_id'] ?>" <?= (int) $course['course_id'] === $selectedCourseId ? 'selected' : '' ?>>
+                        <?= e($course['course_code'] . ' - ' . $course['course_title']) ?>
                         </option>
                     <?php endforeach; ?>
                 </select>
@@ -108,13 +108,13 @@ require_once __DIR__ . '/../includes/header.php';
             <tr><th>Student</th><th>Email</th><th>Status</th></tr>
             <?php foreach ($roster as $student): ?>
                 <tr>
-                    <td><?= e($student['name']) ?></td>
+                    <td><?= e($student['full_name']) ?></td>
                     <td><?= e($student['email']) ?></td>
                     <td>
-                        <select name="status[<?= (int) $student['id'] ?>]">
-                            <option value="present" <?= $student['status'] === 'present' ? 'selected' : '' ?>>Present</option>
-                            <option value="late" <?= $student['status'] === 'late' ? 'selected' : '' ?>>Late</option>
-                            <option value="absent" <?= $student['status'] === 'absent' ? 'selected' : '' ?>>Absent</option>
+                        <select name="status[<?= (int) $student['user_id'] ?>]">
+                            <option value="Present" <?= $student['status'] === 'Present' ? 'selected' : '' ?>>Present</option>
+                            <option value="Late" <?= $student['status'] === 'Late' ? 'selected' : '' ?>>Late</option>
+                            <option value="Absent" <?= $student['status'] === 'Absent' ? 'selected' : '' ?>>Absent</option>
                         </select>
                     </td>
                 </tr>
@@ -133,9 +133,9 @@ require_once __DIR__ . '/../includes/header.php';
             <?php foreach ($records as $record): ?>
                 <tr>
                     <td><?= e($record['class_date']) ?></td>
-                    <td><?= e($record['code']) ?></td>
+                    <td><?= e($record['course_code']) ?></td>
                     <td><?= e($record['student_name']) ?></td>
-                    <td><span class="badge badge-<?= $record['status'] === 'present' ? 'active' : ($record['status'] === 'late' ? 'draft' : 'inactive') ?>"><?= e($record['status']) ?></span></td>
+                    <td><span class="badge badge-<?= $record['status'] === 'Present' ? 'active' : ($record['status'] === 'Late' ? 'draft' : 'inactive') ?>"><?= e($record['status']) ?></span></td>
                 </tr>
             <?php endforeach; ?>
         </table>

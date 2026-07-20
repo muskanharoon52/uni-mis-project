@@ -33,7 +33,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 throw new RuntimeException('You cannot finalize this marks row.');
             }
             $stmt = db()->prepare(
-                'INSERT INTO mark_finalizations (course_id, student_id, is_finalized, finalized_at)
+                'INSERT INTO lms_mark_finalizations (course_id, student_user_id, is_finalized, finalized_at)
                  VALUES (?, ?, 1, CURRENT_TIMESTAMP)
                  ON DUPLICATE KEY UPDATE is_finalized = 1, finalized_at = CURRENT_TIMESTAMP'
             );
@@ -41,7 +41,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $message = 'Marks finalized.';
         } else {
             $stmt = db()->prepare(
-                'INSERT INTO marks (course_id, student_id, component, marks_obtained, total_marks)
+                'INSERT INTO lms_marks (course_id, student_user_id, component, marks_obtained, total_marks)
                  VALUES (?, ?, ?, ?, ?)
                  ON DUPLICATE KEY UPDATE marks_obtained = VALUES(marks_obtained), total_marks = VALUES(total_marks)'
             );
@@ -53,7 +53,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if (!teacher_owns_course((int) $user['id'], $courseId)) {
                         continue;
                     }
-                    $finalizedStmt = db()->prepare('SELECT COUNT(*) FROM mark_finalizations WHERE course_id = ? AND student_id = ? AND is_finalized = 1');
+                    $finalizedStmt = db()->prepare('SELECT COUNT(*) FROM lms_mark_finalizations WHERE course_id = ? AND student_user_id = ? AND is_finalized = 1');
                     $finalizedStmt->execute([$courseId, $studentId]);
                     if ((int) $finalizedStmt->fetchColumn() > 0) {
                         continue;

@@ -9,23 +9,23 @@ $active = 'attendance';
 $pageTitle = 'Attendance';
 
 $coursesStmt = db()->prepare(
-    'SELECT c.id, c.code, c.title
-     FROM enrollments e
-     JOIN courses c ON c.id = e.course_id
-     WHERE e.student_id = ?
-     ORDER BY c.code'
+    'SELECT c.course_id, c.course_code, c.course_title
+     FROM lms_enrollments e
+     JOIN courses c ON c.course_id = e.course_id
+     WHERE e.student_user_id = ?
+     ORDER BY c.course_code'
 );
 $coursesStmt->execute([$user['id']]);
 $courses = $coursesStmt->fetchAll();
 
-$courseId = isset($_GET['course_id']) ? (int) $_GET['course_id'] : ((int) ($courses[0]['id'] ?? 0));
+$courseId = isset($_GET['course_id']) ? (int) $_GET['course_id'] : ((int) ($courses[0]['course_id'] ?? 0));
 $attendanceRows = [];
 
 if ($courseId > 0 && student_enrolled_in_course((int) $user['id'], $courseId)) {
     $attendanceStmt = db()->prepare(
-        'SELECT a.class_date, a.status, c.code, c.title, c.semester
+        'SELECT a.class_date, a.status, c.course_code, c.course_title, c.semester_name
          FROM attendance a
-         JOIN courses c ON c.id = a.course_id
+         JOIN courses c ON c.course_id = a.course_id
          WHERE a.student_id = ? AND a.course_id = ?
          ORDER BY a.class_date DESC'
     );
@@ -39,9 +39,9 @@ require_once __DIR__ . '/../includes/header.php';
     <aside class="course-list-panel">
         <div class="course-list-head">Courses</div>
         <?php foreach ($courses as $course): ?>
-            <a class="course-list-item <?= (int) $course['id'] === $courseId ? 'active' : '' ?>" href="<?= app_url('student/attendance.php?course_id=' . (int) $course['id']) ?>">
-                <strong><?= e($course['code']) ?></strong>
-                <span><?= e($course['title']) ?></span>
+            <a class="course-list-item <?= (int) $course['course_id'] === $courseId ? 'active' : '' ?>" href="<?= app_url('student/attendance.php?course_id=' . (int) $course['course_id']) ?>">
+                <strong><?= e($course['course_code']) ?></strong>
+                <span><?= e($course['course_title']) ?></span>
             </a>
         <?php endforeach; ?>
     </aside>
@@ -55,9 +55,9 @@ require_once __DIR__ . '/../includes/header.php';
                 <?php foreach ($attendanceRows as $row): ?>
                     <tr>
                         <td><?= e($row['class_date']) ?></td>
-                        <td><span class="badge badge-<?= $row['status'] === 'present' ? 'active' : ($row['status'] === 'late' ? 'draft' : 'inactive') ?>"><?= e($row['status']) ?></span></td>
-                        <td><?= e($row['code'] . ' - ' . $row['title']) ?></td>
-                        <td><?= e($row['semester']) ?></td>
+                        <td><span class="badge badge-<?= $row['status'] === 'Present' ? 'active' : ($row['status'] === 'Late' ? 'draft' : 'inactive') ?>"><?= e($row['status']) ?></span></td>
+                        <td><?= e($row['course_code'] . ' - ' . $row['course_title']) ?></td>
+                        <td><?= e($row['semester_name']) ?></td>
                     </tr>
                 <?php endforeach; ?>
                 <?php if (!$attendanceRows): ?>

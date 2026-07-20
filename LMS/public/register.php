@@ -24,16 +24,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } else {
         try {
             $loginId = '9' . str_pad((string) random_int(0, 999), 3, '0', STR_PAD_LEFT);
+            $studentRoleId = (int) db()->query("SELECT role_id FROM roles WHERE role_name = 'Student' LIMIT 1")->fetchColumn();
             $stmt = db()->prepare(
-                'INSERT INTO users (login_id, name, email, password_hash, role, department, program) VALUES (?, ?, ?, ?, ?, ?, ?)'
+                'INSERT INTO users (login_id, full_name, email, password_hash, role_id, department_id, program) VALUES (?, ?, ?, ?, ?, NULL, ?)'
             );
             $stmt->execute([
                 $loginId,
                 $name,
                 $email,
                 password_hash($password, PASSWORD_DEFAULT),
-                'student',
-                $department,
+                $studentRoleId,
                 $program,
             ]);
 

@@ -90,6 +90,8 @@ CREATE TABLE users (
     password_hash VARCHAR(255) NOT NULL,
     role_id       INT NOT NULL,
     department_id INT NULL,                 -- for teachers / dept-scoped staff
+    login_id      VARCHAR(20) NULL UNIQUE,  -- LMS login ID (e.g. 5001, 9001)
+    profile_photo VARCHAR(255) NULL,        -- LMS profile photo path
     status        ENUM('Active','Inactive') NOT NULL DEFAULT 'Active',
     last_login_at DATETIME NULL,
     created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -268,13 +270,17 @@ CREATE TABLE courses (
     course_id      INT AUTO_INCREMENT PRIMARY KEY,
     course_code    VARCHAR(20) NOT NULL UNIQUE,
     course_title   VARCHAR(150) NOT NULL,
+    description    TEXT NULL,                        -- LMS course description
     credit_hours   TINYINT NOT NULL DEFAULT 3,
     department_id  INT NOT NULL,
     semester_id    INT NOT NULL,
+    semester_name  VARCHAR(40) NULL,                 -- LMS semester string (e.g. 'Spring 2026')
+    teacher_id     INT NULL,                         -- LMS direct teacher link (FK to teachers)
     status         ENUM('Active','Inactive') NOT NULL DEFAULT 'Active',
     created_at     TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT fk_course_dept FOREIGN KEY (department_id) REFERENCES departments(department_id),
-    CONSTRAINT fk_course_sem  FOREIGN KEY (semester_id) REFERENCES semesters(semester_id)
+    CONSTRAINT fk_course_sem  FOREIGN KEY (semester_id) REFERENCES semesters(semester_id),
+    CONSTRAINT fk_course_teacher FOREIGN KEY (teacher_id) REFERENCES teachers(teacher_id)
 ) ENGINE=InnoDB;
 
 CREATE TABLE semester_courses (
@@ -324,9 +330,9 @@ CREATE TABLE attendance (
     attendance_id INT AUTO_INCREMENT PRIMARY KEY,
     student_id    INT NOT NULL,
     course_id     INT NOT NULL,
-    teacher_id    INT NOT NULL,
+    teacher_id    INT NULL,                 -- nullable for LMS usage
     class_date    DATE NOT NULL,
-    status        ENUM('Present','Absent','Leave') NOT NULL,
+    status        ENUM('Present','Absent','Late','Leave') NOT NULL,
     marked_at     TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT fk_att_student FOREIGN KEY (student_id) REFERENCES students(student_id),
     CONSTRAINT fk_att_course  FOREIGN KEY (course_id) REFERENCES courses(course_id),
@@ -691,6 +697,137 @@ CREATE TABLE sbe_exam_results (
     UNIQUE KEY uq_studentexam_result (student_exam_id)
 ) ENGINE=InnoDB;
 
+-- =====================================================================
+-- LMS MODULE TABLES (Learning Management System)
+-- =====================================================================
+
+-- LMS: Student-course enrollment (links LMS users to courses)
+CREATE TABLE lms_enrollments (
+    enrollment_id INT AUTO_INCREMENT PRIMARY KEY,
+    student_user_id INT NOT NULL,
+    course_id    INT NOT NULL,
+    enrolled_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_lms_enr_student FOREIGN KEY (student_user_id) REFERENCES users(user_id) ON DELETE CASCADE,
+    CONSTRAINT fk_lms_enr_course  FOREIGN KEY (course_id) REFERENCES courses(course_id) ON DELETE CASCADE,
+    UNIQUE KEY uq_lms_enrollment (student_user_id, course_id)
+) ENGINE=InnoDB;
+
+-- LMS: Teacher-created assignments with file upload and due date
+CREATE TABLE lms_assignments (
+    assignment_id INT AUTO_INCREMENT PRIMARY KEY,
+    course_id    INT NOT NULL,
+    title        VARCHAR(160) NOT NULL,
+    description  TEXT NULL,
+    file_path    VARCHAR(255) NULL,
+    due_date     DATE NOT NULL,
+    created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_lms_asn_course FOREIGN KEY (course_id) REFERENCES courses(course_id) ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+-- LMS: Course lecture materials with file upload
+CREATE TABLE lms_lectures (
+    lecture_id    INT AUTO_INCREMENT PRIMARY KEY,
+    course_id     INT NOT NULL,
+    title         VARCHAR(160) NOT NULL,
+    file_path     VARCHAR(255) NOT NULL,
+    lecture_date  DATE NULL,
+    created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_lms_lec_course FOREIGN KEY (course_id) REFERENCES courses(course_id) ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+-- LMS: Student assignment submissions with grading and feedback
+CREATE TABLE lms_submissions (
+    submission_id   INT AUTO_INCREMENT PRIMARY KEY,
+    assignment_id   INT NOT NULL,
+    student_user_id INT NOT NULL,
+    content         TEXT NOT NULL,
+    submission_file VARCHAR(255) NULL,
+    submitted_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    grade           DECIMAL(5,2) NULL,
+    feedback        TEXT NULL,
+    CONSTRAINT fk_lms_sub_assignment FOREIGN KEY (assignment_id) REFERENCES lms_assignments(assignment_id) ON DELETE CASCADE,
+    CONSTRAINT fk_lms_sub_student    FOREIGN KEY (student_user_id) REFERENCES users(user_id) ON DELETE CASCADE,
+    UNIQUE KEY uq_lms_submission (assignment_id, student_user_id)
+) ENGINE=InnoDB;
+
+-- LMS: Per-component internal marks (quiz, mid, assignment, etc.)
+CREATE TABLE lms_marks (
+    mark_id        INT AUTO_INCREMENT PRIMARY KEY,
+    course_id      INT NOT NULL,
+    student_user_id INT NOT NULL,
+    component      VARCHAR(100) NOT NULL,
+    marks_obtained DECIMAL(6,2) NOT NULL,
+    total_marks    DECIMAL(6,2) NOT NULL,
+    created_at     TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_lms_mark_course FOREIGN KEY (course_id) REFERENCES courses(course_id) ON DELETE CASCADE,
+    CONSTRAINT fk_lms_mark_student FOREIGN KEY (student_user_id) REFERENCES users(user_id) ON DELETE CASCADE,
+    UNIQUE KEY uq_lms_mark (course_id, student_user_id, component)
+) ENGINE=InnoDB;
+
+-- LMS: Locks/finalizes marks for a student-course pair
+CREATE TABLE lms_mark_finalizations (
+    finalization_id INT AUTO_INCREMENT PRIMARY KEY,
+    course_id       INT NOT NULL,
+    student_user_id INT NOT NULL,
+    is_finalized    TINYINT(1) NOT NULL DEFAULT 0,
+    finalized_at    TIMESTAMP NULL,
+    CONSTRAINT fk_lms_mf_course FOREIGN KEY (course_id) REFERENCES courses(course_id) ON DELETE CASCADE,
+    CONSTRAINT fk_lms_mf_student FOREIGN KEY (student_user_id) REFERENCES users(user_id) ON DELETE CASCADE,
+    UNIQUE KEY uq_lms_finalization (course_id, student_user_id)
+) ENGINE=InnoDB;
+
+-- LMS: Student support/query tickets
+CREATE TABLE lms_queries (
+    query_id       INT AUTO_INCREMENT PRIMARY KEY,
+    user_id        INT NOT NULL,
+    subject        VARCHAR(160) NOT NULL,
+    message        TEXT NOT NULL,
+    status         ENUM('open','answered','closed') NOT NULL DEFAULT 'open',
+    reply          TEXT NULL,
+    created_at     TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_lms_qry_user FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+-- LMS: Student applications (leave, withdrawal, etc.)
+CREATE TABLE lms_applications (
+    application_id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id        INT NOT NULL,
+    type           VARCHAR(100) NOT NULL,
+    details        TEXT NOT NULL,
+    status         ENUM('pending','approved','rejected') NOT NULL DEFAULT 'pending',
+    created_at     TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_lms_app_user FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+-- LMS: In-app notifications with sender, recipient, category, read-status
+CREATE TABLE lms_notifications (
+    notification_id   INT AUTO_INCREMENT PRIMARY KEY,
+    recipient_user_id INT NOT NULL,
+    sender_user_id    INT NULL,
+    category          ENUM('notification','message','announcement') NOT NULL DEFAULT 'notification',
+    title             VARCHAR(160) NOT NULL,
+    body              TEXT NOT NULL,
+    link_url          VARCHAR(255) NULL,
+    is_read           TINYINT(1) NOT NULL DEFAULT 0,
+    created_at        TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_lms_notif_recipient FOREIGN KEY (recipient_user_id) REFERENCES users(user_id) ON DELETE CASCADE,
+    CONSTRAINT fk_lms_notif_sender    FOREIGN KEY (sender_user_id) REFERENCES users(user_id) ON DELETE SET NULL
+) ENGINE=InnoDB;
+
+-- LMS: Simplified fee records for LMS views
+CREATE TABLE lms_fee_records (
+    fee_record_id INT AUTO_INCREMENT PRIMARY KEY,
+    student_user_id INT NOT NULL,
+    semester     VARCHAR(40) NOT NULL,
+    description  VARCHAR(160) NOT NULL,
+    amount       DECIMAL(12,2) NOT NULL,
+    paid_amount  DECIMAL(12,2) NOT NULL DEFAULT 0,
+    due_date     DATE NOT NULL,
+    status       ENUM('paid','partial','unpaid') NOT NULL DEFAULT 'unpaid',
+    created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_lms_fee_student FOREIGN KEY (student_user_id) REFERENCES users(user_id) ON DELETE CASCADE
+) ENGINE=InnoDB;
+
 SET FOREIGN_KEY_CHECKS = 1;
 
 -- =====================================================================
@@ -849,6 +986,203 @@ SELECT application_id, temp_application_no, full_name, program_id, session_id, s
 FROM admission_applications
 WHERE application_status IN ('Submitted','Under Review')
 ORDER BY submitted_at ASC;
+
+-- =====================================================================
+-- 10. LMS MODULE SEED DATA
+-- =====================================================================
+
+-- Roles: add Student role for LMS
+INSERT INTO roles (role_name) VALUES ('Student') ON DUPLICATE KEY UPDATE role_name = role_name;
+
+-- LMS Users: 5 teachers (5001-5005) + 20 students (9001-9020)
+-- Password for all: teacher123 / student123 (bcrypt)
+SET @teacher_role = (SELECT role_id FROM roles WHERE role_name = 'Teacher');
+SET @student_role = (SELECT role_id FROM roles WHERE role_name = 'Student');
+SET @cs_dept = (SELECT department_id FROM departments WHERE department_code = 'CS' LIMIT 1);
+SET @sem_1 = (SELECT semester_id FROM semesters WHERE semester_number = 1 LIMIT 1);
+
+-- Department fallback: if CS doesn't exist, use first department
+SET @dept_fallback = COALESCE(@cs_dept, (SELECT department_id FROM departments LIMIT 1));
+SET @sem_fallback  = COALESCE(@sem_1, (SELECT semester_id FROM semesters LIMIT 1));
+
+INSERT INTO users (full_name, username, email, password_hash, role_id, department_id, login_id, profile_photo, status) VALUES
+    ('Dr. Sara Khan',    'teacher_sara',    'sara.khan@university.edu',    '$2y$10$k8/5TEYHKt4qecH5vqVeoOG3SZEPKCr/0jvffQIh/YQjteBHpjarq', @teacher_role, @dept_fallback, '5001', NULL, 'Active'),
+    ('Dr. Ahmed Ali',    'teacher_ahmed',   'ahmed.ali@university.edu',    '$2y$10$k8/5TEYHKt4qecH5vqVeoOG3SZEPKCr/0jvffQIh/YQjteBHpjarq', @teacher_role, @dept_fallback, '5002', NULL, 'Active'),
+    ('Dr. Fatima Noor',  'teacher_fatima',  'fatima.noor@university.edu',  '$2y$10$k8/5TEYHKt4qecH5vqVeoOG3SZEPKCr/0jvffQIh/YQjteBHpjarq', @teacher_role, @dept_fallback, '5003', NULL, 'Active'),
+    ('Prof. Hassan Raza','teacher_hassan',   'hassan.raza@university.edu',  '$2y$10$k8/5TEYHKt4qecH5vqVeoOG3SZEPKCr/0jvffQIh/YQjteBHpjarq', @teacher_role, @dept_fallback, '5004', NULL, 'Active'),
+    ('Ms. Ayesha Siddiq','teacher_ayesha',  'ayesha.siddiq@university.edu','$2y$10$k8/5TEYHKt4qecH5vqVeoOG3SZEPKCr/0jvffQIh/YQjteBHpjarq', @teacher_role, @dept_fallback, '5005', NULL, 'Active');
+
+INSERT INTO users (full_name, username, email, password_hash, role_id, department_id, login_id, profile_photo, status) VALUES
+    ('Ali Raza',         'stu_ali',         'ali.raza@student.edu',         '$2y$10$k8/5TEYHKt4qecH5vqVeoOG3SZEPKCr/0jvffQIh/YQjteBHpjarq', @student_role, @dept_fallback, '9001', NULL, 'Active'),
+    ('Amina Noor',       'stu_amina',       'amina.noor@student.edu',       '$2y$10$k8/5TEYHKt4qecH5vqVeoOG3SZEPKCr/0jvffQIh/YQjteBHpjarq', @student_role, @dept_fallback, '9002', NULL, 'Active'),
+    ('Bilal Ahmed',      'stu_bilal',       'bilal.ahmed@student.edu',      '$2y$10$k8/5TEYHKt4qecH5vqVeoOG3SZEPKCr/0jvffQIh/YQjteBHpjarq', @student_role, @dept_fallback, '9003', NULL, 'Active'),
+    ('Hira Khan',        'stu_hira',        'hira.khan@student.edu',        '$2y$10$k8/5TEYHKt4qecH5vqVeoOG3SZEPKCr/0jvffQIh/YQjteBHpjarq', @student_role, @dept_fallback, '9004', NULL, 'Active'),
+    ('Hassan Ali',       'stu_hassan_s',    'hassan.ali@student.edu',       '$2y$10$k8/5TEYHKt4qecH5vqVeoOG3SZEPKCr/0jvffQIh/YQjteBHpjarq', @student_role, @dept_fallback, '9005', NULL, 'Active'),
+    ('Maryam Iqbal',     'stu_maryam',      'maryam.iqbal@student.edu',     '$2y$10$k8/5TEYHKt4qecH5vqVeoOG3SZEPKCr/0jvffQIh/YQjteBHpjarq', @student_role, @dept_fallback, '9006', NULL, 'Active'),
+    ('Usman Tariq',      'stu_usman',       'usman.tariq@student.edu',      '$2y$10$k8/5TEYHKt4qecH5vqVeoOG3SZEPKCr/0jvffQIh/YQjteBHpjarq', @student_role, @dept_fallback, '9007', NULL, 'Active'),
+    ('Sana Raza',        'stu_sana',        'sana.raza@student.edu',        '$2y$10$k8/5TEYHKt4qecH5vqVeoOG3SZEPKCr/0jvffQIh/YQjteBHpjarq', @student_role, @dept_fallback, '9008', NULL, 'Active'),
+    ('Zain Malik',       'stu_zain',        'zain.malik@student.edu',       '$2y$10$k8/5TEYHKt4qecH5vqVeoOG3SZEPKCr/0jvffQIh/YQjteBHpjarq', @student_role, @dept_fallback, '9009', NULL, 'Active'),
+    ('Iqra Javed',       'stu_iqra',        'iqra.javed@student.edu',       '$2y$10$k8/5TEYHKt4qecH5vqVeoOG3SZEPKCr/0jvffQIh/YQjteBHpjarq', @student_role, @dept_fallback, '9010', NULL, 'Active'),
+    ('Kamran Shah',      'stu_kamran',      'kamran.shah@student.edu',      '$2y$10$k8/5TEYHKt4qecH5vqVeoOG3SZEPKCr/0jvffQIh/YQjteBHpjarq', @student_role, @dept_fallback, '9011', NULL, 'Active'),
+    ('Nadia Bibi',       'stu_nadia',       'nadia.bibi@student.edu',       '$2y$10$k8/5TEYHKt4qecH5vqVeoOG3SZEPKCr/0jvffQIh/YQjteBHpjarq', @student_role, @dept_fallback, '9012', NULL, 'Active'),
+    ('Omar Farooq',      'stu_omar',        'omar.farooq@student.edu',      '$2y$10$k8/5TEYHKt4qecH5vqVeoOG3SZEPKCr/0jvffQIh/YQjteBHpjarq', @student_role, @dept_fallback, '9013', NULL, 'Active'),
+    ('巴基斯坦', 'stu_pakistan', 'pakistan@student.edu', '$2y$10$k8/5TEYHKt4qecH5vqVeoOG3SZEPKCr/0jvffQIh/YQjteBHpjarq', @student_role, @dept_fallback, '9014', NULL, 'Active'),
+    ('Qasim Nawaz',      'stu_qasim',       'qasim.nawaz@student.edu',      '$2y$10$k8/5TEYHKt4qecH5vqVeoOG3SZEPKCr/0jvffQIh/YQjteBHpjarq', @student_role, @dept_fallback, '9015', NULL, 'Active'),
+    ('Rabia Malik',      'stu_rabia',       'rabia.malik@student.edu',      '$2y$10$k8/5TEYHKt4qecH5vqVeoOG3SZEPKCr/0jvffQIh/YQjteBHpjarq', @student_role, @dept_fallback, '9016', NULL, 'Active'),
+    ('Saad Tariq',       'stu_saad',        'saad.tariq@student.edu',       '$2y$10$k8/5TEYHKt4qecH5vqVeoOG3SZEPKCr/0jvffQIh/YQjteBHpjarq', @student_role, @dept_fallback, '9017', NULL, 'Active'),
+    ('Tania Iqbal',      'stu_tania',       'tania.iqbal@student.edu',      '$2y$10$k8/5TEYHKt4qecH5vqVeoOG3SZEPKCr/0jvffQIh/YQjteBHpjarq', @student_role, @dept_fallback, '9018', NULL, 'Active'),
+    ('Umar Hayat',       'stu_umar',        'umar.hayat@student.edu',       '$2y$10$k8/5TEYHKt4qecH5vqVeoOG3SZEPKCr/0jvffQIh/YQjteBHpjarq', @student_role, @dept_fallback, '9019', NULL, 'Active'),
+    ('Zara Hussain',     'stu_zara',        'zara.hussain@student.edu',     '$2y$10$k8/5TEYHKt4qecH5vqVeoOG3SZEPKCr/0jvffQIh/YQjteBHpjarq', @student_role, @dept_fallback, '9020', NULL, 'Active');
+
+-- LMS Courses (assigned to first teacher)
+SET @t1 = (SELECT user_id FROM users WHERE login_id = '5001' LIMIT 1);
+
+INSERT INTO courses (course_code, course_title, description, credit_hours, department_id, semester_id, semester_name, teacher_id, status) VALUES
+    ('CS101',  'Introduction to Programming',    'Fundamentals of programming using clear logic and problem solving.', 3, @dept_fallback, @sem_fallback, 'Spring 2026', @t1, 'Active'),
+    ('CS102',  'Object Oriented Programming',     'OOP concepts: classes, inheritance, polymorphism, and design patterns.', 3, @dept_fallback, @sem_fallback, 'Spring 2026', @t1, 'Active'),
+    ('SE201',  'Software Engineering',            'Software development lifecycle, agile methodologies, and project management.', 3, @dept_fallback, @sem_fallback, 'Spring 2026', @t1, 'Active'),
+    ('SE204',  'Database Systems',                'Design and manage relational databases and SQL-based applications.', 3, @dept_fallback, @sem_fallback, 'Spring 2026', @t1, 'Active'),
+    ('CS301',  'Data Structures and Algorithms',  'Arrays, linked lists, trees, graphs, sorting and searching algorithms.', 3, @dept_fallback, @sem_fallback, 'Spring 2026', @t1, 'Active'),
+    ('CS302',  'Operating Systems',               'Process management, memory management, file systems, and concurrency.', 3, @dept_fallback, @sem_fallback, 'Spring 2026', @t1, 'Active'),
+    ('SE301',  'Web Engineering',                 'Modern web development: HTML, CSS, JavaScript, PHP, and frameworks.', 3, @dept_fallback, @sem_fallback, 'Spring 2026', @t1, 'Active'),
+    ('SE302',  'Information Security',            'Cryptography, network security, access control, and security auditing.', 3, @dept_fallback, @sem_fallback, 'Spring 2026', @t1, 'Active');
+
+-- LMS Enrollments: all 20 students in all 8 courses
+INSERT INTO lms_enrollments (student_user_id, course_id)
+SELECT u.user_id, c.course_id
+FROM users u
+CROSS JOIN courses c
+WHERE u.role_id = @student_role AND c.semester_name = 'Spring 2026';
+
+-- LMS Assignments
+INSERT INTO lms_assignments (course_id, title, description, file_path, due_date) VALUES
+    ((SELECT course_id FROM courses WHERE course_code = 'CS101'),  'Loops Practice',         'Submit five solved loop problems.',                   NULL, '2026-07-20'),
+    ((SELECT course_id FROM courses WHERE course_code = 'CS101'),  'Functions Assignment',    'Write functions for common mathematical operations.',  NULL, '2026-07-25'),
+    ((SELECT course_id FROM courses WHERE course_code = 'CS102'),  'Class Design',            'Design a class hierarchy for a banking system.',       NULL, '2026-07-22'),
+    ((SELECT course_id FROM courses WHERE course_code = 'CS102'),  'Inheritance Lab',         'Implement inheritance and polymorphism examples.',     NULL, '2026-07-28'),
+    ((SELECT course_id FROM courses WHERE course_code = 'SE201'),  'SDLC Report',             'Write a report on SDLC phases for a real project.',    NULL, '2026-07-23'),
+    ((SELECT course_id FROM courses WHERE course_code = 'SE204'),  'ERD Design',              'Create an ERD for a library management system.',        NULL, '2026-07-25'),
+    ((SELECT course_id FROM courses WHERE course_code = 'SE204'),  'SQL Queries',             'Write 10 complex SQL queries with joins.',             NULL, '2026-07-30'),
+    ((SELECT course_id FROM courses WHERE course_code = 'CS301'),  'Binary Tree Implementation', 'Implement a BST with insert, delete, search.',     NULL, '2026-07-24'),
+    ((SELECT course_id FROM courses WHERE course_code = 'CS302'),  'Process Scheduling',      'Simulate FCFS, SJF, and Round Robin algorithms.',      NULL, '2026-07-26'),
+    ((SELECT course_id FROM courses WHERE course_code = 'SE301'),  'Web Page Design',         'Build a responsive landing page using HTML/CSS.',       NULL, '2026-07-27'),
+    ((SELECT course_id FROM courses WHERE course_code = 'SE302'),  'Security Audit Report',   'Perform a basic security audit on a sample system.',    NULL, '2026-07-29');
+
+-- LMS Submissions: some students submitted assignments
+INSERT INTO lms_submissions (assignment_id, student_user_id, content, submission_file, submitted_at, grade, feedback) VALUES
+    (1,  (SELECT user_id FROM users WHERE login_id = '9001'), 'Loops practice submitted for review.', NULL, NOW(), NULL, NULL),
+    (1,  (SELECT user_id FROM users WHERE login_id = '9002'), 'Practice file uploaded.',              NULL, NOW(), NULL, NULL),
+    (6,  (SELECT user_id FROM users WHERE login_id = '9003'), 'ERD draft uploaded.',                  NULL, NOW(), NULL, NULL),
+    (2,  (SELECT user_id FROM users WHERE login_id = '9004'), 'Functions assignment submitted.',       NULL, NOW(), 8.00, 'Good work.'),
+    (7,  (SELECT user_id FROM users WHERE login_id = '9005'), 'SQL queries submitted.',               NULL, NOW(), NULL, NULL),
+    (3,  (SELECT user_id FROM users WHERE login_id = '9006'), 'Class design document uploaded.',       NULL, NOW(), NULL, NULL),
+    (8,  (SELECT user_id FROM users WHERE login_id = '9007'), 'BST implementation submitted.',         NULL, NOW(), 7.50, 'Needs more test cases.'),
+    (1,  (SELECT user_id FROM users WHERE login_id = '9008'), 'Loops solved.',                        NULL, NOW(), NULL, NULL);
+
+-- LMS Attendance
+SET @cs101 = (SELECT course_id FROM courses WHERE course_code = 'CS101' LIMIT 1);
+SET @cs102 = (SELECT course_id FROM courses WHERE course_code = 'CS102' LIMIT 1);
+SET @se204 = (SELECT course_id FROM courses WHERE course_code = 'SE204' LIMIT 1);
+SET @cs301 = (SELECT course_id FROM courses WHERE course_code = 'CS301' LIMIT 1);
+
+INSERT INTO lms_enrollments (student_user_id, course_id)
+SELECT u.user_id, c.course_id
+FROM users u
+CROSS JOIN courses c
+WHERE u.role_id = @student_role AND c.semester_name = 'Spring 2026'
+ON DUPLICATE KEY UPDATE enrolled_at = enrolled_at;
+
+-- Note: LMS attendance uses lms_enrollments for student-course links.
+-- The main attendance table uses students(student_id). For LMS, attendance
+-- is tracked in lms_enrollments with class_date and status added as needed by the app.
+-- Since the LMS PHP code references `attendance` directly, we keep using the main
+-- attendance table but with LMS user IDs mapped.
+
+-- LMS Internal Marks: comprehensive marks for all students
+INSERT INTO lms_marks (course_id, student_user_id, component, marks_obtained, total_marks)
+SELECT
+    c.course_id,
+    u.user_id,
+    m.component,
+    m.marks_obtained,
+    m.total_marks
+FROM users u
+CROSS JOIN courses c
+CROSS JOIN (
+    SELECT 'assignment_1' AS component, 3 AS marks_obtained, 10 AS total_marks UNION ALL
+    SELECT 'assignment_2', 5, 10 UNION ALL
+    SELECT 'assignment_3', 2, 10 UNION ALL
+    SELECT 'test_1', 7, 10 UNION ALL
+    SELECT 'test_2', 4, 10 UNION ALL
+    SELECT 'test_3', 6, 10 UNION ALL
+    SELECT 'presentation', 8, 10 UNION ALL
+    SELECT 'major_assignment', 9, 10 UNION ALL
+    SELECT 'mid_term', 20, 25
+) m
+WHERE u.role_id = @student_role
+  AND c.semester_name = 'Spring 2026'
+  AND u.login_id IN ('9001','9002','9003','9004','9005','9006','9007','9008','9009','9010')
+ON DUPLICATE KEY UPDATE marks_obtained = m.marks_obtained;
+
+-- LMS Queries
+INSERT INTO lms_queries (user_id, subject, message, status, reply, created_at) VALUES
+    ((SELECT user_id FROM users WHERE login_id = '9001'), 'Attendance correction', 'Please check my attendance for CS101.', 'open', NULL, NOW()),
+    ((SELECT user_id FROM users WHERE login_id = '9002'), 'Assignment deadline',   'Can the assignment deadline be extended?', 'open', NULL, NOW()),
+    ((SELECT user_id FROM users WHERE login_id = '9003'), 'Marks review',          'Please review my recent mid term marks.', 'open', NULL, NOW()),
+    ((SELECT user_id FROM users WHERE login_id = '9004'), 'Course material',       'Where can I find the slides for OOP?', 'answered', 'Check the lectures section.', NOW()),
+    ((SELECT user_id FROM users WHERE login_id = '9005'), 'Lab access',            'I cannot access the database lab.', 'open', NULL, NOW());
+
+-- LMS Applications
+INSERT INTO lms_applications (user_id, type, details, status, created_at) VALUES
+    ((SELECT user_id FROM users WHERE login_id = '9001'), 'Leave Request',          'Medical leave for one day.',                    'pending',  NOW()),
+    ((SELECT user_id FROM users WHERE login_id = '9002'), 'Leave Request',          'Family event on Monday.',                       'pending',  NOW()),
+    ((SELECT user_id FROM users WHERE login_id = '9003'), 'Course Withdrawal',      'I want to drop SE302 this semester.',           'pending',  NOW()),
+    ((SELECT user_id FROM users WHERE login_id = '9004'), 'Transcript Request',     'Need official transcript for job application.', 'approved', NOW()),
+    ((SELECT user_id FROM users WHERE login_id = '9005'), 'Semester Freeze',        'Medical emergency, need to freeze this semester.','pending', NOW());
+
+-- LMS Notifications
+INSERT INTO lms_notifications (recipient_user_id, sender_user_id, category, title, body, link_url, is_read, created_at)
+SELECT u.user_id, @t1, 'notification', 'New assignment posted', CONCAT('An assignment has been uploaded for ', c.course_code, '.'), 'student/submissions.php', 0, NOW()
+FROM users u
+CROSS JOIN courses c
+WHERE u.role_id = @student_role
+  AND c.semester_name = 'Spring 2026'
+  AND u.login_id IN ('9001','9002','9003','9004','9005')
+LIMIT 50;
+
+INSERT INTO lms_notifications (recipient_user_id, sender_user_id, category, title, body, link_url, is_read, created_at)
+SELECT u.user_id, @t1, 'message', 'Welcome to University LMS', 'Check your courses and keep an eye on assignments in the dashboard.', 'student/dashboard.php', 0, NOW()
+FROM users u
+WHERE u.role_id = @student_role
+  AND u.login_id IN ('9006','9007','9008','9009','9010');
+
+INSERT INTO lms_notifications (recipient_user_id, sender_user_id, category, title, body, link_url, is_read, created_at)
+SELECT u.user_id, @t1, 'announcement', 'Semester update', 'Spring 2026 notices will appear here.', 'student/dashboard.php', 0, NOW()
+FROM users u
+WHERE u.role_id = @student_role
+  AND u.login_id IN ('9011','9012','9013','9014','9015');
+
+-- LMS Fee Records
+INSERT INTO lms_fee_records (student_user_id, semester, description, amount, paid_amount, due_date, status)
+SELECT u.user_id, 'Spring 2026', 'Semester Tuition Fee', 85000.00,
+    CASE
+        WHEN u.login_id IN ('9001','9004','9006','9008','9010','9012','9014','9016','9018','9020') THEN 85000.00
+        WHEN u.login_id IN ('9002','9007','9011','9015','9019') THEN 42500.00
+        ELSE 0.00
+    END,
+    '2026-07-15',
+    CASE
+        WHEN u.login_id IN ('9001','9004','9006','9008','9010','9012','9014','9016','9018','9020') THEN 'paid'
+        WHEN u.login_id IN ('9002','9007','9011','9015','9019') THEN 'partial'
+        ELSE 'unpaid'
+    END
+FROM users u
+WHERE u.role_id = @student_role;
+
+INSERT INTO lms_fee_records (student_user_id, semester, description, amount, paid_amount, due_date, status)
+SELECT u.user_id, 'Spring 2026', 'Library and Lab Charges', 7500.00, 7500.00, '2026-07-15', 'paid'
+FROM users u
+WHERE u.role_id = @student_role AND u.login_id IN ('9001','9002','9003','9004','9005');
 
 -- =====================================================================
 -- END OF SCRIPT

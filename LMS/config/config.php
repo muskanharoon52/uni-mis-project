@@ -6,7 +6,7 @@ define('APP_NAME', 'University LMS');
 define('APP_BASE_PATH', '/LMS_Module');
 
 define('DB_HOST', '127.0.0.1');
-define('DB_NAME', 'lms_mis');
+define('DB_NAME', 'university_mis');
 define('DB_USER', 'root');
 define('DB_PASS', '');
 define('DB_CHARSET', 'utf8mb4');

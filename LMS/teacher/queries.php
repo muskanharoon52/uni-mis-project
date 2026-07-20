@@ -16,10 +16,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $queryId = (int) ($_POST['query_id'] ?? 0);
         $allowedStmt = db()->prepare(
             'SELECT q.user_id
-             FROM queries q
-             JOIN enrollments e ON e.student_id = q.user_id
-             JOIN courses c ON c.id = e.course_id
-             WHERE q.id = ? AND c.teacher_id = ?
+             FROM lms_queries q
+             JOIN lms_enrollments e ON e.student_user_id = q.user_id
+             JOIN courses c ON c.course_id = e.course_id
+             WHERE q.query_id = ? AND c.teacher_id = ?
              LIMIT 1'
         );
         $allowedStmt->execute([$queryId, $user['id']]);
@@ -28,7 +28,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             throw new RuntimeException('You cannot reply to this query.');
         }
 
-        $stmt = db()->prepare("UPDATE queries SET status = 'answered', reply = ? WHERE id = ?");
+        $stmt = db()->prepare("UPDATE lms_queries SET status = 'answered', reply = ? WHERE query_id = ?");
         $stmt->execute([trim((string) $_POST['reply']), $queryId]);
         create_notification($studentId, 'Query answered', 'A teacher has replied to your query.', app_url('student/queries.php'), 'notification', (int) $user['id']);
         $message = 'Reply saved.';
@@ -38,11 +38,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 $queriesStmt = db()->prepare(
-    'SELECT DISTINCT q.*, u.name, u.email
-     FROM queries q
-     JOIN users u ON u.id = q.user_id
-     JOIN enrollments e ON e.student_id = q.user_id
-     JOIN courses c ON c.id = e.course_id
+    'SELECT DISTINCT q.*, u.full_name, u.email
+     FROM lms_queries q
+     JOIN users u ON u.user_id = q.user_id
+     JOIN lms_enrollments e ON e.student_user_id = q.user_id
+     JOIN courses c ON c.course_id = e.course_id
      WHERE c.teacher_id = ?
      ORDER BY q.created_at DESC'
 );
@@ -60,14 +60,14 @@ require_once __DIR__ . '/../includes/header.php';
             <tr><th>Student</th><th>Subject</th><th>Message</th><th>Status</th><th>Reply</th></tr>
             <?php foreach ($queries as $query): ?>
                 <tr>
-                    <td><?= e($query['name']) ?><br><span class="muted"><?= e($query['email']) ?></span></td>
+                    <td><?= e($query['full_name']) ?><br><span class="muted"><?= e($query['email']) ?></span></td>
                     <td><?= e($query['subject']) ?></td>
                     <td><?= e($query['message']) ?></td>
                     <td><span class="badge badge-<?= $query['status'] === 'answered' ? 'active' : 'draft' ?>"><?= e($query['status']) ?></span></td>
                 <td>
                     <form method="post">
                         <?= csrf_field() ?>
-                        <input type="hidden" name="query_id" value="<?= (int) $query['id'] ?>">
+                        <input type="hidden" name="query_id" value="<?= (int) $query['query_id'] ?>">
                         <textarea name="reply"><?= e($query['reply']) ?></textarea>
                         <button class="btn btn-primary btn-sm" type="submit">Reply</button>
                     </form>

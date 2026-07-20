@@ -16,8 +16,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $photoPath = save_uploaded_file('profile_photo', 'profiles', ['jpg', 'jpeg', 'png', 'webp']);
         $stmt = db()->prepare(
             'UPDATE users
-             SET name = ?, department = ?, profile_photo = COALESCE(?, profile_photo)
-             WHERE id = ?'
+             SET full_name = ?, department_id = ?, profile_photo = COALESCE(?, profile_photo)
+             WHERE user_id = ?'
         );
         $stmt->execute([
             trim((string) ($_POST['name'] ?? '')),

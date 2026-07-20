@@ -17,7 +17,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (!in_array($status, ['pending', 'approved', 'rejected'], true)) {
             throw new RuntimeException('Invalid application status.');
         }
-        $stmt = db()->prepare('UPDATE applications SET status = ? WHERE id = ?');
+        $stmt = db()->prepare('UPDATE lms_applications SET status = ? WHERE application_id = ?');
         $stmt->execute([$status, (int) $_POST['application_id']]);
         $message = 'Application updated.';
     } catch (RuntimeException $exception) {
@@ -26,7 +26,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 $applications = db()->query(
-    'SELECT a.*, u.name, u.email FROM applications a JOIN users u ON u.id = a.user_id ORDER BY a.created_at DESC'
+    'SELECT a.*, u.full_name, u.email FROM lms_applications a JOIN users u ON u.user_id = a.user_id ORDER BY a.created_at DESC'
 )->fetchAll();
 
 require_once __DIR__ . '/../includes/header.php';
@@ -40,14 +40,14 @@ require_once __DIR__ . '/../includes/header.php';
             <tr><th>Student</th><th>Type</th><th>Details</th><th>Status</th><th>Action</th></tr>
             <?php foreach ($applications as $application): ?>
                 <tr>
-                    <td><?= e($application['name']) ?><br><span class="muted"><?= e($application['email']) ?></span></td>
+                    <td><?= e($application['full_name']) ?><br><span class="muted"><?= e($application['email']) ?></span></td>
                     <td><?= e($application['type']) ?></td>
                     <td><?= e($application['details']) ?></td>
                     <td><span class="badge badge-<?= $application['status'] === 'approved' ? 'active' : ($application['status'] === 'rejected' ? 'inactive' : 'draft') ?>"><?= e($application['status']) ?></span></td>
                 <td>
                     <form method="post">
                         <?= csrf_field() ?>
-                        <input type="hidden" name="application_id" value="<?= (int) $application['id'] ?>">
+                        <input type="hidden" name="application_id" value="<?= (int) $application['application_id'] ?>">
                         <select name="status">
                             <option value="pending" <?= $application['status'] === 'pending' ? 'selected' : '' ?>>Pending</option>
                             <option value="approved" <?= $application['status'] === 'approved' ? 'selected' : '' ?>>Approved</option>

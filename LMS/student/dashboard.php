@@ -11,8 +11,8 @@ $now = new DateTimeImmutable('now');
 
 $detailsStmt = db()->prepare(
     'SELECT COUNT(*) AS course_count
-     FROM enrollments
-     WHERE student_id = ?'
+     FROM lms_enrollments
+     WHERE student_user_id = ?'
 );
 $detailsStmt->execute([$user['id']]);
 $courseCount = (int) $detailsStmt->fetchColumn();
@@ -29,18 +29,18 @@ $internalMarkTotals = array_map(static function (array $row): array {
 
 $attendanceStmt = db()->prepare(
     'SELECT
-        c.code,
-        c.title,
-        COUNT(a.id) AS total_classes,
-        SUM(a.status = "present") AS present_count,
-        SUM(a.status = "late") AS late_count,
-        SUM(a.status = "absent") AS absent_count
-     FROM enrollments e
-     JOIN courses c ON c.id = e.course_id
-     LEFT JOIN attendance a ON a.course_id = c.id AND a.student_id = e.student_id
-     WHERE e.student_id = ?
-     GROUP BY c.id, c.code, c.title
-     ORDER BY c.code'
+        c.course_code,
+        c.course_title,
+        COUNT(a.attendance_id) AS total_classes,
+        SUM(a.status = \'Present\') AS present_count,
+        SUM(a.status = \'Late\') AS late_count,
+        SUM(a.status = \'Absent\') AS absent_count
+     FROM lms_enrollments e
+     JOIN courses c ON c.course_id = e.course_id
+     LEFT JOIN attendance a ON a.course_id = c.course_id AND a.student_id = e.student_user_id
+     WHERE e.student_user_id = ?
+     GROUP BY c.course_id, c.course_code, c.course_title
+     ORDER BY c.course_code'
 );
 $attendanceStmt->execute([$user['id']]);
 $attendanceRows = $attendanceStmt->fetchAll();
@@ -53,7 +53,7 @@ foreach ($attendanceRows as $row) {
 }
 $overallAttendance = $totalClasses > 0 ? round(($totalPresent / $totalClasses) * 100, 1) : 0;
 
-$feesStmt = db()->prepare('SELECT * FROM fee_records WHERE student_id = ? ORDER BY due_date DESC');
+$feesStmt = db()->prepare('SELECT * FROM lms_fee_records WHERE student_user_id = ? ORDER BY due_date DESC');
 $feesStmt->execute([$user['id']]);
 $feeRows = $feesStmt->fetchAll();
 $totalAmount = array_sum(array_map(static fn (array $row): float => (float) $row['amount'], $feeRows));
@@ -163,8 +163,8 @@ require_once __DIR__ . '/../includes/header.php';
                     $percent = $total > 0 ? round(($present / $total) * 100, 1) : 0;
                     ?>
                     <tr>
-                        <td><span class="badge badge-outline"><?= e($row['code']) ?></span></td>
-                        <td><?= e($row['title']) ?></td>
+                        <td><span class="badge badge-outline"><?= e($row['course_code']) ?></span></td>
+                        <td><?= e($row['course_title']) ?></td>
                         <td><?= $total ?></td>
                         <td><span class="badge badge-active"><?= (int) $row['present_count'] ?></span></td>
                         <td><span class="badge badge-draft"><?= (int) $row['late_count'] ?></span></td>

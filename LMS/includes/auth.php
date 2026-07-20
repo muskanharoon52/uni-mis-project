@@ -62,14 +62,14 @@ function require_role(string $role): array
 
 function teacher_owns_course(int $teacherId, int $courseId): bool
 {
-    $stmt = db()->prepare('SELECT COUNT(*) FROM courses WHERE id = ? AND teacher_id = ?');
+    $stmt = db()->prepare('SELECT COUNT(*) FROM courses WHERE course_id = ? AND teacher_id = ?');
     $stmt->execute([$courseId, $teacherId]);
     return (int) $stmt->fetchColumn() > 0;
 }
 
 function student_enrolled_in_course(int $studentId, int $courseId): bool
 {
-    $stmt = db()->prepare('SELECT COUNT(*) FROM enrollments WHERE student_id = ? AND course_id = ?');
+    $stmt = db()->prepare('SELECT COUNT(*) FROM lms_enrollments WHERE student_user_id = ? AND course_id = ?');
     $stmt->execute([$studentId, $courseId]);
     return (int) $stmt->fetchColumn() > 0;
 }
@@ -77,10 +77,10 @@ function student_enrolled_in_course(int $studentId, int $courseId): bool
 function teacher_owns_submission(int $teacherId, int $submissionId): bool
 {
     $stmt = db()->prepare(
-        'SELECT COUNT(*) FROM submissions s
-         JOIN assignments a ON a.id = s.assignment_id
-         JOIN courses c ON c.id = a.course_id
-         WHERE s.id = ? AND c.teacher_id = ?'
+        'SELECT COUNT(*) FROM lms_submissions s
+         JOIN lms_assignments a ON a.assignment_id = s.assignment_id
+         JOIN courses c ON c.course_id = a.course_id
+         WHERE s.submission_id = ? AND c.teacher_id = ?'
     );
     $stmt->execute([$submissionId, $teacherId]);
     return (int) $stmt->fetchColumn() > 0;
@@ -131,15 +131,15 @@ function internal_mark_components(): array
 function internal_mark_rows_for_student(int $studentId): array
 {
     $stmt = db()->prepare(
-        'SELECT c.id AS course_id, c.code, c.title,
+        'SELECT c.course_id AS course_id, c.course_code AS code, c.course_title AS title,
             COALESCE(f.is_finalized, 0) AS is_finalized,
             m.component, m.marks_obtained
-         FROM enrollments e
-         JOIN courses c ON c.id = e.course_id
-         LEFT JOIN mark_finalizations f ON f.course_id = c.id AND f.student_id = e.student_id
-         LEFT JOIN marks m ON m.course_id = c.id AND m.student_id = e.student_id
-         WHERE e.student_id = ?
-         ORDER BY c.code'
+         FROM lms_enrollments e
+         JOIN courses c ON c.course_id = e.course_id
+         LEFT JOIN lms_mark_finalizations f ON f.course_id = c.course_id AND f.student_user_id = e.student_user_id
+         LEFT JOIN lms_marks m ON m.course_id = c.course_id AND m.student_user_id = e.student_user_id
+         WHERE e.student_user_id = ?
+         ORDER BY c.course_code'
     );
     $stmt->execute([$studentId]);
     return build_internal_mark_rows($stmt->fetchAll());
@@ -148,17 +148,17 @@ function internal_mark_rows_for_student(int $studentId): array
 function internal_mark_rows_for_teacher(int $teacherId): array
 {
     $stmt = db()->prepare(
-        'SELECT c.id AS course_id, c.code, c.title,
-            u.id AS student_id, u.name AS student_name,
+        'SELECT c.course_id AS course_id, c.course_code AS code, c.course_title AS title,
+            u.user_id AS student_id, u.full_name AS student_name,
             COALESCE(f.is_finalized, 0) AS is_finalized,
             m.component, m.marks_obtained
          FROM courses c
-         JOIN enrollments e ON e.course_id = c.id
-         JOIN users u ON u.id = e.student_id
-         LEFT JOIN mark_finalizations f ON f.course_id = c.id AND f.student_id = u.id
-         LEFT JOIN marks m ON m.course_id = c.id AND m.student_id = u.id
+         JOIN lms_enrollments e ON e.course_id = c.course_id
+         JOIN users u ON u.user_id = e.student_user_id
+         LEFT JOIN lms_mark_finalizations f ON f.course_id = c.course_id AND f.student_user_id = u.user_id
+         LEFT JOIN lms_marks m ON m.course_id = c.course_id AND m.student_user_id = u.user_id
          WHERE c.teacher_id = ?
-         ORDER BY c.code, u.name'
+         ORDER BY c.course_code, u.full_name'
     );
     $stmt->execute([$teacherId]);
     return build_internal_mark_rows($stmt->fetchAll());
@@ -195,7 +195,7 @@ function internal_mark_total(array $row): float
 
 function unread_notification_count(int $userId, ?string $category = null): int
 {
-    $sql = 'SELECT COUNT(*) FROM notifications WHERE recipient_user_id = ? AND is_read = 0';
+    $sql = 'SELECT COUNT(*) FROM lms_notifications WHERE recipient_user_id = ? AND is_read = 0';
     $params = [$userId];
     if ($category !== null) {
         $sql .= ' AND category = ?';
@@ -208,7 +208,7 @@ function unread_notification_count(int $userId, ?string $category = null): int
 
 function recent_notifications(int $userId, ?string $category = null, int $limit = 5): array
 {
-    $sql = 'SELECT * FROM notifications WHERE recipient_user_id = ?';
+    $sql = 'SELECT * FROM lms_notifications WHERE recipient_user_id = ?';
     $params = [$userId];
     if ($category !== null) {
         $sql .= ' AND category = ?';
@@ -223,7 +223,7 @@ function recent_notifications(int $userId, ?string $category = null, int $limit 
 function create_notification(int $recipientId, string $title, string $body, ?string $linkUrl = null, string $category = 'notification', ?int $senderId = null): void
 {
     $stmt = db()->prepare(
-        'INSERT INTO notifications (recipient_user_id, sender_user_id, category, title, body, link_url) VALUES (?, ?, ?, ?, ?, ?)'
+        'INSERT INTO lms_notifications (recipient_user_id, sender_user_id, category, title, body, link_url) VALUES (?, ?, ?, ?, ?, ?)'
     );
     $stmt->execute([$recipientId, $senderId, $category, $title, $body, $linkUrl]);
 }
@@ -231,10 +231,10 @@ function create_notification(int $recipientId, string $title, string $body, ?str
 function teacher_course_student_ids(int $teacherId, ?int $courseId = null): array
 {
     if ($courseId !== null) {
-        $stmt = db()->prepare('SELECT DISTINCT e.student_id FROM enrollments e JOIN courses c ON c.id = e.course_id WHERE c.teacher_id = ? AND c.id = ?');
+        $stmt = db()->prepare('SELECT DISTINCT e.student_user_id FROM lms_enrollments e JOIN courses c ON c.course_id = e.course_id WHERE c.teacher_id = ? AND c.course_id = ?');
         $stmt->execute([$teacherId, $courseId]);
     } else {
-        $stmt = db()->prepare('SELECT DISTINCT e.student_id FROM enrollments e JOIN courses c ON c.id = e.course_id WHERE c.teacher_id = ?');
+        $stmt = db()->prepare('SELECT DISTINCT e.student_user_id FROM lms_enrollments e JOIN courses c ON c.course_id = e.course_id WHERE c.teacher_id = ?');
         $stmt->execute([$teacherId]);
     }
     return array_map('intval', $stmt->fetchAll(PDO::FETCH_COLUMN));
@@ -242,7 +242,7 @@ function teacher_course_student_ids(int $teacherId, ?int $courseId = null): arra
 
 function notify_course_students(int $courseId, string $title, string $body, ?string $linkUrl = null, string $category = 'notification', ?int $senderId = null): void
 {
-    $teacherStmt = db()->prepare('SELECT teacher_id FROM courses WHERE id = ? LIMIT 1');
+    $teacherStmt = db()->prepare('SELECT teacher_id FROM courses WHERE course_id = ? LIMIT 1');
     $teacherStmt->execute([$courseId]);
     $teacherId = (int) $teacherStmt->fetchColumn();
     if ($teacherId <= 0) return;

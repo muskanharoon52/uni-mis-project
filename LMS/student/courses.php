@@ -9,21 +9,21 @@ $active = 'courses';
 $pageTitle = 'Courses';
 
 $coursesStmt = db()->prepare(
-    'SELECT c.*, u.name AS teacher_name
-     FROM enrollments e
-     JOIN courses c ON c.id = e.course_id
-     LEFT JOIN users u ON u.id = c.teacher_id
-     WHERE e.student_id = ?
-     ORDER BY c.code'
+    'SELECT c.*, u.full_name AS teacher_name
+     FROM lms_enrollments e
+     JOIN courses c ON c.course_id = e.course_id
+     LEFT JOIN users u ON u.user_id = c.teacher_id
+     WHERE e.student_user_id = ?
+     ORDER BY c.course_code'
 );
 $coursesStmt->execute([$user['id']]);
 $courses = $coursesStmt->fetchAll();
 
 $currentCourse = null;
 if ($courses) {
-    $selectedCourseId = (int) ($_GET['course_id'] ?? $courses[0]['id']);
+    $selectedCourseId = (int) ($_GET['course_id'] ?? $courses[0]['course_id']);
     foreach ($courses as $course) {
-        if ((int) $course['id'] === $selectedCourseId) {
+        if ((int) $course['course_id'] === $selectedCourseId) {
             $currentCourse = $course;
             break;
         }
@@ -45,15 +45,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         $assignmentId = (int) ($_POST['assignment_id'] ?? 0);
         $courseId = (int) ($_POST['course_id'] ?? 0);
-        if (!$assignmentId || !$courseId || (int) $currentCourse['id'] !== $courseId) {
+        if (!$assignmentId || !$courseId || (int) $currentCourse['course_id'] !== $courseId) {
             throw new RuntimeException('Invalid submission request.');
         }
 
         $allowedStmt = db()->prepare(
             'SELECT COUNT(*)
-             FROM assignments a
-             JOIN enrollments e ON e.course_id = a.course_id
-             WHERE a.id = ? AND e.student_id = ?'
+             FROM lms_assignments a
+             JOIN lms_enrollments e ON e.course_id = a.course_id
+             WHERE a.assignment_id = ? AND e.student_user_id = ?'
         );
         $allowedStmt->execute([$assignmentId, $user['id']]);
         if ((int) $allowedStmt->fetchColumn() === 0) {
@@ -66,7 +66,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
 
         $stmt = db()->prepare(
-            'INSERT INTO submissions (assignment_id, student_id, content, submission_file)
+            'INSERT INTO lms_submissions (assignment_id, student_user_id, content, submission_file)
              VALUES (?, ?, ?, ?)
              ON DUPLICATE KEY UPDATE content = VALUES(content), submission_file = VALUES(submission_file), submitted_at = CURRENT_TIMESTAMP'
         );
@@ -83,9 +83,9 @@ require_once __DIR__ . '/../includes/header.php';
     <aside class="course-list-panel">
         <div class="course-list-head">My Courses</div>
         <?php foreach ($courses as $course): ?>
-            <a class="course-list-item <?= $currentCourse && (int) $currentCourse['id'] === (int) $course['id'] ? 'active' : '' ?>" href="<?= app_url('student/courses.php?course_id=' . (int) $course['id']) ?>">
-                <strong><?= e($course['code']) ?></strong>
-                <span><?= e($course['title']) ?></span>
+            <a class="course-list-item <?= $currentCourse && (int) $currentCourse['course_id'] === (int) $course['course_id'] ? 'active' : '' ?>" href="<?= app_url('student/courses.php?course_id=' . (int) $course['course_id']) ?>">
+                <strong><?= e($course['course_code']) ?></strong>
+                <span><?= e($course['course_title']) ?></span>
             </a>
         <?php endforeach; ?>
     </aside>
@@ -98,15 +98,15 @@ require_once __DIR__ . '/../includes/header.php';
             </div>
         <?php else: ?>
             <div class="course-summary card">
-                <h1><?= e($currentCourse['code'] . ' - ' . $currentCourse['title']) ?></h1>
+                <h1><?= e($currentCourse['course_code'] . ' - ' . $currentCourse['course_title']) ?></h1>
                 <p class="muted">Teacher: <?= e($currentCourse['teacher_name'] ?: 'Not assigned') ?></p>
                 <p><?= e($currentCourse['description'] ?: 'No course description available.') ?></p>
             </div>
 
             <div class="course-tabs">
-                <a class="course-tab <?= $view === 'overview' ? 'active' : '' ?>" href="<?= app_url('student/courses.php?course_id=' . (int) $currentCourse['id'] . '&view=overview') ?>">Overview</a>
-                <a class="course-tab <?= $view === 'lectures' ? 'active' : '' ?>" href="<?= app_url('student/courses.php?course_id=' . (int) $currentCourse['id'] . '&view=lectures') ?>">Lectures</a>
-                <a class="course-tab <?= $view === 'assignment' ? 'active' : '' ?>" href="<?= app_url('student/courses.php?course_id=' . (int) $currentCourse['id'] . '&view=assignment') ?>">Assignment</a>
+                <a class="course-tab <?= $view === 'overview' ? 'active' : '' ?>" href="<?= app_url('student/courses.php?course_id=' . (int) $currentCourse['course_id'] . '&view=overview') ?>">Overview</a>
+                <a class="course-tab <?= $view === 'lectures' ? 'active' : '' ?>" href="<?= app_url('student/courses.php?course_id=' . (int) $currentCourse['course_id'] . '&view=lectures') ?>">Lectures</a>
+                <a class="course-tab <?= $view === 'assignment' ? 'active' : '' ?>" href="<?= app_url('student/courses.php?course_id=' . (int) $currentCourse['course_id'] . '&view=assignment') ?>">Assignment</a>
             </div>
 
             <?php if ($message): ?><div class="alert alert-success"><?= e($message) ?></div><?php endif; ?>
@@ -123,7 +123,7 @@ require_once __DIR__ . '/../includes/header.php';
                     <div class="table-responsive">
                     <table>
                         <tr><th>Lecture</th><th>Date</th><th>File</th></tr>
-                        <?php $lectureStmt = db()->prepare('SELECT * FROM lectures WHERE course_id = ? ORDER BY id DESC'); $lectureStmt->execute([(int) $currentCourse['id']]); $lectures = $lectureStmt->fetchAll(); ?>
+                        <?php $lectureStmt = db()->prepare('SELECT * FROM lectures WHERE course_id = ? ORDER BY id DESC'); $lectureStmt->execute([(int) $currentCourse['course_id']]); $lectures = $lectureStmt->fetchAll(); ?>
                         <?php foreach ($lectures as $lecture): ?>
                             <tr><td><?= e($lecture['title']) ?></td><td><?= e($lecture['lecture_date']) ?></td><td><a href="<?= app_url($lecture['file_path']) ?>" target="_blank">Download</a></td></tr>
                         <?php endforeach; ?>
@@ -142,12 +142,12 @@ require_once __DIR__ . '/../includes/header.php';
                         <?php
                         $assignmentsStmt = db()->prepare(
                              'SELECT a.*, s.submission_file, s.submitted_at, s.grade, s.feedback
-                              FROM assignments a
-                              LEFT JOIN submissions s ON s.assignment_id = a.id AND s.student_id = ?
+                              FROM lms_assignments a
+                              LEFT JOIN lms_submissions s ON s.assignment_id = a.assignment_id AND s.student_user_id = ?
                               WHERE a.course_id = ?
                               ORDER BY a.due_date'
                         );
-                        $assignmentsStmt->execute([$user['id'], $currentCourse['id']]);
+                        $assignmentsStmt->execute([$user['id'], $currentCourse['course_id']]);
                         $assignments = $assignmentsStmt->fetchAll();
                         ?>
                         <?php foreach ($assignments as $assignment): ?>
@@ -164,8 +164,8 @@ require_once __DIR__ . '/../includes/header.php';
                                 <td>
                                     <form class="assignment-upload" method="post" enctype="multipart/form-data">
                                         <?= csrf_field() ?>
-                                        <input type="hidden" name="assignment_id" value="<?= (int) $assignment['id'] ?>">
-                                        <input type="hidden" name="course_id" value="<?= (int) $currentCourse['id'] ?>">
+                                        <input type="hidden" name="assignment_id" value="<?= (int) $assignment['assignment_id'] ?>">
+                                        <input type="hidden" name="course_id" value="<?= (int) $currentCourse['course_id'] ?>">
                                         <input name="submission_file" type="file" accept=".pdf,.doc,.docx,.zip" required>
                                         <button class="btn btn-primary btn-sm" type="submit"><?= $assignment['submission_file'] ? 'Update' : 'Upload' ?></button>
                                         <?php if ($assignment['submission_file']): ?><a href="<?= app_url($assignment['submission_file']) ?>" target="_blank">Current file</a><?php endif; ?>

@@ -13,7 +13,7 @@ $error = '';
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     try {
         verify_csrf();
-        $stmt = db()->prepare('INSERT INTO queries (user_id, subject, message) VALUES (?, ?, ?)');
+        $stmt = db()->prepare('INSERT INTO lms_queries (user_id, subject, message) VALUES (?, ?, ?)');
         $stmt->execute([$user['id'], trim((string) $_POST['subject']), trim((string) $_POST['message'])]);
         $message = 'Query submitted.';
     } catch (RuntimeException $exception) {
@@ -21,7 +21,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-$queriesStmt = db()->prepare('SELECT * FROM queries WHERE user_id = ? ORDER BY created_at DESC');
+$queriesStmt = db()->prepare('SELECT * FROM lms_queries WHERE user_id = ? ORDER BY created_at DESC');
 $queriesStmt->execute([$user['id']]);
 $queries = $queriesStmt->fetchAll();
 

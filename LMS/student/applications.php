@@ -20,7 +20,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             throw new RuntimeException('Type and details are required.');
         }
 
-        $stmt = db()->prepare('INSERT INTO applications (user_id, type, details) VALUES (?, ?, ?)');
+        $stmt = db()->prepare('INSERT INTO lms_applications (user_id, type, details) VALUES (?, ?, ?)');
         $stmt->execute([$user['id'], $type, $details]);
         $message = 'Application submitted successfully.';
     } catch (RuntimeException $exception) {
@@ -28,7 +28,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-$applicationsStmt = db()->prepare('SELECT * FROM applications WHERE user_id = ? ORDER BY created_at DESC');
+$applicationsStmt = db()->prepare('SELECT * FROM lms_applications WHERE user_id = ? ORDER BY created_at DESC');
 $applicationsStmt->execute([$user['id']]);
 $applications = $applicationsStmt->fetchAll();
 

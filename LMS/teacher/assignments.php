@@ -10,7 +10,7 @@ $pageTitle = 'Assignments';
 $message = '';
 $error = '';
 
-$coursesStmt = db()->prepare('SELECT * FROM courses WHERE teacher_id = ? ORDER BY code');
+$coursesStmt = db()->prepare('SELECT * FROM courses WHERE teacher_id = ? ORDER BY course_code');
 $coursesStmt->execute([$user['id']]);
 $courses = $coursesStmt->fetchAll();
 
@@ -28,10 +28,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
 
         $filePath = save_uploaded_file('assignment_file', 'assignments', ['pdf', 'doc', 'docx', 'zip']);
-        $stmt = db()->prepare('INSERT INTO assignments (course_id, title, description, file_path, due_date) VALUES (?, ?, ?, ?, ?)');
+        $stmt = db()->prepare('INSERT INTO lms_assignments (course_id, title, description, file_path, due_date) VALUES (?, ?, ?, ?, ?)');
         $stmt->execute([$courseId, $title, trim((string) ($_POST['description'] ?? '')), $filePath, (string) $_POST['due_date']]);
 
-        $courseStmt = db()->prepare('SELECT code FROM courses WHERE id = ? LIMIT 1');
+        $courseStmt = db()->prepare('SELECT course_code FROM courses WHERE course_id = ? LIMIT 1');
         $courseStmt->execute([$courseId]);
         $courseCode = (string) $courseStmt->fetchColumn();
         notify_course_students($courseId, 'New assignment posted', 'An assignment titled "' . $title . '" has been uploaded for ' . $courseCode . '.', app_url('student/courses.php?course_id=' . $courseId . '&view=assignment'));
@@ -42,16 +42,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 $assignmentsStmt = db()->prepare(
-    'SELECT a.*, c.code,
-        COUNT(DISTINCT e.student_id) AS enrolled_count,
-        COUNT(DISTINCT s.id) AS submitted_count,
-        SUM(s.grade IS NULL AND s.id IS NOT NULL) AS ungraded_count
-     FROM assignments a
-     JOIN courses c ON c.id = a.course_id
-     LEFT JOIN enrollments e ON e.course_id = c.id
-     LEFT JOIN submissions s ON s.assignment_id = a.id
+    'SELECT a.*, c.course_code,
+        COUNT(DISTINCT e.student_user_id) AS enrolled_count,
+        COUNT(DISTINCT s.submission_id) AS submitted_count,
+        SUM(s.grade IS NULL AND s.submission_id IS NOT NULL) AS ungraded_count
+     FROM lms_assignments a
+     JOIN courses c ON c.course_id = a.course_id
+     LEFT JOIN lms_enrollments e ON e.course_id = c.course_id
+     LEFT JOIN lms_submissions s ON s.assignment_id = a.assignment_id
      WHERE c.teacher_id = ?
-     GROUP BY a.id
+     GROUP BY a.assignment_id
      ORDER BY a.due_date'
 );
 $assignmentsStmt->execute([$user['id']]);
@@ -67,7 +67,7 @@ require_once __DIR__ . '/../includes/header.php';
         <h3>Create Assignment</h3>
         <label for="course_id">Course</label>
         <select id="course_id" name="course_id" required>
-            <?php foreach ($courses as $course): ?><option value="<?= (int) $course['id'] ?>"><?= e($course['code'] . ' - ' . $course['title']) ?></option><?php endforeach; ?>
+            <?php foreach ($courses as $course): ?><option value="<?= (int) $course['course_id'] ?>"><?= e($course['course_code'] . ' - ' . $course['course_title']) ?></option><?php endforeach; ?>
         </select>
         <label for="title">Title</label>
         <input id="title" name="title" required>
@@ -86,7 +86,7 @@ require_once __DIR__ . '/../includes/header.php';
             <tr><th>Course</th><th>Title</th><th>Submissions</th><th>Ungraded</th><th>File</th><th>Due</th></tr>
             <?php foreach ($assignments as $assignment): ?>
                 <tr>
-                    <td><?= e($assignment['code']) ?></td>
+                    <td><?= e($assignment['course_code']) ?></td>
                     <td><?= e($assignment['title']) ?></td>
                     <td><?= (int) $assignment['submitted_count'] ?> / <?= (int) $assignment['enrolled_count'] ?></td>
                     <td><?= (int) $assignment['ungraded_count'] ?></td>

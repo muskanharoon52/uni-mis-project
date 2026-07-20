@@ -10,7 +10,7 @@ $pageTitle = 'Messages';
 $message = '';
 $error = '';
 
-$coursesStmt = db()->prepare('SELECT id, code, title FROM courses WHERE teacher_id = ? ORDER BY code');
+$coursesStmt = db()->prepare('SELECT course_id, course_code, course_title FROM courses WHERE teacher_id = ? ORDER BY course_code');
 $coursesStmt->execute([$user['id']]);
 $courses = $coursesStmt->fetchAll();
 
@@ -62,7 +62,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 $messagesStmt = db()->prepare(
     "SELECT n.title, n.body, n.link_url, MAX(n.created_at) AS sent_at, COUNT(*) AS recipient_count
-     FROM notifications n
+     FROM lms_notifications n
      WHERE n.sender_user_id = ? AND n.category = 'message'
      GROUP BY n.title, n.body, n.link_url, DATE_FORMAT(n.created_at, '%Y-%m-%d %H:%i')
      ORDER BY sent_at DESC
@@ -89,7 +89,7 @@ require_once __DIR__ . '/../includes/header.php';
         <select id="course_id" name="course_id">
             <option value="0">Select course</option>
             <?php foreach ($courses as $course): ?>
-                <option value="<?= (int) $course['id'] ?>"><?= e($course['code'] . ' - ' . $course['title']) ?></option>
+                <option value="<?= (int) $course['course_id'] ?>"><?= e($course['course_code'] . ' - ' . $course['course_title']) ?></option>
             <?php endforeach; ?>
         </select>
         <label for="subject">Subject</label>

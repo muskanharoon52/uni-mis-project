@@ -15,16 +15,16 @@ $initials = strtoupper(substr((string) $user['name'], 0, 1));
 
 $courseStmt = db()->prepare(
     'SELECT c.*,
-        COUNT(DISTINCT e.student_id) AS student_count,
-        COUNT(DISTINCT a.id) AS assignment_count,
+        COUNT(DISTINCT e.student_user_id) AS student_count,
+        COUNT(DISTINCT a.assignment_id) AS assignment_count,
         COUNT(DISTINCT l.id) AS lecture_count
      FROM courses c
-     LEFT JOIN enrollments e ON e.course_id = c.id
-     LEFT JOIN assignments a ON a.course_id = c.id
-     LEFT JOIN lectures l ON l.course_id = c.id
+     LEFT JOIN lms_enrollments e ON e.course_id = c.course_id
+     LEFT JOIN lms_assignments a ON a.course_id = c.course_id
+     LEFT JOIN lectures l ON l.course_id = c.course_id
      WHERE c.teacher_id = ?
-     GROUP BY c.id
-     ORDER BY c.code'
+     GROUP BY c.course_id
+     ORDER BY c.course_code'
 );
 $courseStmt->execute([$user['id']]);
 $courses = $courseStmt->fetchAll();
@@ -37,19 +37,19 @@ foreach ($courses as $course) {
 
 $pendingStmt = db()->prepare(
     'SELECT COUNT(*)
-     FROM submissions s
-     JOIN assignments a ON a.id = s.assignment_id
-     JOIN courses c ON c.id = a.course_id
+     FROM lms_submissions s
+     JOIN lms_assignments a ON a.assignment_id = s.assignment_id
+     JOIN courses c ON c.course_id = a.course_id
      WHERE c.teacher_id = ? AND s.grade IS NULL'
 );
 $pendingStmt->execute([$user['id']]);
 $pendingSubmissions = (int) $pendingStmt->fetchColumn();
 
 $attendanceStmt = db()->prepare(
-    'SELECT COUNT(a.id) AS total_records,
-        SUM(a.status IN ("present", "late")) AS present_records
+    'SELECT COUNT(a.attendance_id) AS total_records,
+        SUM(a.status IN ("Present", "Late")) AS present_records
      FROM attendance a
-     JOIN courses c ON c.id = a.course_id
+     JOIN courses c ON c.course_id = a.course_id
      WHERE c.teacher_id = ?'
 );
 $attendanceStmt->execute([$user['id']]);
@@ -59,11 +59,11 @@ $presentAttendance = (int) $attendanceSummary['present_records'];
 $averageAttendance = $totalAttendance > 0 ? round(($presentAttendance / $totalAttendance) * 100, 1) : 0;
 
 $activityStmt = db()->prepare(
-    'SELECT u.name AS student_name, c.code, s.submitted_at AS activity_time, "Assignment submitted" AS activity
-     FROM submissions s
-     JOIN assignments a ON a.id = s.assignment_id
-     JOIN courses c ON c.id = a.course_id
-     JOIN users u ON u.id = s.student_id
+    'SELECT u.full_name AS student_name, c.course_code, s.submitted_at AS activity_time, "Assignment submitted" AS activity
+     FROM lms_submissions s
+     JOIN lms_assignments a ON a.assignment_id = s.assignment_id
+     JOIN courses c ON c.course_id = a.course_id
+     JOIN users u ON u.user_id = s.student_user_id
      WHERE c.teacher_id = ?
      ORDER BY s.submitted_at DESC
      LIMIT 6'
@@ -76,8 +76,8 @@ $timeSlots = ['09:00 AM', '10:30 AM', '12:00 PM', '02:00 PM'];
 foreach (array_slice($courses, 0, 4) as $index => $course) {
     $schedule[] = [
         'time' => $timeSlots[$index] ?? '03:30 PM',
-        'course' => $course['title'],
-        'code' => $course['code'],
+        'course' => $course['course_title'],
+        'code' => $course['course_code'],
         'section' => 'A',
         'room' => $index % 2 === 0 ? 'Room 204' : 'Lab 3',
         'status' => $index === 0 ? 'Ongoing' : ($index < 2 ? 'Upcoming' : 'Completed'),
@@ -185,15 +185,15 @@ require_once __DIR__ . '/../includes/header.php';
             <tbody>
                 <?php foreach ($courses as $course): ?>
                     <tr>
-                        <td><strong><?= e($course['title']) ?></strong></td>
-                        <td><span class="badge badge-outline"><?= e($course['code']) ?></span></td>
-                        <td><?= e($course['semester']) ?></td>
+                        <td><strong><?= e($course['course_title']) ?></strong></td>
+                        <td><span class="badge badge-outline"><?= e($course['course_code']) ?></span></td>
+                        <td><?= e($course['semester_name']) ?></td>
                         <td><?= (int) $course['credit_hours'] ?></td>
                         <td><?= (int) $course['student_count'] ?></td>
                         <td><?= (int) $course['assignment_count'] ?></td>
                         <td><?= (int) $course['lecture_count'] ?></td>
                         <td>
-                            <a class="btn btn-sm btn-outline" href="<?= app_url('teacher/courses.php?course_id=' . (int) $course['id']) ?>">View</a>
+                            <a class="btn btn-sm btn-outline" href="<?= app_url('teacher/courses.php?course_id=' . (int) $course['course_id']) ?>">View</a>
                         </td>
                     </tr>
                 <?php endforeach; ?>

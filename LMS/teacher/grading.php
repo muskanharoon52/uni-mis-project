@@ -21,7 +21,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($grade !== null && ($grade < 0 || $grade > 100)) {
             throw new RuntimeException('Grade must be between 0 and 100.');
         }
-        $stmt = db()->prepare('UPDATE submissions SET grade = ?, feedback = ? WHERE id = ?');
+        $stmt = db()->prepare('UPDATE lms_submissions SET grade = ?, feedback = ? WHERE submission_id = ?');
         $stmt->execute([$grade, trim((string) ($_POST['feedback'] ?? '')), $submissionId]);
         $message = 'Submission graded.';
     } catch (RuntimeException $exception) {
@@ -30,11 +30,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 $submissionsStmt = db()->prepare(
-    'SELECT s.*, a.title, c.code, u.name AS student_name
-     FROM submissions s
-     JOIN assignments a ON a.id = s.assignment_id
-     JOIN courses c ON c.id = a.course_id
-     JOIN users u ON u.id = s.student_id
+    'SELECT s.*, a.title, c.course_code, u.full_name AS student_name
+     FROM lms_submissions s
+     JOIN lms_assignments a ON a.assignment_id = s.assignment_id
+     JOIN courses c ON c.course_id = a.course_id
+     JOIN users u ON u.user_id = s.student_user_id
      WHERE c.teacher_id = ?
      ORDER BY s.submitted_at DESC'
 );
@@ -51,7 +51,7 @@ require_once __DIR__ . '/../includes/header.php';
         <tr><th>Course</th><th>Assignment</th><th>Student</th><th>Submission</th><th>Grade</th></tr>
         <?php foreach ($submissions as $submission): ?>
             <tr>
-                <td><?= e($submission['code']) ?></td>
+                <td><?= e($submission['course_code']) ?></td>
                 <td><?= e($submission['title']) ?></td>
                 <td><?= e($submission['student_name']) ?></td>
                 <td>
@@ -61,7 +61,7 @@ require_once __DIR__ . '/../includes/header.php';
                 <td>
                     <form method="post">
                         <?= csrf_field() ?>
-                        <input type="hidden" name="submission_id" value="<?= (int) $submission['id'] ?>">
+                        <input type="hidden" name="submission_id" value="<?= (int) $submission['submission_id'] ?>">
                         <input name="grade" type="number" step="0.01" min="0" max="100" value="<?= e((string) $submission['grade']) ?>" placeholder="Grade">
                         <input name="feedback" value="<?= e($submission['feedback']) ?>" placeholder="Feedback">
                         <button class="btn" type="submit">Save</button>
