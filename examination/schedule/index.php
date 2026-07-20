@@ -2,6 +2,8 @@
 require_once '../../config/database.php';
 require_once '../models/ExamSchedule.php';
 include '../../includes/header.php';
+$showDashboardBackButton = true;
+$hideSidebarToggle = true;
 include '../../includes/navbar.php';
 
 // Initialize the model
@@ -9,14 +11,14 @@ $model = new ExamSchedule();
 $schedules = $model->getAll();
 ?>
 
-<!-- Main Container -->
+<!-- Main Container with Slideable Sidebar -->
 <div class="main-container">
-   
     
+    
+    <!-- Main Content Area -->
     <div class="content-area" id="contentArea">
         <div class="d-flex justify-content-between align-items-center mb-4">
-            
-            <h2><i class="bi bi-calendar-event"></i> Exam Schedules</h2>
+            <h2> Exam Schedules</h2>
             <a href="add.php" class="btn btn-primary">
                 <i class="bi bi-plus-circle"></i> Add New Schedule
             </a>

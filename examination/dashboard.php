@@ -51,21 +51,18 @@ if ($result) {
     $stats['upcoming_exams'] = $row ? $row['count'] : 0;
 }
 
-// Results Published - check if status column exists, if not, count all
-$result = $conn->query("SELECT COUNT(*) as count FROM exam_results");
+// Published results
+$result = $conn->query("SELECT COUNT(*) as count FROM exam_results WHERE status = 'published'");
 if ($result) {
     $row = $result->fetch_assoc();
     $stats['results_published'] = $row ? $row['count'] : 0;
 }
 
-// Pending Results - only if status column exists
+// Draft results awaiting publication
 $result = $conn->query("SELECT COUNT(*) as count FROM exam_results WHERE status = 'draft'");
 if ($result) {
     $row = $result->fetch_assoc();
     $stats['pending_results'] = $row ? $row['count'] : 0;
-} else {
-    // If status column doesn't exist, set to 0
-    $stats['pending_results'] = 0;
 }
 
 // Recent Exam Schedules

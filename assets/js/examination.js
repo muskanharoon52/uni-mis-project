@@ -340,3 +340,190 @@ document.addEventListener('DOMContentLoaded', function() {
 function confirmDelete(message) {
     return confirm(message || 'Are you sure you want to delete this item?');
 }
+/**
+ * Sidebar Toggle Functionality
+ * Handles slide animation, keyboard shortcuts, and state persistence
+ */
+(function() {
+    'use strict';
+    
+    // Wait for DOM to load
+    document.addEventListener('DOMContentLoaded', function() {
+        // Get elements
+        const sidebar = document.getElementById('sidebar');
+        const overlay = document.getElementById('sidebarOverlay');
+        const contentArea = document.getElementById('contentArea');
+        const toggleBtn = document.getElementById('sidebarToggle');
+        
+        // Only proceed if elements exist
+        if (!sidebar || !toggleBtn) {
+            console.warn('Sidebar elements not found. Make sure sidebar exists in HTML.');
+            return;
+        }
+        
+        console.log('✅ Sidebar initialized successfully');
+        
+        // Toggle sidebar function
+        function toggleSidebar() {
+            const isOpen = sidebar.classList.contains('open');
+            
+            // Toggle classes
+            sidebar.classList.toggle('open');
+            if (overlay) overlay.classList.toggle('active');
+            if (contentArea) contentArea.classList.toggle('shifted');
+            
+            // Save state to localStorage
+            localStorage.setItem('sidebarOpen', !isOpen);
+            
+            // Update button aria-label
+            toggleBtn.setAttribute('aria-expanded', !isOpen);
+            
+            // Update button icon (optional)
+            updateButtonIcon(!isOpen);
+        }
+        
+        // Open sidebar
+        function openSidebar() {
+            sidebar.classList.add('open');
+            if (overlay) overlay.classList.add('active');
+            if (contentArea) contentArea.classList.add('shifted');
+            localStorage.setItem('sidebarOpen', 'true');
+            toggleBtn.setAttribute('aria-expanded', 'true');
+            updateButtonIcon(true);
+        }
+        
+        // Close sidebar
+        function closeSidebar() {
+            sidebar.classList.remove('open');
+            if (overlay) overlay.classList.remove('active');
+            if (contentArea) contentArea.classList.remove('shifted');
+            localStorage.setItem('sidebarOpen', 'false');
+            toggleBtn.setAttribute('aria-expanded', 'false');
+            updateButtonIcon(false);
+        }
+        
+        // Update button icon (optional - for visual feedback)
+        function updateButtonIcon(isOpen) {
+            const bars = toggleBtn.querySelectorAll('.bar');
+            if (isOpen) {
+                // Transform to X when open
+                if (bars.length === 3) {
+                    bars[0].style.transform = 'rotate(45deg) translate(5px, 5px)';
+                    bars[1].style.opacity = '0';
+                    bars[2].style.transform = 'rotate(-45deg) translate(7px, -6px)';
+                }
+            } else {
+                // Reset to hamburger when closed
+                bars.forEach(bar => {
+                    bar.style.transform = '';
+                    bar.style.opacity = '';
+                });
+            }
+        }
+        
+        // Event Listeners
+        // Toggle on button click
+        toggleBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            toggleSidebar();
+        });
+        
+        // Close sidebar when clicking overlay
+        if (overlay) {
+            overlay.addEventListener('click', function() {
+                if (sidebar.classList.contains('open')) {
+                    closeSidebar();
+                }
+            });
+        }
+        
+        // Keyboard shortcuts
+        document.addEventListener('keydown', function(e) {
+            // Ctrl+B to toggle sidebar
+            if (e.ctrlKey && e.key === 'b') {
+                e.preventDefault();
+                toggleSidebar();
+            }
+            // Escape to close
+            if (e.key === 'Escape' && sidebar.classList.contains('open')) {
+                closeSidebar();
+            }
+        });
+        
+        // Restore state from localStorage
+        const savedState = localStorage.getItem('sidebarOpen');
+        const isDesktop = window.innerWidth > 768;
+        
+        if (savedState === 'true' && isDesktop) {
+            setTimeout(function() {
+                openSidebar();
+            }, 100);
+        } else if (savedState === 'false' || !isDesktop) {
+            closeSidebar();
+        }
+        
+        // Handle window resize
+        let resizeTimer;
+        window.addEventListener('resize', function() {
+            clearTimeout(resizeTimer);
+            resizeTimer = setTimeout(function() {
+                const isDesktopNow = window.innerWidth > 768;
+                
+                if (!isDesktopNow) {
+                    if (sidebar.classList.contains('open')) {
+                        closeSidebar();
+                    }
+                } else {
+                    const saved = localStorage.getItem('sidebarOpen');
+                    if (saved === 'true' && !sidebar.classList.contains('open')) {
+                        openSidebar();
+                    } else if (saved === 'false' && sidebar.classList.contains('open')) {
+                        closeSidebar();
+                    }
+                }
+            }, 250);
+        });
+        
+        // Touch swipe support for mobile
+        let touchStartX = 0;
+        let touchEndX = 0;
+        
+        document.addEventListener('touchstart', function(e) {
+            touchStartX = e.changedTouches[0].screenX;
+        });
+        
+        document.addEventListener('touchend', function(e) {
+            touchEndX = e.changedTouches[0].screenX;
+            handleSwipe();
+        });
+        
+        function handleSwipe() {
+            const swipeDistance = touchStartX - touchEndX;
+            const isOpen = sidebar.classList.contains('open');
+            
+            // Swipe right to open (from left edge)
+            if (swipeDistance < -50 && touchStartX < 30 && !isOpen) {
+                openSidebar();
+            }
+            
+            // Swipe left to close
+            if (swipeDistance > 50 && isOpen) {
+                closeSidebar();
+            }
+        }
+    });
+})();
+
+// Submenu toggle function
+function toggleSubmenu(element) {
+    const submenu = element.nextElementSibling;
+    if (submenu) {
+        submenu.classList.toggle('open');
+        const icon = element.querySelector('.bi-chevron-down, .bi-chevron-up');
+        if (icon) {
+            icon.classList.toggle('bi-chevron-down');
+            icon.classList.toggle('bi-chevron-up');
+        }
+    }
+}

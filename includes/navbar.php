@@ -1,15 +1,17 @@
 <nav class="navbar navbar-expand-lg navbar-dark bg-primary navbar-fixed">
     <div class="container-fluid">
-        <!-- Hamburger Menu Button for Sidebar -->
-        <button class="hamburger-btn" id="sidebarToggle" aria-label="Toggle Sidebar">
-            <div class="bar-container">
-                <span class="bar"></span>
-                <span class="bar"></span>
-                <span class="bar"></span>
-            </div>
-        </button>
+        <?php if (empty($hideSidebarToggle)): ?>
+            <!-- Hamburger Menu Button for Sidebar -->
+            <button class="hamburger-btn" id="sidebarToggle" aria-label="Toggle Sidebar">
+                <div class="bar-container">
+                    <span class="bar"></span>
+                    <span class="bar"></span>
+                    <span class="bar"></span>
+                </div>
+            </button>
+        <?php endif; ?>
         
-        <a class="navbar-brand" href="../index.php">
+        <a class="navbar-brand" href="/uni-mis-project/index.php">
             <i class="bi bi-mortarboard"></i> University MIS
         </a>
         
@@ -17,12 +19,27 @@
             <span class="navbar-toggler-icon"></span>
         </button>
         
-        
+        <div class="collapse navbar-collapse" id="navbarNav">
+            <ul class="navbar-nav me-auto">
+                <?php if (!empty($showDashboardBackButton)): ?>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/uni-mis-project/examination/dashboard.php">
+                            <i class="bi bi-arrow-left"></i> Back to Dashboard
+                        </a>
+                    </li>
+                <?php endif; ?>
+                <li class="nav-item">
+                    
+                </li>
+                <li class="nav-item dropdown">
+                    <a class="nav-link dropdown-toggle <?php echo strpos($_SERVER['REQUEST_URI'], 'schedule') !== false || strpos($_SERVER['REQUEST_URI'], 'results') !== false || strpos($_SERVER['REQUEST_URI'], 'promote') !== false ? 'active' : ''; ?>" 
+                       href="#" id="examDropdown" role="button" data-bs-toggle="dropdown">
+                        <i class="bi bi-calendar-event"></i> Examination
                     </a>
                     <ul class="dropdown-menu">
-                        <li><a class="dropdown-item" href="../examination/schedule/index.php">Schedule</a></li>
-                        <li><a class="dropdown-item" href="../examination/results/index.php">Results</a></li>
-                        <li><a class="dropdown-item" href="../examination/promote/index.php">Promotion</a></li>
+                        <li><a class="dropdown-item" href="/uni-mis-project/examination/schedule/index.php">Schedule</a></li>
+                        <li><a class="dropdown-item" href="/uni-mis-project/examination/results/index.php">Results</a></li>
+                        <li><a class="dropdown-item" href="/uni-mis-project/examination/promote/index.php">Promotion</a></li>
                     </ul>
                 </li>
             </ul>

@@ -1,10 +1,30 @@
 <?php
 require_once '../../config/database.php';
 require_once '../models/ExamResult.php';
+
+$model = new ExamResult();
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_GET['id'])) {
+    $marksObtained = (float) ($_POST['marks_obtained'] ?? 0);
+    $totalMarks = (float) ($_POST['total_marks'] ?? 0);
+
+    if ($totalMarks <= 0 || $marksObtained < 0 || $marksObtained > $totalMarks) {
+        $_SESSION['error'] = 'Marks obtained must be between 0 and the total marks.';
+    } elseif ($model->update($_GET['id'], [
+        'marks_obtained' => $marksObtained,
+        'total_marks' => $totalMarks,
+        'grade' => $_POST['grade']
+    ])) {
+        $_SESSION['success'] = 'Result updated successfully!';
+        header('Location: index.php');
+        exit;
+    } else {
+        $_SESSION['error'] = 'Failed to update result.';
+    }
+}
+
 include '../../includes/header.php';
 include '../../includes/navbar.php';
 
-$model = new ExamResult();
 $result = $model->getById($_GET['id']);
 
 if (!$result) {

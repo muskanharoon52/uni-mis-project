@@ -2,6 +2,8 @@
 require_once '../../config/database.php';
 require_once '../models/ExamResult.php';
 include '../../includes/header.php';
+$hideSidebarToggle = true;
+$showDashboardBackButton = true;
 include '../../includes/navbar.php';
 
 
@@ -12,7 +14,7 @@ $results = $model->getAll();
 <div class="container-fluid mt-4">
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h2>Exam Results</h2>
-        <a href="?action=add" class="btn btn-primary">
+        <a href="add.php" class="btn btn-primary">
             <i class="bi bi-plus-circle"></i> Add Results
         </a>
     </div>
@@ -75,15 +77,15 @@ $results = $model->getAll();
                                     </td>
                                     <td>
                                         <div class="btn-group" role="group">
-                                            <a href="?action=view&id=<?php echo $result['result_id']; ?>" 
+                                            <a href="view.php?id=<?php echo $result['result_id']; ?>" 
                                                class="btn btn-sm btn-info">
                                                 <i class="bi bi-eye"></i>
                                             </a>
-                                            <a href="?action=edit&id=<?php echo $result['result_id']; ?>" 
+                                            <a href="edit.php?id=<?php echo $result['result_id']; ?>" 
                                                class="btn btn-sm btn-warning">
                                                 <i class="bi bi-pencil"></i>
                                             </a>
-                                            <a href="?action=delete&id=<?php echo $result['result_id']; ?>" 
+                                            <a href="delete.php?id=<?php echo $result['result_id']; ?>" 
                                                class="btn btn-sm btn-danger"
                                                onclick="return confirm('Are you sure you want to delete this result?')">
                                                 <i class="bi bi-trash"></i>

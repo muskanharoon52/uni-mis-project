@@ -1,6 +1,3 @@
-<?php
-// includes/footer.php
-?>
 <footer class="footer mt-auto py-3 bg-light">
     <div class="container text-center">
         <span class="text-muted">© <?php echo date('Y'); ?> University MIS. All rights reserved.</span>
@@ -9,24 +6,21 @@
     </div>
 </footer>
 
-<!-- ============================================ -->
-<!-- EXTERNAL LIBRARIES                          -->
-<!-- ============================================ -->
+<!-- Bootstrap Bundle with Popper -->
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+
+<!-- jQuery -->
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+
+<!-- DataTables -->
 <script src="https://cdn.datatables.net/1.11.5/js/jquery.dataTables.min.js"></script>
 <script src="https://cdn.datatables.net/1.11.5/js/dataTables.bootstrap5.min.js"></script>
 
-<!-- ============================================ -->
-<!-- CUSTOM SCRIPTS                              -->
-<!-- ============================================ -->
+<!-- Custom JavaScript Files -->
 <script src="../assets/js/script.js"></script>
 <script src="../assets/js/sidebar.js"></script>
 <script src="../assets/js/examination.js"></script>
 
-<!-- ============================================ -->
-<!-- INITIALIZATION                              -->
-<!-- ============================================ -->
 <script>
 $(document).ready(function() {
     // Initialize DataTables if table exists

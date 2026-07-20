@@ -82,7 +82,7 @@ if (!$result) {
                 <a href="edit.php?id=<?php echo $result['result_id']; ?>" class="btn btn-warning me-2">
                     <i class="bi bi-pencil"></i> Edit
                 </a>
-                <a href="?action=delete&id=<?php echo $result['result_id']; ?>" 
+                <a href="delete.php?id=<?php echo $result['result_id']; ?>" 
                    class="btn btn-danger" 
                    onclick="return confirm('Are you sure you want to delete this result?')">
                     <i class="bi bi-trash"></i> Delete

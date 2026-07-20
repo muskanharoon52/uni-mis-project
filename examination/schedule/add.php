@@ -2,6 +2,8 @@
 require_once '../../config/database.php';
 require_once '../models/ExamSchedule.php';
 include '../../includes/header.php';
+$hideSidebarToggle = true;
+$showDashboardBackButton = true;
 include '../../includes/navbar.php';
 
 $conn = getConnection();

@@ -2,7 +2,39 @@
 require_once '../../config/database.php';
 require_once '../models/ExamResult.php';
 require_once '../models/ExamSchedule.php';
+
+$formError = '';
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $marksObtained = (float) ($_POST['marks_obtained'] ?? 0);
+    $totalMarks = (float) ($_POST['total_marks'] ?? 0);
+
+    if (empty($_POST['student_id']) || empty($_POST['exam_id']) || empty($_POST['grade'])) {
+        $formError = 'Please complete all fields.';
+    } elseif ($totalMarks <= 0 || $marksObtained < 0 || $marksObtained > $totalMarks) {
+        $formError = 'Marks obtained must be between 0 and the total marks.';
+    } else {
+        $resultModel = new ExamResult();
+        $resultAdded = $resultModel->add([
+            'student_id' => $_POST['student_id'],
+            'exam_id' => $_POST['exam_id'],
+            'marks_obtained' => $marksObtained,
+            'total_marks' => $totalMarks,
+            'grade' => $_POST['grade']
+        ]);
+
+        if ($resultAdded) {
+            $_SESSION['success'] = 'Result added successfully!';
+            header('Location: index.php');
+            exit;
+        }
+
+        $formError = 'This result already exists, or it could not be added.';
+    }
+}
+
 include '../../includes/header.php';
+$hideSidebarToggle = true;
+$showDashboardBackButton = true;
 include '../../includes/navbar.php';
 
 $conn = getConnection();
@@ -28,6 +60,9 @@ $students = $conn->query("
                     <h5>Add Exam Results</h5>
                 </div>
                 <div class="card-body">
+                    <?php if ($formError): ?>
+                        <div class="alert alert-danger"><?php echo htmlspecialchars($formError); ?></div>
+                    <?php endif; ?>
                     <form method="POST">
                         <div class="mb-3">
                             <label for="student_id" class="form-label">Student</label>

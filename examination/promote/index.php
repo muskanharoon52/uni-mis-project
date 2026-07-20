@@ -2,6 +2,8 @@
 require_once '../../config/database.php';
 require_once '../models/StudentPromotion.php';
 include '../../includes/header.php';
+$hideSidebarToggle = true;
+$showDashboardBackButton = true;
 include '../../includes/navbar.php';
 // ... rest of code
 

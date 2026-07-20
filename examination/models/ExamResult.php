@@ -55,7 +55,7 @@ class ExamResult {
         $sql = "INSERT INTO exam_results (student_id, exam_id, marks_obtained, total_marks, grade, status) 
                 VALUES (?, ?, ?, ?, ?, 'draft')";
         $stmt = $this->conn->prepare($sql);
-        $stmt->bind_param("siids", 
+        $stmt->bind_param("sidds", 
             $data['student_id'], 
             $data['exam_id'], 
             $data['marks_obtained'], 

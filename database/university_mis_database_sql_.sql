@@ -175,7 +175,8 @@ CREATE TABLE `exam_results` (
   `exam_id` int(11) DEFAULT NULL,
   `marks_obtained` decimal(5,2) DEFAULT NULL,
   `total_marks` int(11) DEFAULT NULL,
-  `grade` varchar(2) DEFAULT NULL
+  `grade` varchar(2) DEFAULT NULL,
+  `status` enum('draft','published') NOT NULL DEFAULT 'draft'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- --------------------------------------------------------
