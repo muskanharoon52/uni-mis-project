@@ -27,11 +27,11 @@ DELIMITER $$
 --
 CREATE DEFINER=`root`@`localhost` PROCEDURE `generate_student_id` (IN `program_code` VARCHAR(10), IN `batch_year` INT, OUT `new_id` VARCHAR(20))   BEGIN
     DECLARE last_number INT;
-    
+
     SELECT COUNT(*) + 1 INTO last_number
     FROM students
     WHERE student_id LIKE CONCAT(program_code, '-', batch_year, '-%');
-    
+
     SET new_id = CONCAT(program_code, '-', batch_year, '-', LPAD(last_number, 3, '0'));
 END$$
 
@@ -435,12 +435,12 @@ CREATE TABLE `users` (
 --
 
 INSERT INTO `users` (`user_id`, `email`, `password_hash`, `full_name`, `phone`, `role_id`, `is_active`, `created_at`) VALUES
-(1, 'admin@university.edu', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'Dr. Ahmed Khan', '0300-1234567', 1, 1, '2026-06-27 18:33:55'),
-(2, 'sso@university.edu', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'Mr. Ali Raza', '0300-7654321', 2, 1, '2026-06-27 18:33:55'),
-(3, 'account@university.edu', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'Mr. Usman Malik', '0300-9876543', 6, 1, '2026-06-27 18:33:55'),
-(4, 'faculty@university.edu', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'Dr. Samina Akhtar', '0300-5555555', 3, 1, '2026-06-27 18:33:55'),
-(5, 'student1@university.edu', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'Muhammad Ali', '0310-1111111', 4, 1, '2026-06-27 18:33:55'),
-(6, 'student2@university.edu', '$2y$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', 'Usman Ahmed', '0310-3333333', 4, 1, '2026-06-27 18:33:55');
+(1, 'admin@university.edu', '$2y$10$9dyD7r1kzdwv8BnLvmFsiefqVxH3VwQEaBukCxxi8sq2M0MFZPPHC', 'Dr. Ahmed Khan', '0300-1234567', 1, 1, '2026-06-27 18:33:55'),
+(2, 'sso@university.edu', '$2y$10$9dyD7r1kzdwv8BnLvmFsiefqVxH3VwQEaBukCxxi8sq2M0MFZPPHC', 'Mr. Ali Raza', '0300-7654321', 2, 1, '2026-06-27 18:33:55'),
+(3, 'account@university.edu', '$2y$10$9dyD7r1kzdwv8BnLvmFsiefqVxH3VwQEaBukCxxi8sq2M0MFZPPHC', 'Mr. Usman Malik', '0300-9876543', 6, 1, '2026-06-27 18:33:55'),
+(4, 'faculty@university.edu', '$2y$10$9dyD7r1kzdwv8BnLvmFsiefqVxH3VwQEaBukCxxi8sq2M0MFZPPHC', 'Dr. Samina Akhtar', '0300-5555555', 3, 1, '2026-06-27 18:33:55'),
+(5, 'student1@university.edu', '$2y$10$9dyD7r1kzdwv8BnLvmFsiefqVxH3VwQEaBukCxxi8sq2M0MFZPPHC', 'Muhammad Ali', '0310-1111111', 4, 1, '2026-06-27 18:33:55'),
+(6, 'student2@university.edu', '$2y$10$9dyD7r1kzdwv8BnLvmFsiefqVxH3VwQEaBukCxxi8sq2M0MFZPPHC', 'Usman Ahmed', '0310-3333333', 4, 1, '2026-06-27 18:33:55');
 
 -- --------------------------------------------------------
 
