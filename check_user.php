@@ -1,5 +1,5 @@
 <?php
-require_once 'includes/db.php';
+require_once 'config/db.php';
 
 $email = 'sso@university.edu';
 

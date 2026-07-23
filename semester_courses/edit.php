@@ -2,7 +2,7 @@
 // semester_courses/assign.php
 
 // Include database (session is already started in db.php)
-require_once __DIR__ . '/../includes/db.php';
+require_once __DIR__ . '/../config/db.php';
 require_once __DIR__ . '/../includes/header.php';
 
 // Get parameters
