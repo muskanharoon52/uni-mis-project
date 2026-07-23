@@ -691,6 +691,29 @@ CREATE TABLE sbe_exam_results (
     UNIQUE KEY uq_studentexam_result (student_exam_id)
 ) ENGINE=InnoDB;
 
+-- =====================================================================
+-- 7b. EXAMINATION MODULE
+-- Authentication layer for examination staff who review SBE results
+-- and manage student promotions. Uses exm_ prefix-free naming since
+-- this module only owns one table. Reads from sbe_* and core tables.
+-- =====================================================================
+
+CREATE TABLE examination_auth_users (
+    auth_id       INT AUTO_INCREMENT PRIMARY KEY,
+    role          ENUM('Examiner') NOT NULL DEFAULT 'Examiner',
+    login_id      VARCHAR(50) NOT NULL UNIQUE,
+    password_hash VARCHAR(255) NOT NULL,
+    display_name  VARCHAR(150) NOT NULL,
+    status        ENUM('Active','Inactive') NOT NULL DEFAULT 'Active',
+    created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB;
+
+-- Examination staff seed data (password: exam123)
+INSERT INTO examination_auth_users (role, login_id, password_hash, display_name, status) VALUES
+    ('Examiner', '6001', '$2y$10$k8/5TEYHKt4qecH5vqVeoOG3SZEPKCr/0jvffQIh/YQjteBHpjarq', 'Examiner 6001', 'Active'),
+    ('Examiner', '6002', '$2y$10$k8/5TEYHKt4qecH5vqVeoOG3SZEPKCr/0jvffQIh/YQjteBHpjarq', 'Examiner 6002', 'Active');
+
 SET FOREIGN_KEY_CHECKS = 1;
 
 -- =====================================================================
