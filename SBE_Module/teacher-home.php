@@ -15,7 +15,6 @@ $db = db();
 
 $questionsCount = table_count('sbe_question_bank');
 $examsCount     = table_count('sbe_exams');
-$scheduleCount  = table_count('sbe_exam_schedule');
 
 $statusCounts = $db->query("SELECT status, COUNT(*) AS total FROM sbe_exams GROUP BY status")->fetchAll(PDO::FETCH_KEY_PAIR);
 $draftExams = (int) ($statusCounts['Draft'] ?? 0);
@@ -31,8 +30,6 @@ $passRate = $submittedAttempts > 0 ? round(($db->query("SELECT COUNT(*) FROM sbe
 $recentResults = $db->query('SELECT er.obtained_marks, er.total_marks, er.percentage, er.pass_fail_status, er.published_at, se.student_id, e.exam_code, e.title FROM sbe_exam_results er INNER JOIN sbe_student_exams se ON se.student_exam_id = er.student_exam_id INNER JOIN sbe_exams e ON e.exam_id = er.exam_id ORDER BY er.published_at DESC LIMIT 6')->fetchAll();
 
 $topStudents = $db->query('SELECT se.student_id, ROUND(AVG(se.percentage),1) AS avg_pct, COUNT(*) AS attempts FROM sbe_student_exams se WHERE se.status IN (\'Submitted\',\'Auto Submitted\') GROUP BY se.student_id ORDER BY avg_pct DESC LIMIT 5')->fetchAll();
-
-$upcomingSchedules = $db->query('SELECT es.schedule_id, es.exam_date, es.start_time, es.location, es.section, es.status, e.exam_code, e.title FROM sbe_exam_schedule es INNER JOIN sbe_exams e ON e.exam_id = es.exam_id WHERE es.exam_date >= CURDATE() ORDER BY es.exam_date ASC, es.start_time ASC LIMIT 5')->fetchAll();
 
 $questionTopics = $db->query('SELECT topic, COUNT(*) AS total FROM sbe_question_bank GROUP BY topic ORDER BY total DESC LIMIT 5')->fetchAll();
 
@@ -51,7 +48,6 @@ require __DIR__ . '/includes/header.php';
         <div class="greeting-actions">
             <a class="btn btn-solid" href="question-bank.php">+ Add Questions</a>
             <a class="btn" href="exams.php">Create Exam</a>
-            <a class="btn" href="exam-schedule.php">Schedule Exam</a>
         </div>
     </div>
 
@@ -152,63 +148,30 @@ require __DIR__ . '/includes/header.php';
 
     </div>
 
-    <div class="grid-2 page-section animate-in animate-delay-3">
-
-        <div class="table-card">
-            <div class="card-header">
-                <h3>Recent Results</h3>
-                <p>Latest graded submissions from students</p>
-            </div>
-            <div class="table-wrapper" style="margin-top:10px;">
-                <table>
-                    <thead><tr><th>Student</th><th>Exam</th><th>Score</th><th>Status</th></tr></thead>
-                    <tbody>
-                    <?php if (empty($recentResults)): ?>
-                        <tr><td colspan="4"><div class="empty-state"><p>No results yet.</p></div></td></tr>
-                    <?php else: ?>
-                        <?php foreach ($recentResults as $r): ?>
-                            <tr>
-                                <td class="small fw-700">#<?= (int) $r['student_id'] ?></td>
-                                <td><span class="badge manual"><?= e($r['exam_code']) ?></span> <span class="small"><?= e(mb_strimwidth($r['title'],0,20,'...')) ?></span></td>
-                                <td class="fw-700"><?= number_format((float) $r['percentage'], 1) ?>%</td>
-                                <td><span class="badge <?= e(strtolower($r['pass_fail_status'])) ?>"><?= e($r['pass_fail_status']) ?></span></td>
-                            </tr>
-                        <?php endforeach; ?>
-                    <?php endif; ?>
-                    </tbody>
-                </table>
-            </div>
+    <div class="table-card page-section animate-in animate-delay-3">
+        <div class="card-header">
+            <h3>Recent Results</h3>
+            <p>Latest graded submissions from students</p>
         </div>
-
-        <div class="table-card">
-            <div class="card-header">
-                <h3>Upcoming Schedules</h3>
-                <p>Exam sessions from today onwards</p>
-            </div>
-            <div class="table-wrapper" style="margin-top:10px;">
-                <table>
-                    <thead><tr><th>Exam</th><th>Date</th><th>Section</th><th>Status</th></tr></thead>
-                    <tbody>
-                    <?php if (empty($upcomingSchedules)): ?>
-                        <tr><td colspan="4"><div class="empty-state"><p>No upcoming schedules.</p></div></td></tr>
-                    <?php else: ?>
-                        <?php foreach ($upcomingSchedules as $s): ?>
-                            <tr>
-                                <td>
-                                    <span class="badge manual"><?= e($s['exam_code']) ?></span>
-                                    <div class="small fw-700" style="margin-top:2px;"><?= e(mb_strimwidth($s['title'],0,24,'...')) ?></div>
-                                </td>
-                                <td class="small"><?= e($s['exam_date']) ?></td>
-                                <td class="small"><?= e($s['section']) ?></td>
-                                <td><span class="badge <?= e(strtolower($s['status'])) ?>"><?= e($s['status']) ?></span></td>
-                            </tr>
-                        <?php endforeach; ?>
-                    <?php endif; ?>
-                    </tbody>
-                </table>
-            </div>
+        <div class="table-wrapper" style="margin-top:10px;">
+            <table>
+                <thead><tr><th>Student</th><th>Exam</th><th>Score</th><th>Status</th></tr></thead>
+                <tbody>
+                <?php if (empty($recentResults)): ?>
+                    <tr><td colspan="4"><div class="empty-state"><p>No results yet.</p></div></td></tr>
+                <?php else: ?>
+                    <?php foreach ($recentResults as $r): ?>
+                        <tr>
+                            <td class="small fw-700">#<?= (int) $r['student_id'] ?></td>
+                            <td><span class="badge manual"><?= e($r['exam_code']) ?></span> <span class="small"><?= e(mb_strimwidth($r['title'],0,20,'...')) ?></span></td>
+                            <td class="fw-700"><?= number_format((float) $r['percentage'], 1) ?>%</td>
+                            <td><span class="badge <?= e(strtolower($r['pass_fail_status'])) ?>"><?= e($r['pass_fail_status']) ?></span></td>
+                        </tr>
+                    <?php endforeach; ?>
+                <?php endif; ?>
+                </tbody>
+            </table>
         </div>
-
     </div>
 
     <div class="grid-3 page-section animate-in animate-delay-3">

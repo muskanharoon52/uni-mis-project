@@ -62,9 +62,6 @@ $userInitial = strtoupper(substr($user['display_name'] ?? 'G', 0, 1));
                 <a class="<?= $activePage === 'exams' ? 'active' : '' ?>" href="exams.php">
                     <span class="nav-icon">&#128221;</span> Exam Pool
                 </a>
-                <a class="<?= $activePage === 'exam_schedule' ? 'active' : '' ?>" href="exam-schedule.php">
-                    <span class="nav-icon">&#128197;</span> Exam Schedule
-                </a>
                 <a class="<?= $activePage === 'exam_questions' ? 'active' : '' ?>" href="exam-questions.php">
                     <span class="nav-icon">&#128450;</span> Question Mapping
                 </a>
