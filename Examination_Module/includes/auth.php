@@ -5,14 +5,14 @@ declare(strict_types=1);
 if (!function_exists('current_user')) {
     function current_user(): ?array
     {
-        return $_SESSION['auth_user'] ?? null;
+        return $_SESSION['exm_auth_user'] ?? null;
     }
 }
 
 if (!function_exists('auth_login')) {
     function auth_login(array $user): void
     {
-        $_SESSION['auth_user'] = [
+        $_SESSION['exm_auth_user'] = [
             'auth_id' => (int) $user['auth_id'],
             'role' => (string) $user['role'],
             'login_id' => (string) $user['login_id'],
@@ -25,7 +25,7 @@ if (!function_exists('auth_login')) {
 if (!function_exists('auth_logout')) {
     function auth_logout(): void
     {
-        unset($_SESSION['auth_user']);
+        unset($_SESSION['exm_auth_user']);
         if (session_status() === PHP_SESSION_ACTIVE) {
             session_regenerate_id(true);
         }
