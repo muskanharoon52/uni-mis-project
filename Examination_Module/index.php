@@ -21,6 +21,8 @@ $passCount = $db->query('SELECT COUNT(*) FROM sbe_exam_results WHERE pass_fail_s
 $failCount = $db->query('SELECT COUNT(*) FROM sbe_exam_results WHERE pass_fail_status = \'Fail\'')->fetchColumn();
 $totalPromotions = $db->query('SELECT COUNT(*) FROM student_promotions')->fetchColumn();
 $pendingPromotions = (int) $totalStudents - (int) $totalPromotions;
+$totalSchedules = $db->query('SELECT COUNT(*) FROM sbe_exam_schedule')->fetchColumn();
+$ongoingSchedules = $db->query("SELECT COUNT(*) FROM sbe_exam_schedule WHERE status = 'Ongoing'")->fetchColumn();
 
 $recentResults = $db->query('SELECT er.obtained_marks, er.total_marks, er.percentage, er.pass_fail_status, er.published_at, se.student_id, e.exam_code, e.title, s.full_name FROM sbe_exam_results er INNER JOIN sbe_student_exams se ON se.student_exam_id = er.student_exam_id INNER JOIN sbe_exams e ON e.exam_id = er.exam_id INNER JOIN students s ON s.student_id = se.student_id ORDER BY er.published_at DESC LIMIT 8')->fetchAll();
 
@@ -39,9 +41,10 @@ require __DIR__ . '/includes/header.php';
     <div class="greeting-card">
         <div class="greeting-eyebrow">Examination Portal</div>
         <h2><?= e($greeting) ?>, <?= e($user['display_name']) ?>!</h2>
-        <p>Review student results from SBE exams and manage semester promotions from a single dashboard.</p>
+        <p>Review student results from SBE exams, schedule exams, and manage semester promotions from a single dashboard.</p>
         <div class="greeting-actions">
             <a class="btn btn-solid" href="view-results.php">View Results</a>
+            <a class="btn" href="exam-schedule.php">Schedule Exam</a>
             <a class="btn" href="promote-students.php">Promote Students</a>
         </div>
     </div>
@@ -60,10 +63,10 @@ require __DIR__ . '/includes/header.php';
             <div class="stat-trend up"><?= $passRate ?>% pass rate</div>
         </div>
         <div class="stat-card-v2">
-            <div class="stat-icon blue">&#9989;</div>
-            <div class="stat-label">Passed</div>
-            <div class="stat-value"><?= number_format((int) $passCount) ?></div>
-            <div class="stat-trend up"><?= number_format((int) $failCount) ?> failed</div>
+            <div class="stat-icon blue">&#128197;</div>
+            <div class="stat-label">Schedules</div>
+            <div class="stat-value"><?= number_format((int) $totalSchedules) ?></div>
+            <div class="stat-trend up"><?= $ongoingSchedules ?> ongoing</div>
         </div>
         <div class="stat-card-v2">
             <div class="stat-icon amber">&#11014;</div>
@@ -118,6 +121,13 @@ require __DIR__ . '/includes/header.php';
                     <div>
                         <strong style="color:var(--text-strong);">View All Results</strong>
                         <small style="display:block; margin-top:2px; color:var(--text-muted);">Browse SBE exam results by student or exam</small>
+                    </div>
+                </a>
+                <a class="action-card" href="exam-schedule.php" style="flex-direction:row; align-items:center; gap:14px; text-decoration:none;">
+                    <div class="action-icon" style="background:#eff6ff; color:#3b82f6;">&#128197;</div>
+                    <div>
+                        <strong style="color:var(--text-strong);">Exam Schedule</strong>
+                        <small style="display:block; margin-top:2px; color:var(--text-muted);">Schedule and manage exam delivery windows</small>
                     </div>
                 </a>
                 <a class="action-card" href="promote-students.php" style="flex-direction:row; align-items:center; gap:14px; text-decoration:none;">

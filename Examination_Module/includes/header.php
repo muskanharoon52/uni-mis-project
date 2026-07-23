@@ -60,6 +60,11 @@ $userInitial = strtoupper(substr($user['display_name'] ?? 'G', 0, 1));
                     <span class="nav-icon">&#127942;</span> View Results
                 </a>
 
+                <span class="nav-section-label">Exam Management</span>
+                <a class="<?= $activePage === 'exam_schedule' ? 'active' : '' ?>" href="exam-schedule.php">
+                    <span class="nav-icon">&#128197;</span> Exam Schedule
+                </a>
+
                 <span class="nav-section-label">Student Affairs</span>
                 <a class="<?= $activePage === 'promote_students' ? 'active' : '' ?>" href="promote-students.php">
                     <span class="nav-icon">&#11014;</span> Promote Students
