@@ -9,7 +9,11 @@ if ($_SESSION['role_id'] != 3 && $_SESSION['role_id'] != 1) {
     exit();
 }
 
-include $_SERVER['DOCUMENT_ROOT'] . '/MIS/finance/includes/header.php';
+// Include database connection
+include __DIR__ . '/../../config/db_connect.php';
+
+// Include header
+include __DIR__ . '/../includes/header.php';
 
 $error = '';
 $success = '';
@@ -85,4 +89,4 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     </div>
 </div>
 
-<?php include $_SERVER['DOCUMENT_ROOT'] . '/MIS/finance/includes/footer.php'; ?>
+<?php include __DIR__ . '/../includes/footer.php'; ?>

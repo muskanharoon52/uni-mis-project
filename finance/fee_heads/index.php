@@ -9,7 +9,11 @@ if ($_SESSION['role_id'] != 3 && $_SESSION['role_id'] != 1) {
     exit();
 }
 
-include $_SERVER['DOCUMENT_ROOT'] . '/MIS/finance/includes/header.php';
+// Include database connection
+include __DIR__ . '/../../config/db_connect.php';
+
+// Include header
+include __DIR__ . '/../includes/header.php';
 
 $sql = "SELECT * FROM fee_heads WHERE deleted_at IS NULL ORDER BY fee_head_id DESC";
 $result = mysqli_query($conn, $sql);
@@ -88,4 +92,4 @@ $result = mysqli_query($conn, $sql);
     </div>
 </div>
 
-<?php include $_SERVER['DOCUMENT_ROOT'] . '/MIS/finance/includes/footer.php'; ?>
+<?php include __DIR__ . '/../includes/footer.php'; ?>

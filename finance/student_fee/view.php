@@ -9,7 +9,11 @@ if ($_SESSION['role_id'] != 3 && $_SESSION['role_id'] != 1) {
     exit();
 }
 
-include $_SERVER['DOCUMENT_ROOT'] . '/MIS/finance/includes/header.php';
+// Include database connection
+include __DIR__ . '/../../config/db_connect.php';
+
+// Include header
+include __DIR__ . '/../includes/header.php';
 
 if (!isset($_GET['id']) || empty($_GET['id'])) {
     echo '<script>window.location.href="index.php?error=Invalid fee record ID";</script>';
@@ -153,4 +157,4 @@ $detail_result = mysqli_query($conn, $detail_sql);
     </div>
 </div>
 
-<?php include $_SERVER['DOCUMENT_ROOT'] . '/MIS/finance/includes/footer.php'; ?>
+<?php include __DIR__ . '/../includes/footer.php'; ?>

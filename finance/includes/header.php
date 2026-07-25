@@ -5,7 +5,7 @@ if (session_status() === PHP_SESSION_NONE) {
 }
 
 // Include database connection
-include $_SERVER['DOCUMENT_ROOT'] . '/MIS/config/db_connect.php';
+include __DIR__ . '/../../config/db_connect.php';
 
 // Check if user is logged in
 if (!isset($_SESSION['user_id'])) {
@@ -111,17 +111,17 @@ $current_folder = basename(dirname($_SERVER['PHP_SELF']));
     </div>
     <ul class="nav flex-column mt-3">
         <li class="nav-item">
-            <a class="nav-link <?php echo ($current_page == 'dashboard.php') ? 'active' : ''; ?>" href="/MIS/finance/dashboard.php">
+            <a class="nav-link <?php echo ($current_page == 'dashboard.php') ? 'active' : ''; ?>" href="/uni-mis-project/finance/dashboard.php">
                 <i class="fas fa-chart-pie"></i> Dashboard
             </a>
         </li>
         <li class="nav-item">
-            <a class="nav-link <?php echo ($current_folder == 'fee_heads') ? 'active' : ''; ?>" href="/MIS/finance/fee_heads/index.php">
+            <a class="nav-link <?php echo ($current_folder == 'fee_heads') ? 'active' : ''; ?>" href="/uni-mis-project/finance/fee_heads/index.php">
                 <i class="fas fa-tags"></i> Fee Heads
             </a>
         </li>
         <li class="nav-item">
-            <a class="nav-link <?php echo ($current_folder == 'fee_structure') ? 'active' : ''; ?>" href="/MIS/finance/fee_structure/index.php">
+            <a class="nav-link <?php echo ($current_folder == 'fee_structure') ? 'active' : ''; ?>" href="/uni-mis-project/finance/fee_structure/index.php">
                 <i class="fas fa-layer-group"></i> Fee Structure
             </a>
         </li>
@@ -131,28 +131,28 @@ $current_folder = basename(dirname($_SERVER['PHP_SELF']));
                 <span class="arrow <?php echo ($current_folder == 'student_fee') ? 'open' : ''; ?>"><i class="fas fa-chevron-right"></i></span>
             </a>
             <ul class="sub-menu <?php echo ($current_folder == 'student_fee') ? 'show' : ''; ?>" id="studentFeeSubMenu">
-                <li><a class="nav-link" href="/MIS/finance/student_fee/generate.php"><i class="fas fa-plus-circle text-success"></i> Generate Fee</a></li>
-                <li><a class="nav-link" href="/MIS/finance/student_fee/index.php"><i class="fas fa-list text-primary"></i> Fee Records</a></li>
-                <li><a class="nav-link" href="/MIS/finance/student_fee/view.php?id=1"><i class="fas fa-eye text-info"></i> View Fee</a></li>
+                <li><a class="nav-link" href="/uni-mis-project/finance/student_fee/generate.php"><i class="fas fa-plus-circle text-success"></i> Generate Fee</a></li>
+                <li><a class="nav-link" href="/uni-mis-project/finance/student_fee/index.php"><i class="fas fa-list text-primary"></i> Fee Records</a></li>
+                <li><a class="nav-link" href="/uni-mis-project/finance/student_fee/view.php?id=1"><i class="fas fa-eye text-info"></i> View Fee</a></li>
             </ul>
         </li>
         <li class="nav-item">
-            <a class="nav-link <?php echo ($current_folder == 'payments') ? 'active' : ''; ?>" href="/MIS/finance/payments/index.php">
+            <a class="nav-link <?php echo ($current_folder == 'payments') ? 'active' : ''; ?>" href="/uni-mis-project/finance/payments/index.php">
                 <i class="fas fa-money-bill-wave"></i> Payments
             </a>
         </li>
         <li class="nav-item">
-            <a class="nav-link <?php echo ($current_folder == 'receipts') ? 'active' : ''; ?>" href="/MIS/finance/receipts/index.php">
+            <a class="nav-link <?php echo ($current_folder == 'receipts') ? 'active' : ''; ?>" href="/uni-mis-project/finance/receipts/index.php">
                 <i class="fas fa-receipt"></i> Receipts
             </a>
         </li>
         <li class="nav-item">
-            <a class="nav-link <?php echo ($current_folder == 'logs') ? 'active' : ''; ?>" href="/MIS/finance/logs/index.php">
+            <a class="nav-link <?php echo ($current_folder == 'logs') ? 'active' : ''; ?>" href="/uni-mis-project/finance/logs/index.php">
                 <i class="fas fa-history"></i> Activity Logs
             </a>
         </li>
     </ul>
-    <a href="/MIS/auth/logout.php" class="logout-btn">
+    <a href="/uni-mis-project/auth/logout.php" class="logout-btn">
         <i class="fas fa-sign-out-alt"></i> Logout
     </a>
 </div>

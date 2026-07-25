@@ -9,7 +9,11 @@ if ($_SESSION['role_id'] != 3 && $_SESSION['role_id'] != 1) {
     exit();
 }
 
-include $_SERVER['DOCUMENT_ROOT'] . '/MIS/finance/includes/header.php';
+// Include database connection
+include __DIR__ . '/../../config/db_connect.php';
+
+// Include header
+include __DIR__ . '/../includes/header.php';
 
 $module_filter = isset($_GET['module']) ? mysqli_real_escape_string($conn, $_GET['module']) : '';
 $action_filter = isset($_GET['action']) ? mysqli_real_escape_string($conn, $_GET['action']) : '';
@@ -157,4 +161,4 @@ if (!$module_result) {
     </div>
 </div>
 
-<?php include $_SERVER['DOCUMENT_ROOT'] . '/MIS/finance/includes/footer.php'; ?>
+<?php include __DIR__ . '/../includes/footer.php'; ?>

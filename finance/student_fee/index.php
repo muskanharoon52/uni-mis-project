@@ -9,7 +9,11 @@ if ($_SESSION['role_id'] != 3 && $_SESSION['role_id'] != 1) {
     exit();
 }
 
-include $_SERVER['DOCUMENT_ROOT'] . '/MIS/finance/includes/header.php';
+// Include database connection
+include __DIR__ . '/../../config/db_connect.php';
+
+// Include header
+include __DIR__ . '/../includes/header.php';
 
 $sql = "SELECT 
         sf.student_fee_id,
@@ -121,4 +125,4 @@ $result = mysqli_query($conn, $sql);
     </div>
 </div>
 
-<?php include $_SERVER['DOCUMENT_ROOT'] . '/MIS/finance/includes/footer.php'; ?>
+<?php include __DIR__ . '/../includes/footer.php'; ?>

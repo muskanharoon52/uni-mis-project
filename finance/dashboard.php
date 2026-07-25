@@ -9,8 +9,8 @@ if ($_SESSION['role_id'] != 3 && $_SESSION['role_id'] != 1) {
     exit();
 }
 
-include $_SERVER['DOCUMENT_ROOT'] . '/MIS/config/db_connect.php';
-include $_SERVER['DOCUMENT_ROOT'] . '/MIS/finance/includes/header.php';
+include __DIR__ . '/../config/db_connect.php';
+include __DIR__ . '/includes/header.php';
 
 // ----- STATISTICS -----
 $stu_sql = "SELECT COUNT(*) AS total FROM students WHERE status = 'Active'";
@@ -267,4 +267,4 @@ new Chart(pieCtx, {
 });
 </script>
 
-<?php include $_SERVER['DOCUMENT_ROOT'] . '/MIS/finance/includes/footer.php'; ?>
+<include __DIR__ . '/includes/footer.php';>

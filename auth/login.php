@@ -1,6 +1,6 @@
 <?php
 session_start();
-include $_SERVER['DOCUMENT_ROOT'] . '/MIS/config/db_connect.php';
+include $_SERVER['DOCUMENT_ROOT'] . '/uni-mis-project/config/db_connect.php';
 
 $error = '';
 
