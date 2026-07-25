@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: Jul 17, 2026 at 09:01 PM
+-- Generation Time: Jul 25, 2026 at 12:28 PM
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.2.12
 
@@ -169,6 +169,59 @@ CREATE TABLE `examinations` (
 -- --------------------------------------------------------
 
 --
+-- Table structure for table `exam_results`
+--
+
+CREATE TABLE `exam_results` (
+  `result_id` int(11) NOT NULL,
+  `exam_id` int(11) NOT NULL,
+  `student_id` int(11) NOT NULL,
+  `marks_obtained` decimal(6,2) DEFAULT NULL,
+  `total_marks` decimal(6,2) DEFAULT NULL,
+  `grade` varchar(2) DEFAULT NULL,
+  `status` varchar(20) NOT NULL DEFAULT 'Pending',
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `exam_schedules`
+--
+
+CREATE TABLE `exam_schedules` (
+  `exam_id` int(11) NOT NULL,
+  `course_id` int(11) NOT NULL,
+  `exam_type` varchar(30) NOT NULL,
+  `date` date NOT NULL,
+  `start_time` time NOT NULL,
+  `end_time` time NOT NULL,
+  `room` varchar(30) NOT NULL,
+  `status` enum('Scheduled','Ongoing','Completed','Cancelled') NOT NULL DEFAULT 'Scheduled',
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `faculty`
+--
+
+CREATE TABLE `faculty` (
+  `faculty_id` int(11) NOT NULL,
+  `teacher_id` int(11) DEFAULT NULL,
+  `faculty_name` varchar(150) NOT NULL,
+  `designation` varchar(100) DEFAULT NULL,
+  `email` varchar(150) NOT NULL,
+  `phone` varchar(20) DEFAULT NULL,
+  `department_id` int(11) NOT NULL,
+  `status` enum('Active','Inactive') NOT NULL DEFAULT 'Active',
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------------------------------------
+
+--
 -- Table structure for table `fee_heads`
 --
 
@@ -261,7 +314,7 @@ CREATE TABLE `payments` (
   `payment_date` datetime NOT NULL DEFAULT current_timestamp(),
   `received_by` int(11) NOT NULL,
   `status` enum('Success','Reversed') NOT NULL DEFAULT 'Success'
-) ;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
 -- Triggers `payments`
@@ -336,6 +389,46 @@ DELIMITER ;
 -- --------------------------------------------------------
 
 --
+-- Table structure for table `programs`
+--
+
+CREATE TABLE `programs` (
+  `program_id` int(11) NOT NULL,
+  `program_name` varchar(100) NOT NULL,
+  `program_code` varchar(20) NOT NULL,
+  `department_id` int(11) DEFAULT NULL,
+  `duration_years` tinyint(4) NOT NULL DEFAULT 4,
+  `total_semesters` tinyint(4) NOT NULL DEFAULT 8,
+  `status` enum('Active','Inactive') NOT NULL DEFAULT 'Active',
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `question_bank`
+--
+
+CREATE TABLE `question_bank` (
+  `question_id` int(11) NOT NULL,
+  `exam_id` int(11) DEFAULT NULL,
+  `course_id` int(11) NOT NULL,
+  `teacher_id` int(11) DEFAULT NULL,
+  `question_text` text NOT NULL,
+  `option_a` varchar(255) NOT NULL,
+  `option_b` varchar(255) NOT NULL,
+  `option_c` varchar(255) NOT NULL,
+  `option_d` varchar(255) NOT NULL,
+  `correct_option` enum('A','B','C','D') NOT NULL,
+  `marks` decimal(5,2) NOT NULL DEFAULT 1.00,
+  `difficulty_level` enum('Easy','Medium','Hard') NOT NULL DEFAULT 'Medium',
+  `status` enum('Active','Inactive') NOT NULL DEFAULT 'Active',
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------------------------------------
+
+--
 -- Table structure for table `question_papers`
 --
 
@@ -348,7 +441,7 @@ CREATE TABLE `question_papers` (
   `status` enum('Pending','Published') NOT NULL DEFAULT 'Pending',
   `publish_date` date DEFAULT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp()
-) ;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- --------------------------------------------------------
 
@@ -375,6 +468,16 @@ CREATE TABLE `roles` (
   `role_name` varchar(50) NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+--
+-- Dumping data for table `roles`
+--
+
+INSERT INTO `roles` (`role_id`, `role_name`) VALUES
+(1, 'Admin'),
+(3, 'Finance Officer'),
+(4, 'Student'),
+(2, 'Teacher');
+
 -- --------------------------------------------------------
 
 --
@@ -392,7 +495,7 @@ CREATE TABLE `sbe_auth_users` (
   `status` enum('Active','Inactive') NOT NULL DEFAULT 'Active',
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
-) ;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- --------------------------------------------------------
 
@@ -420,7 +523,7 @@ CREATE TABLE `sbe_exams` (
   `status` enum('Draft','Published','Closed','Archived') NOT NULL DEFAULT 'Draft',
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
-) ;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- --------------------------------------------------------
 
@@ -456,7 +559,7 @@ CREATE TABLE `sbe_exam_results` (
   `status` enum('Draft','Published','Archived') NOT NULL DEFAULT 'Draft',
   `published_at` datetime DEFAULT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp()
-) ;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- --------------------------------------------------------
 
@@ -478,7 +581,7 @@ CREATE TABLE `sbe_exam_schedule` (
   `status` enum('Scheduled','Ongoing','Completed','Cancelled') NOT NULL DEFAULT 'Scheduled',
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
-) ;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- --------------------------------------------------------
 
@@ -814,7 +917,7 @@ CREATE TABLE `timetable` (
   `semester_id` int(11) NOT NULL,
   `session_id` int(11) NOT NULL,
   `section` varchar(5) NOT NULL DEFAULT 'A'
-) ;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- --------------------------------------------------------
 
@@ -835,6 +938,16 @@ CREATE TABLE `users` (
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--
+-- Dumping data for table `users`
+--
+
+INSERT INTO `users` (`user_id`, `full_name`, `username`, `email`, `password_hash`, `role_id`, `department_id`, `status`, `last_login_at`, `created_at`, `updated_at`) VALUES
+(9, 'Finance Officer', 'finance', 'finance@university.edu', 'finance123', 3, NULL, 'Active', '2026-07-23 14:45:53', '2026-07-23 03:23:21', '2026-07-23 09:45:53'),
+(10, 'Administrator', 'admin', 'admin@university.edu', 'admin123', 1, NULL, 'Active', '2026-07-23 14:47:29', '2026-07-23 03:23:21', '2026-07-23 09:47:29'),
+(11, 'Teacher', 'teacher', 'teacher@university.edu', 'teacher123', 2, NULL, 'Active', '2026-07-23 15:45:35', '2026-07-23 03:23:21', '2026-07-23 10:45:35'),
+(12, 'Student', 'student', 'student@university.edu', 'student123', 4, NULL, 'Active', '2026-07-23 14:45:53', '2026-07-23 03:23:21', '2026-07-23 09:45:53');
 
 -- --------------------------------------------------------
 
@@ -948,6 +1061,28 @@ ALTER TABLE `examinations`
   ADD KEY `fk_exm_creator` (`created_by`);
 
 --
+-- Indexes for table `exam_results`
+--
+ALTER TABLE `exam_results`
+  ADD PRIMARY KEY (`result_id`),
+  ADD UNIQUE KEY `uq_result_student_exam` (`student_id`,`exam_id`),
+  ADD KEY `idx_results_exam` (`exam_id`);
+
+--
+-- Indexes for table `exam_schedules`
+--
+ALTER TABLE `exam_schedules`
+  ADD PRIMARY KEY (`exam_id`),
+  ADD KEY `idx_schedule_course_date` (`course_id`,`date`);
+
+--
+-- Indexes for table `faculty`
+--
+ALTER TABLE `faculty`
+  ADD PRIMARY KEY (`faculty_id`),
+  ADD KEY `fk_faculty_dept` (`department_id`);
+
+--
 -- Indexes for table `fee_heads`
 --
 ALTER TABLE `fee_heads`
@@ -995,6 +1130,21 @@ ALTER TABLE `payment_reversals`
   ADD PRIMARY KEY (`reversal_id`),
   ADD KEY `fk_rev_payment` (`payment_id`),
   ADD KEY `fk_rev_officer` (`reversed_by`);
+
+--
+-- Indexes for table `programs`
+--
+ALTER TABLE `programs`
+  ADD PRIMARY KEY (`program_id`);
+
+--
+-- Indexes for table `question_bank`
+--
+ALTER TABLE `question_bank`
+  ADD PRIMARY KEY (`question_id`),
+  ADD KEY `idx_questions_exam` (`exam_id`),
+  ADD KEY `idx_questions_course` (`course_id`),
+  ADD KEY `idx_questions_difficulty` (`difficulty_level`);
 
 --
 -- Indexes for table `question_papers`
@@ -1273,6 +1423,24 @@ ALTER TABLE `examinations`
   MODIFY `exam_id` int(11) NOT NULL AUTO_INCREMENT;
 
 --
+-- AUTO_INCREMENT for table `exam_results`
+--
+ALTER TABLE `exam_results`
+  MODIFY `result_id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `exam_schedules`
+--
+ALTER TABLE `exam_schedules`
+  MODIFY `exam_id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `faculty`
+--
+ALTER TABLE `faculty`
+  MODIFY `faculty_id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
 -- AUTO_INCREMENT for table `fee_heads`
 --
 ALTER TABLE `fee_heads`
@@ -1309,6 +1477,18 @@ ALTER TABLE `payment_reversals`
   MODIFY `reversal_id` int(11) NOT NULL AUTO_INCREMENT;
 
 --
+-- AUTO_INCREMENT for table `programs`
+--
+ALTER TABLE `programs`
+  MODIFY `program_id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `question_bank`
+--
+ALTER TABLE `question_bank`
+  MODIFY `question_id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
 -- AUTO_INCREMENT for table `question_papers`
 --
 ALTER TABLE `question_papers`
@@ -1324,7 +1504,7 @@ ALTER TABLE `receipts`
 -- AUTO_INCREMENT for table `roles`
 --
 ALTER TABLE `roles`
-  MODIFY `role_id` int(11) NOT NULL AUTO_INCREMENT;
+  MODIFY `role_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=5;
 
 --
 -- AUTO_INCREMENT for table `sbe_auth_users`
@@ -1462,7 +1642,7 @@ ALTER TABLE `timetable`
 -- AUTO_INCREMENT for table `users`
 --
 ALTER TABLE `users`
-  MODIFY `user_id` int(11) NOT NULL AUTO_INCREMENT;
+  MODIFY `user_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=13;
 
 --
 -- Constraints for dumped tables
@@ -1505,6 +1685,12 @@ ALTER TABLE `examinations`
   ADD CONSTRAINT `fk_exm_creator` FOREIGN KEY (`created_by`) REFERENCES `users` (`user_id`),
   ADD CONSTRAINT `fk_exm_sem` FOREIGN KEY (`semester_id`) REFERENCES `semesters` (`semester_id`),
   ADD CONSTRAINT `fk_exm_session` FOREIGN KEY (`session_id`) REFERENCES `sessions` (`session_id`);
+
+--
+-- Constraints for table `faculty`
+--
+ALTER TABLE `faculty`
+  ADD CONSTRAINT `fk_faculty_dept` FOREIGN KEY (`department_id`) REFERENCES `departments` (`department_id`);
 
 --
 -- Constraints for table `fee_structures`
