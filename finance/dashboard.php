@@ -1,15 +1,22 @@
 <?php
 session_start();
+
+// Check if user is logged in
 if (!isset($_SESSION['user_id'])) {
-    header('Location: ../auth/login.php');
+    header('Location: ../auth/login.php?error=Please login first');
     exit();
 }
+
+// Check if user has finance role (role_id = 3) or admin (role_id = 1)
 if ($_SESSION['role_id'] != 3 && $_SESSION['role_id'] != 1) {
     header('Location: ../auth/login.php?error=Access denied. Finance Officer only.');
     exit();
 }
 
+// Include database connection
 include __DIR__ . '/../config/db_connect.php';
+
+// Include header
 include __DIR__ . '/includes/header.php';
 
 // ----- STATISTICS -----
@@ -226,6 +233,7 @@ while ($row = mysqli_fetch_assoc($pie_result)) {
     </div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
 // Bar Chart - Monthly Collection
 const ctx = document.getElementById('paymentChart').getContext('2d');
@@ -245,7 +253,16 @@ new Chart(ctx, {
     options: {
         responsive: true,
         plugins: { legend: { display: false } },
-        scales: { y: { beginAtZero: true, ticks: { callback: function(value) { return 'PKR ' + value.toLocaleString(); } } } }
+        scales: { 
+            y: { 
+                beginAtZero: true, 
+                ticks: { 
+                    callback: function(value) { 
+                        return 'PKR ' + value.toLocaleString(); 
+                    } 
+                } 
+            } 
+        }
     }
 });
 
@@ -267,4 +284,37 @@ new Chart(pieCtx, {
 });
 </script>
 
-<include __DIR__ . '/includes/footer.php';>
+<!-- Style for stat cards -->
+<style>
+.stat-card {
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+    cursor: default;
+}
+.stat-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+}
+.stat-card .label {
+    font-size: 0.85rem;
+    opacity: 0.8;
+    font-weight: 500;
+}
+.stat-card .number {
+    font-size: 1.8rem;
+    font-weight: 700;
+}
+.stat-card .icon {
+    font-size: 2.5rem;
+    opacity: 0.5;
+}
+.user-badge {
+    background: #2c3e50;
+    color: #fff;
+    padding: 6px 15px;
+    border-radius: 20px;
+    font-size: 0.9rem;
+    margin-right: 10px;
+}
+</style>
+
+<?php include __DIR__ . '/includes/footer.php'; ?>
