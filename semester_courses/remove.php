@@ -1,31 +1,76 @@
 <?php
-// semester_courses/remove.php
+// semester_courses/remove.php - Remove course from semester
 
-// Start session if not started
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
+require_once __DIR__ . '/../config/db.php';
+require_once __DIR__ . '/../includes/auth.php';
+
+if (!isLoggedIn()) {
+    header('Location: ' . BASE_URL . 'login.php');
+    exit;
 }
 
-// Include database
-require_once __DIR__ . '/../config/db.php';
+$user = getCurrentUser();
+$role = $user['role_name'] ?? 'User';
 
-$id = isset($_GET['id']) ? intval($_GET['id']) : 0;
+if (!in_array($role, ['sso', 'admin'])) {
+    header('Location: ' . BASE_URL . 'dashboard.php');
+    exit;
+}
 
-if($id > 0) {
-    // Delete the assignment
-    $sql = "DELETE FROM semester_courses WHERE id = ?";
-    $result = executeQuery($sql, [$id]);
-    
-    if($result) {
-        $_SESSION['message'] = 'Course removed from semester successfully!';
-        $_SESSION['message_type'] = 'success';
+$conn = getConnection();
+
+// Get parameters
+$assignment_id = isset($_GET['assignment_id']) ? (int)$_GET['assignment_id'] : 0;
+$course_id = isset($_GET['course_id']) ? (int)$_GET['course_id'] : 0;
+
+if ($assignment_id == 0) {
+    header('Location: index.php?error=Invalid assignment ID');
+    exit;
+}
+
+// ✅ FIRST CHECK: What is the primary key column name?
+// Try different column names
+$column_check = $conn->query("SHOW COLUMNS FROM semester_courses");
+$columns = [];
+while ($col = $column_check->fetch_assoc()) {
+    $columns[] = $col['Field'];
+}
+
+// Find the primary key column
+$pk_column = 'id'; // default
+if (in_array('semester_course_id', $columns)) {
+    $pk_column = 'semester_course_id';
+} elseif (in_array('assignment_id', $columns)) {
+    $pk_column = 'assignment_id';
+} elseif (in_array('sc_id', $columns)) {
+    $pk_column = 'sc_id';
+}
+
+// ✅ DELETE using the correct column name
+$delete_query = "DELETE FROM semester_courses WHERE $pk_column = ?";
+$delete_stmt = $conn->prepare($delete_query);
+
+if ($delete_stmt === false) {
+    // If prepare fails, try direct query
+    $delete_query_direct = "DELETE FROM semester_courses WHERE $pk_column = $assignment_id";
+    if (mysqli_query($conn, $delete_query_direct)) {
+        header('Location: view.php?course_id=' . $course_id . '&success=Course removed from semester successfully');
+        exit;
     } else {
-        $_SESSION['message'] = 'Error removing course: ' . $conn->error;
-        $_SESSION['message_type'] = 'danger';
+        header('Location: view.php?course_id=' . $course_id . '&error=Failed to remove: ' . mysqli_error($conn));
+        exit;
     }
 }
 
-// Redirect back
-header('Location: index.php');
-exit;
+$delete_stmt->bind_param("i", $assignment_id);
+
+if ($delete_stmt->execute()) {
+    header('Location: view.php?course_id=' . $course_id . '&success=Course removed from semester successfully');
+    exit;
+} else {
+    header('Location: view.php?course_id=' . $course_id . '&error=Failed to remove: ' . $delete_stmt->error);
+    exit;
+}
+
+$delete_stmt->close();
 ?>

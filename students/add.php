@@ -1,17 +1,77 @@
 <?php
+// students/add.php - Add Student (COMPLETE FIXED)
+
 require_once __DIR__ . '/../config/db.php';
 require_once __DIR__ . '/../includes/auth.php';
-requireSSO();
 
-global $conn;
+// Check if logged in
+if (!isLoggedIn()) {
+    header('Location: ' . BASE_URL . 'login.php');
+    exit;
+}
 
+$user = getCurrentUser();
+$role = $user['role_name'] ?? 'User';
+
+// Only SSO and Admin can add students
+if (!in_array($role, ['sso', 'admin'])) {
+    header('Location: ' . BASE_URL . 'dashboard.php');
+    exit;
+}
+
+$conn = getConnection();
 $errors = [];
 $success = '';
 
+// ============================================
+// FIX: Add getRow() function if not exists
+// ============================================
+if (!function_exists('getRow')) {
+    function getRow($sql, $params = []) {
+        $conn = getConnection();
+        $stmt = mysqli_prepare($conn, $sql);
+        if (!$stmt) return null;
+        
+        if (!empty($params)) {
+            $types = str_repeat('s', count($params));
+            mysqli_stmt_bind_param($stmt, $types, ...$params);
+        }
+        
+        mysqli_stmt_execute($stmt);
+        $result = mysqli_stmt_get_result($stmt);
+        return mysqli_fetch_assoc($result);
+    }
+}
+
 // Get programs for dropdown
 $program_query = "SELECT program_id as id, program_name as name, program_code FROM programs ORDER BY program_name";
-$program_result = $conn->query($program_query);
-$programs = $program_result ? $program_result->fetch_all(MYSQLI_ASSOC) : [];
+$program_result = mysqli_query($conn, $program_query);
+$programs = [];
+if ($program_result) {
+    while ($row = mysqli_fetch_assoc($program_result)) {
+        $programs[] = $row;
+    }
+}
+
+// Get semesters for dropdown
+$semesters_query = "SELECT semester_id, semester_name FROM semesters ORDER BY semester_name";
+$semesters_result = mysqli_query($conn, $semesters_query);
+$semesters = [];
+if ($semesters_result) {
+    while ($row = mysqli_fetch_assoc($semesters_result)) {
+        $semesters[] = $row;
+    }
+}
+
+// Get sessions for dropdown
+$sessions_query = "SELECT session_id, session_name FROM sessions WHERE status = 'Active' ORDER BY session_name";
+$sessions_result = mysqli_query($conn, $sessions_query);
+$sessions = [];
+if ($sessions_result) {
+    while ($row = mysqli_fetch_assoc($sessions_result)) {
+        $sessions[] = $row;
+    }
+}
 
 // Handle form submission
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -47,7 +107,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if (empty($errors)) {
         // Start transaction
-        $conn->begin_transaction();
+        mysqli_begin_transaction($conn);
         
         try {
             // 1. Get program code
@@ -61,13 +121,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             
             // 2. Count existing students for auto ID
             $count_query = "SELECT COUNT(*) as count FROM students WHERE program_id = ? AND batch_year = ?";
-            $count_stmt = $conn->prepare($count_query);
-            $count_stmt->bind_param("ii", $program_id, $batch_year);
-            $count_stmt->execute();
-            $count_result = $count_stmt->get_result();
-            $count = $count_result->fetch_assoc();
+            $count_stmt = mysqli_prepare($conn, $count_query);
+            mysqli_stmt_bind_param($count_stmt, "ii", $program_id, $batch_year);
+            mysqli_stmt_execute($count_stmt);
+            $count_result = mysqli_stmt_get_result($count_stmt);
+            $count = mysqli_fetch_assoc($count_result);
             $student_number = ($count['count'] ?? 0) + 1;
-            $count_stmt->close();
+            mysqli_stmt_close($count_stmt);
             
             // 3. Generate student ID
             $student_id = $program_code . '-' . $batch_year . '-' . str_pad($student_number, 3, '0', STR_PAD_LEFT);
@@ -77,61 +137,84 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $roll_no = $student_id;
             }
             
-            // 4. Insert into users table - FIXED bind_param
+            // 4. Insert into users table
             $password_hash = password_hash($password, PASSWORD_DEFAULT);
             
-            // SQL with 5 placeholders: email, password_hash, full_name, phone, plain_password
-            $insert_user = "INSERT INTO users (email, password_hash, full_name, phone, role_id, is_active, plain_password) 
-                            VALUES (?, ?, ?, ?, 4, 1, ?)";
-            //                             1  2  3  4        5
-            //                             ^  ^  ^  ^        ^
-            //                           email, hash, name, phone, plain_password
+            // ✅ FIXED: Check column names in users table
+            // Option A: If users table has 'status' column
+            $insert_user = "INSERT INTO users (email, password_hash, full_name, phone, role_id, status) 
+                            VALUES (?, ?, ?, ?, 4, 'Active')";
             
-            $stmt = $conn->prepare($insert_user);
-            // 5 type characters for 5 values: "sssss" (all strings)
-            $stmt->bind_param("sssss", $email, $password_hash, $full_name, $phone, $password);
-            //               1      2      3      4      5
-            //               ^      ^      ^      ^      ^
-            //             email  hash   name   phone  plain_pass
-            
-            if (!$stmt->execute()) {
-                throw new Exception("Error creating user: " . $stmt->error);
+            // ✅ FIX: Check if prepare fails
+            $stmt = mysqli_prepare($conn, $insert_user);
+            if ($stmt === false) {
+                // Option B: If users table has 'is_active' column instead
+                $insert_user = "INSERT INTO users (email, password_hash, full_name, phone, role_id, is_active) 
+                                VALUES (?, ?, ?, ?, 4, 1)";
+                $stmt = mysqli_prepare($conn, $insert_user);
             }
-            $user_id = $conn->insert_id;
-            $stmt->close();
             
-            // 5. Insert into students table - 11 placeholders
+            if ($stmt === false) {
+                // Option C: If no status column at all
+                $insert_user = "INSERT INTO users (email, password_hash, full_name, phone, role_id) 
+                                VALUES (?, ?, ?, ?, 4)";
+                $stmt = mysqli_prepare($conn, $insert_user);
+            }
+            
+            // Check if prepare finally worked
+            if ($stmt === false) {
+                throw new Exception("Error preparing user insert: " . mysqli_error($conn));
+            }
+            
+            // Bind parameters based on which query was used
+            if (strpos($insert_user, 'status') !== false) {
+                mysqli_stmt_bind_param($stmt, "ssss", $email, $password_hash, $full_name, $phone);
+            } elseif (strpos($insert_user, 'is_active') !== false) {
+                mysqli_stmt_bind_param($stmt, "ssss", $email, $password_hash, $full_name, $phone);
+            } else {
+                mysqli_stmt_bind_param($stmt, "ssss", $email, $password_hash, $full_name, $phone);
+            }
+            
+            if (!mysqli_stmt_execute($stmt)) {
+                throw new Exception("Error creating user: " . mysqli_stmt_error($stmt));
+            }
+            $user_id = mysqli_insert_id($conn);
+            mysqli_stmt_close($stmt);
+            
+            // 5. Insert into students table
             $insert_student = "INSERT INTO students (
                 student_id, roll_no, user_id, program_id, section, 
                 batch_year, semester, status, enrollment_date, father_name, session
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
-            //             1  2  3  4  5  6  7  8  9  10 11
             
-            $stmt = $conn->prepare($insert_student);
-            // 11 type characters for 11 values: "ssiisississ"
-            // s = string, i = integer
-            $stmt->bind_param(
+            $stmt = mysqli_prepare($conn, $insert_student);
+            if ($stmt === false) {
+                throw new Exception("Error preparing student insert: " . mysqli_error($conn));
+            }
+            
+            mysqli_stmt_bind_param(
+                $stmt,
                 "ssiisississ",
-                $student_id,    // 1 - string
-                $roll_no,       // 2 - string
-                $user_id,       // 3 - integer
-                $program_id,    // 4 - integer
-                $section,       // 5 - string
-                $batch_year,    // 6 - integer
-                $semester,      // 7 - integer
-                $status,        // 8 - string
-                $enrollment_date, // 9 - string
-                $father_name,   // 10 - string
-                $session        // 11 - string
+                $student_id,
+                $roll_no,
+                $user_id,
+                $program_id,
+                $section,
+                $batch_year,
+                $semester,
+                $status,
+                $enrollment_date,
+                $father_name,
+                $session
             );
             
-            if (!$stmt->execute()) {
-                throw new Exception("Error creating student: " . $stmt->error);
+            if (!mysqli_stmt_execute($stmt)) {
+                throw new Exception("Error creating student: " . mysqli_stmt_error($stmt));
             }
-            $stmt->close();
+            mysqli_stmt_close($stmt);
             
             // Commit transaction
-            $conn->commit();
+            mysqli_commit($conn);
             
             $success = "✅ Student added successfully!<br><br>
                         <strong>Student ID:</strong> $student_id<br>
@@ -143,7 +226,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $_POST = [];
             
         } catch (Exception $e) {
-            $conn->rollback();
+            mysqli_rollback($conn);
             $errors[] = $e->getMessage();
         }
     }
@@ -154,42 +237,23 @@ include __DIR__ . '/../includes/sidebar.php';
 ?>
 
 <style>
-    .form-section {
-        background: white;
-        padding: 25px;
-        border-radius: 10px;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        margin-bottom: 20px;
-    }
-    
-    .form-section-title {
-        font-weight: 600;
-        color: #2c3e50;
-        margin-bottom: 20px;
-        padding-bottom: 10px;
-        border-bottom: 2px solid #f0f2f5;
-    }
-    
-    .required-field::after {
-        content: '*';
-        color: #e74c3c;
-        margin-left: 4px;
-    }
-    
-    .success-box {
-        background: #d4edda;
-        border: 1px solid #c3e6cb;
-        border-radius: 8px;
-        padding: 20px;
-        color: #155724;
-        margin-bottom: 20px;
-    }
-    
-    .field-hint {
-        font-size: 12px;
-        color: #6c757d;
-        margin-top: 4px;
-    }
+    .main-content { margin-left: 250px; padding: 20px; }
+    .form-section { background: white; padding: 25px; border-radius: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-bottom: 20px; }
+    .form-section-title { font-weight: 600; color: #2c3e50; margin-bottom: 20px; padding-bottom: 10px; border-bottom: 2px solid #f0f2f5; }
+    .required-field::after { content: '*'; color: #e74c3c; margin-left: 4px; }
+    .success-box { background: #d4edda; border: 1px solid #c3e6cb; border-radius: 8px; padding: 20px; color: #155724; margin-bottom: 20px; }
+    .field-hint { font-size: 12px; color: #6c757d; margin-top: 4px; }
+    .sidebar { width: 250px; height: 100vh; background: linear-gradient(180deg, #1a1a2e 0%, #16213e 100%); color: white; position: fixed; left: 0; top: 0; overflow-y: auto; padding-bottom: 20px; z-index: 1000; }
+    .sidebar .brand { padding: 20px; text-align: center; border-bottom: 1px solid rgba(255,255,255,0.1); }
+    .sidebar .brand h4 { font-weight: 700; margin: 0; }
+    .sidebar .brand small { color: #a8a8b3; }
+    .sidebar .nav-link { color: #a8a8b3; padding: 12px 20px; border-radius: 0; transition: all 0.3s; }
+    .sidebar .nav-link:hover { color: white; background: rgba(255,255,255,0.05); }
+    .sidebar .nav-link.active { color: white; background: rgba(102, 126, 234, 0.3); border-left: 3px solid #667eea; }
+    .sidebar .nav-link i { width: 20px; margin-right: 10px; }
+    .topbar { background: white; padding: 15px 25px; border-radius: 15px; margin-bottom: 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); display: flex; justify-content: space-between; align-items: center; }
+    .topbar .avatar { width: 40px; height: 40px; border-radius: 50%; background: #667eea; color: white; display: flex; align-items: center; justify-content: center; font-weight: 700; }
+    @media (max-width: 768px) { .sidebar { width: 100%; height: auto; position: relative; } .main-content { margin-left: 0; } }
 </style>
 
 <div class="main-content">
