@@ -6,7 +6,7 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
-$config = require __DIR__ . '/app.php';
+$config = require __DIR__ . '/sbe.php';
 
 if (!function_exists('db')) {
     function db(): PDO
@@ -17,7 +17,7 @@ if (!function_exists('db')) {
             return $pdo;
         }
 
-        $config = require __DIR__ . '/app.php';
+        $config = require __DIR__ . '/sbe.php';
         $db = $config['database'];
 
         $dsn = sprintf(

@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-require __DIR__ . '/config/db_connect.php';
+require dirname(__DIR__, 1) . '/config/sbe_db_connect.php';
 require __DIR__ . '/includes/helpers.php';
 require __DIR__ . '/includes/auth.php';
 

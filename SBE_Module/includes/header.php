@@ -7,7 +7,7 @@ if (file_exists($authFile)) {
     require_once $authFile;
 }
 
-$config = require __DIR__ . '/../config/app.php';
+$config = require dirname(__DIR__, 2) . '/config/sbe.php';
 $pageTitle = $pageTitle ?? $config['app_name'];
 $activePage = $activePage ?? 'dashboard';
 $user = current_user();

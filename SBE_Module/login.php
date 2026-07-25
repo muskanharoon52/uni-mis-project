@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-require __DIR__ . '/config/db_connect.php';
+require dirname(__DIR__, 1) . '/config/sbe_db_connect.php';
 require __DIR__ . '/includes/helpers.php';
 require __DIR__ . '/includes/auth.php';
 
-$config = require __DIR__ . '/config/app.php';
+$config = require dirname(__DIR__, 1) . '/config/sbe.php';
 
 if (current_user()) {
     $user = current_user();
