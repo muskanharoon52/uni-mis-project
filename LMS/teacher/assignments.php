@@ -11,14 +11,14 @@ $message = '';
 $error = '';
 
 $coursesStmt = db()->prepare('SELECT * FROM courses WHERE teacher_id = ? ORDER BY course_code');
-$coursesStmt->execute([$user['id']]);
+$coursesStmt->execute([$user['teacher_id']]);
 $courses = $coursesStmt->fetchAll();
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     try {
         verify_csrf();
         $courseId = (int) ($_POST['course_id'] ?? 0);
-        if (!teacher_owns_course((int) $user['id'], $courseId)) {
+        if (!teacher_owns_course((int) $user['teacher_id'], $courseId)) {
             throw new RuntimeException('Select one of your courses.');
         }
 
@@ -54,7 +54,7 @@ $assignmentsStmt = db()->prepare(
      GROUP BY a.assignment_id
      ORDER BY a.due_date'
 );
-$assignmentsStmt->execute([$user['id']]);
+$assignmentsStmt->execute([$user['teacher_id']]);
 $assignments = $assignmentsStmt->fetchAll();
 
 require_once __DIR__ . '/../includes/header.php';

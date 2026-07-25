@@ -12,7 +12,8 @@ $coursesStmt = db()->prepare(
     'SELECT c.*, u.full_name AS teacher_name
      FROM lms_enrollments e
      JOIN courses c ON c.course_id = e.course_id
-     LEFT JOIN users u ON u.user_id = c.teacher_id
+     LEFT JOIN teachers t ON t.teacher_id = c.teacher_id
+     LEFT JOIN users u ON u.user_id = t.user_id
      WHERE e.student_user_id = ?
      ORDER BY c.course_code'
 );
@@ -123,7 +124,7 @@ require_once __DIR__ . '/../includes/header.php';
                     <div class="table-responsive">
                     <table>
                         <tr><th>Lecture</th><th>Date</th><th>File</th></tr>
-                        <?php $lectureStmt = db()->prepare('SELECT * FROM lectures WHERE course_id = ? ORDER BY id DESC'); $lectureStmt->execute([(int) $currentCourse['course_id']]); $lectures = $lectureStmt->fetchAll(); ?>
+                        <?php $lectureStmt = db()->prepare('SELECT * FROM lms_lectures WHERE course_id = ? ORDER BY lecture_id DESC'); $lectureStmt->execute([(int) $currentCourse['course_id']]); $lectures = $lectureStmt->fetchAll(); ?>
                         <?php foreach ($lectures as $lecture): ?>
                             <tr><td><?= e($lecture['title']) ?></td><td><?= e($lecture['lecture_date']) ?></td><td><a href="<?= app_url($lecture['file_path']) ?>" target="_blank">Download</a></td></tr>
                         <?php endforeach; ?>

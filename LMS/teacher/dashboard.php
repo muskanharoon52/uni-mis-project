@@ -17,16 +17,16 @@ $courseStmt = db()->prepare(
     'SELECT c.*,
         COUNT(DISTINCT e.student_user_id) AS student_count,
         COUNT(DISTINCT a.assignment_id) AS assignment_count,
-        COUNT(DISTINCT l.id) AS lecture_count
+        COUNT(DISTINCT l.lecture_id) AS lecture_count
      FROM courses c
      LEFT JOIN lms_enrollments e ON e.course_id = c.course_id
      LEFT JOIN lms_assignments a ON a.course_id = c.course_id
-     LEFT JOIN lectures l ON l.course_id = c.course_id
+     LEFT JOIN lms_lectures l ON l.course_id = c.course_id
      WHERE c.teacher_id = ?
      GROUP BY c.course_id
      ORDER BY c.course_code'
 );
-$courseStmt->execute([$user['id']]);
+$courseStmt->execute([$user['teacher_id']]);
 $courses = $courseStmt->fetchAll();
 
 $courseCount = count($courses);
@@ -42,17 +42,17 @@ $pendingStmt = db()->prepare(
      JOIN courses c ON c.course_id = a.course_id
      WHERE c.teacher_id = ? AND s.grade IS NULL'
 );
-$pendingStmt->execute([$user['id']]);
+$pendingStmt->execute([$user['teacher_id']]);
 $pendingSubmissions = (int) $pendingStmt->fetchColumn();
 
 $attendanceStmt = db()->prepare(
     'SELECT COUNT(a.attendance_id) AS total_records,
-        SUM(a.status IN ("Present", "Late")) AS present_records
+        SUM(a.status = "Present") AS present_records
      FROM attendance a
      JOIN courses c ON c.course_id = a.course_id
      WHERE c.teacher_id = ?'
 );
-$attendanceStmt->execute([$user['id']]);
+$attendanceStmt->execute([$user['teacher_id']]);
 $attendanceSummary = $attendanceStmt->fetch() ?: ['total_records' => 0, 'present_records' => 0];
 $totalAttendance = (int) $attendanceSummary['total_records'];
 $presentAttendance = (int) $attendanceSummary['present_records'];
@@ -68,7 +68,7 @@ $activityStmt = db()->prepare(
      ORDER BY s.submitted_at DESC
      LIMIT 6'
 );
-$activityStmt->execute([$user['id']]);
+$activityStmt->execute([$user['teacher_id']]);
 $studentActivities = $activityStmt->fetchAll();
 
 $schedule = [];
@@ -118,11 +118,6 @@ require_once __DIR__ . '/../includes/header.php';
         <span class="action-card-icon">&#128218;</span>
         <div class="action-card-title">My Courses</div>
         <div class="action-card-desc"><?= $courseCount ?> active course<?= $courseCount !== 1 ? 's' : '' ?></div>
-    </a>
-    <a class="action-card" href="<?= app_url('teacher/students.php') ?>">
-        <span class="action-card-icon">&#128101;</span>
-        <div class="action-card-title">Students</div>
-        <div class="action-card-desc">View &amp; manage enrolled students</div>
     </a>
     <a class="action-card" href="<?= app_url('teacher/grading.php') ?>">
         <span class="action-card-icon">&#9997;</span>

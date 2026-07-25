@@ -55,7 +55,7 @@ require_once __DIR__ . '/../includes/header.php';
                 <?php foreach ($attendanceRows as $row): ?>
                     <tr>
                         <td><?= e($row['class_date']) ?></td>
-                        <td><span class="badge badge-<?= $row['status'] === 'Present' ? 'active' : ($row['status'] === 'Late' ? 'draft' : 'inactive') ?>"><?= e($row['status']) ?></span></td>
+                        <td><span class="badge badge-<?= $row['status'] === 'Present' ? 'active' : 'inactive' ?>"><?= e($row['status']) ?></span></td>
                         <td><?= e($row['course_code'] . ' - ' . $row['course_title']) ?></td>
                         <td><?= e($row['semester_name']) ?></td>
                     </tr>

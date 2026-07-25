@@ -10,20 +10,32 @@ if (session_status() === PHP_SESSION_NONE) {
 
 function current_user(): ?array
 {
-    return $_SESSION['auth_user'] ?? null;
+    $user = $_SESSION['lms_auth_user'] ?? null;
+    if ($user !== null && empty($user['teacher_id'])) {
+        try {
+            $stmt = db()->prepare('SELECT teacher_id FROM teachers WHERE user_id = ? LIMIT 1');
+            $stmt->execute([(int) $user['id']]);
+            $user['teacher_id'] = (int) ($stmt->fetchColumn() ?: 0);
+            $_SESSION['lms_auth_user'] = $user;
+        } catch (Throwable $e) {
+            $user['teacher_id'] = 0;
+        }
+    }
+    return $user;
 }
 
 function auth_login(array $user): void
 {
     session_regenerate_id(true);
-    $_SESSION['auth_user'] = [
-        'id'           => (int) ($user['id'] ?? 0),
+    $_SESSION['lms_auth_user'] = [
+        'id'           => (int) ($user['id'] ?? $user['user_id'] ?? 0),
         'login_id'     => (string) ($user['login_id'] ?? ''),
         'role'         => (string) ($user['role'] ?? ''),
-        'name'         => (string) ($user['name'] ?? ''),
+        'name'         => (string) ($user['name'] ?? $user['full_name'] ?? ''),
         'department'   => (string) ($user['department'] ?? ''),
         'program'      => (string) ($user['program'] ?? ''),
         'profile_photo'=> (string) ($user['profile_photo'] ?? ''),
+        'teacher_id'   => (int) ($user['teacher_id'] ?? 0),
     ];
 }
 

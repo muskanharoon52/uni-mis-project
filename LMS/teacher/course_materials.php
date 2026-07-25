@@ -10,12 +10,12 @@ $pageTitle = 'Course Materials';
 
 $stmt = db()->prepare(
     'SELECT l.*, c.course_code
-     FROM lectures l
+     FROM lms_lectures l
      JOIN courses c ON c.course_id = l.course_id
      WHERE c.teacher_id = ?
-     ORDER BY l.id DESC'
+     ORDER BY l.lecture_id DESC'
 );
-$stmt->execute([$user['id']]);
+$stmt->execute([$user['teacher_id']]);
 $materials = $stmt->fetchAll();
 
 require_once __DIR__ . '/../includes/header.php';

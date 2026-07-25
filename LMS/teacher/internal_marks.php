@@ -29,7 +29,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         if ($action === 'finalize') {
             [$courseId, $studentId] = array_map('intval', explode(':', (string) $_POST['finalize_row']));
-                    if (!teacher_owns_course((int) $user['id'], $courseId)) {
+            if (!teacher_owns_course((int) $user['teacher_id'], $courseId)) {
                 throw new RuntimeException('You cannot finalize this marks row.');
             }
             $stmt = db()->prepare(
@@ -50,7 +50,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 foreach ($courseRows as $courseId => $componentValues) {
                     $studentId = (int) $studentId;
                     $courseId = (int) $courseId;
-            if (!teacher_owns_course((int) $user['id'], $courseId)) {
+            if (!teacher_owns_course((int) $user['teacher_id'], $courseId)) {
                         continue;
                     }
                     $finalizedStmt = db()->prepare('SELECT COUNT(*) FROM lms_mark_finalizations WHERE course_id = ? AND student_user_id = ? AND is_finalized = 1');
@@ -76,7 +76,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-$rows = internal_mark_rows_for_teacher((int) $user['id']);
+$rows = internal_mark_rows_for_teacher((int) $user['teacher_id']);
 
 require_once __DIR__ . '/../includes/header.php';
 ?>

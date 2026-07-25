@@ -22,7 +22,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
              WHERE q.query_id = ? AND c.teacher_id = ?
              LIMIT 1'
         );
-        $allowedStmt->execute([$queryId, $user['id']]);
+        $allowedStmt->execute([$queryId, $user['teacher_id']]);
         $studentId = (int) $allowedStmt->fetchColumn();
         if (!$studentId) {
             throw new RuntimeException('You cannot reply to this query.');
@@ -46,7 +46,7 @@ $queriesStmt = db()->prepare(
      WHERE c.teacher_id = ?
      ORDER BY q.created_at DESC'
 );
-$queriesStmt->execute([$user['id']]);
+$queriesStmt->execute([$user['teacher_id']]);
 $queries = $queriesStmt->fetchAll();
 
 require_once __DIR__ . '/../includes/header.php';

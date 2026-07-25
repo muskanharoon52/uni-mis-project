@@ -17,34 +17,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         verify_csrf();
         $action = (string) ($_POST['action'] ?? '');
 
-        if ($action === 'add_course') {
-            $code = trim((string) ($_POST['code'] ?? ''));
-            $title = trim((string) ($_POST['title'] ?? ''));
-            if ($code === '' || $title === '') {
-                throw new RuntimeException('Course code and title are required.');
-            }
-            $stmt = db()->prepare('INSERT INTO courses (course_code, course_title, description, credit_hours, teacher_id, semester_name) VALUES (?, ?, ?, ?, ?, ?)');
-            $stmt->execute([$code, $title, trim((string) ($_POST['description'] ?? '')), (int) ($_POST['credit_hours'] ?? 3), $user['id'], trim((string) ($_POST['semester'] ?? 'Spring 2026'))]);
-            $message = 'Course added.';
-        } else {
-            $courseId = (int) ($_POST['course_id'] ?? 0);
-            if (!teacher_owns_course((int) $user['id'], $courseId)) {
-                throw new RuntimeException('You cannot edit this course.');
-            }
+        $courseId = (int) ($_POST['course_id'] ?? 0);
+        if (!teacher_owns_course((int) $user['teacher_id'], $courseId)) {
+            throw new RuntimeException('You cannot edit this course.');
+        }
 
-            if ($action === 'save_assignment') {
-                $filePath = save_uploaded_file('assignment_file', 'assignments', ['pdf', 'doc', 'docx', 'zip']);
-                $title = trim((string) ($_POST['title'] ?? ''));
-                $stmt = db()->prepare('INSERT INTO lms_assignments (course_id, title, description, file_path, due_date) VALUES (?, ?, ?, ?, ?)');
-                $stmt->execute([$courseId, $title, trim((string) ($_POST['description'] ?? '')), $filePath, (string) ($_POST['due_date'] ?? date('Y-m-d'))]);
-                notify_course_students($courseId, 'New assignment posted', 'An assignment titled "' . $title . '" has been uploaded.', app_url('student/courses.php?course_id=' . $courseId . '&view=assignment'));
-                $message = 'Assignment posted.';
-            } elseif ($action === 'save_lecture') {
-                $filePath = save_uploaded_file('lecture_file', 'lectures', ['ppt', 'pptx', 'pdf', 'doc', 'docx']);
-                $stmt = db()->prepare('INSERT INTO lectures (course_id, title, file_path, lecture_date) VALUES (?, ?, ?, ?)');
-                $stmt->execute([$courseId, trim((string) ($_POST['title'] ?? '')), $filePath, $_POST['lecture_date'] !== '' ? (string) $_POST['lecture_date'] : null]);
-                $message = 'Lecture uploaded.';
-            }
+        if ($action === 'save_assignment') {
+            $filePath = save_uploaded_file('assignment_file', 'assignments', ['pdf', 'doc', 'docx', 'zip']);
+            $title = trim((string) ($_POST['title'] ?? ''));
+            $stmt = db()->prepare('INSERT INTO lms_assignments (course_id, title, description, file_path, due_date) VALUES (?, ?, ?, ?, ?)');
+            $stmt->execute([$courseId, $title, trim((string) ($_POST['description'] ?? '')), $filePath, (string) ($_POST['due_date'] ?? date('Y-m-d'))]);
+            notify_course_students($courseId, 'New assignment posted', 'An assignment titled "' . $title . '" has been uploaded.', app_url('student/courses.php?course_id=' . $courseId . '&view=assignment'));
+            $message = 'Assignment posted.';
+        } elseif ($action === 'save_lecture') {
+            $filePath = save_uploaded_file('lecture_file', 'lectures', ['ppt', 'pptx', 'pdf', 'doc', 'docx']);
+            $stmt = db()->prepare('INSERT INTO lms_lectures (course_id, title, file_path, lecture_date) VALUES (?, ?, ?, ?)');
+            $stmt->execute([$courseId, trim((string) ($_POST['title'] ?? '')), $filePath, $_POST['lecture_date'] !== '' ? (string) $_POST['lecture_date'] : null]);
+            $message = 'Lecture uploaded.';
         }
     } catch (RuntimeException $exception) {
         $error = $exception->getMessage();
@@ -55,16 +44,16 @@ $coursesStmt = db()->prepare(
     'SELECT c.*,
         COUNT(DISTINCT e.student_user_id) AS student_count,
         COUNT(DISTINCT a.assignment_id) AS assignment_count,
-        COUNT(DISTINCT l.id) AS lecture_count
+        COUNT(DISTINCT l.lecture_id) AS lecture_count
      FROM courses c
      LEFT JOIN lms_enrollments e ON e.course_id = c.course_id
      LEFT JOIN lms_assignments a ON a.course_id = c.course_id
-     LEFT JOIN lectures l ON l.course_id = c.course_id
+     LEFT JOIN lms_lectures l ON l.course_id = c.course_id
      WHERE c.teacher_id = ?
      GROUP BY c.course_id
      ORDER BY c.course_code'
 );
-$coursesStmt->execute([$user['id']]);
+$coursesStmt->execute([$user['teacher_id']]);
 $courses = $coursesStmt->fetchAll();
 $selectedCourse = $courses[0] ?? null;
 if (isset($_GET['course_id'])) {
@@ -80,22 +69,6 @@ require_once __DIR__ . '/../includes/header.php';
 ?>
 <?php if ($message): ?><div class="alert alert-success"><?= e($message) ?></div><?php endif; ?>
 <?php if ($error): ?><div class="alert alert-error"><?= e($error) ?></div><?php endif; ?>
-
-<div class="card">
-    <div class="card-header"><h3>Add Course</h3></div>
-    <form method="post">
-        <?= csrf_field() ?>
-        <input type="hidden" name="action" value="add_course">
-        <div class="inline-form-row">
-            <div><label for="code">Code</label><input id="code" name="code" required></div>
-            <div><label for="title">Title</label><input id="title" name="title" required></div>
-            <div><label for="description">Description</label><textarea id="description" name="description"></textarea></div>
-            <div><label for="credit_hours">Credits</label><input id="credit_hours" name="credit_hours" type="number" min="1" value="3"></div>
-            <div><label for="semester">Semester</label><input id="semester" name="semester" value="Spring 2026"></div>
-            <div style="align-self:end;"><button class="btn btn-primary" type="submit">Add Course</button></div>
-        </div>
-    </form>
-</div>
 
 <div class="card mt-4">
     <div class="card-header"><h3>Your Courses</h3></div>
@@ -195,7 +168,7 @@ require_once __DIR__ . '/../includes/header.php';
                     <div class="card">
                         <div class="card-header"><h3>Lectures</h3></div>
                         <div class="table-responsive">
-                        <?php $lectureStmt = db()->prepare('SELECT * FROM lectures WHERE course_id = ? ORDER BY id DESC'); $lectureStmt->execute([(int) $selectedCourse['course_id']]); ?>
+                        <?php $lectureStmt = db()->prepare('SELECT * FROM lms_lectures WHERE course_id = ? ORDER BY lecture_id DESC'); $lectureStmt->execute([(int) $selectedCourse['course_id']]); ?>
                         <table>
                             <tr><th>Title</th><th>Date</th><th>File</th></tr>
                             <?php foreach ($lectureStmt->fetchAll() as $lecture): ?>

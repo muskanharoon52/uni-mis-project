@@ -14,7 +14,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     try {
         verify_csrf();
         $submissionId = (int) ($_POST['submission_id'] ?? 0);
-        if (!teacher_owns_submission((int) $user['id'], $submissionId)) {
+        if (!teacher_owns_submission((int) $user['teacher_id'], $submissionId)) {
             throw new RuntimeException('You cannot grade this submission.');
         }
         $grade = $_POST['grade'] === '' ? null : (float) $_POST['grade'];
@@ -38,7 +38,7 @@ $submissionsStmt = db()->prepare(
      WHERE c.teacher_id = ?
      ORDER BY s.submitted_at DESC'
 );
-$submissionsStmt->execute([$user['id']]);
+$submissionsStmt->execute([$user['teacher_id']]);
 $submissions = $submissionsStmt->fetchAll();
 
 require_once __DIR__ . '/../includes/header.php';
@@ -48,7 +48,8 @@ require_once __DIR__ . '/../includes/header.php';
 <div class="card">
     <div class="card-header"><h3>Submissions</h3></div>
     <div class="table-responsive">
-        <tr><th>Course</th><th>Assignment</th><th>Student</th><th>Submission</th><th>Grade</th></tr>
+        <table>
+            <tr><th>Course</th><th>Assignment</th><th>Student</th><th>Submission</th><th>Grade</th></tr>
         <?php foreach ($submissions as $submission): ?>
             <tr>
                 <td><?= e($submission['course_code']) ?></td>
@@ -72,6 +73,7 @@ require_once __DIR__ . '/../includes/header.php';
         <?php if (!$submissions): ?>
             <tr><td colspan="5" class="muted text-center">No assignment submissions uploaded yet.</td></tr>
         <?php endif; ?>
+        </table>
     </div>
 </div>
 <?php require_once __DIR__ . '/../includes/footer.php'; ?>

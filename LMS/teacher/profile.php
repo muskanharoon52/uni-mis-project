@@ -51,7 +51,7 @@ require_once __DIR__ . '/../includes/header.php';
         <label for="name">Name</label>
         <input id="name" name="name" value="<?= e($user['name']) ?>" required>
         <label for="email">Email</label>
-        <input id="email" value="<?= e($user['email']) ?>" disabled>
+        <input id="email" value="<?= e($user['login_id']) ?>" disabled>
         <label for="department">Department</label>
         <input id="department" name="department" value="<?= e((string) $user['department']) ?>">
         <button class="btn btn-primary" type="submit">Save Profile</button>

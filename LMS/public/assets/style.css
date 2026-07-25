@@ -212,6 +212,8 @@ img { max-width: 100%; display: block; }
 .user-strip-name { display: block; font-size: .84rem; font-weight: 600; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .user-strip-role { display: block; font-size: .72rem; color: var(--sidebar-text); }
 .sidebar-user .actions { display: flex; gap: 6px; }
+.sidebar-user .btn-ghost { color: #fff; border-color: rgba(255,255,255,0.15); }
+.sidebar-user .btn-ghost:hover { background: rgba(255,255,255,0.1); color: #fff; }
 
 /* ── Mobile Menu ───────────────────────────────────── */
 .menu-toggle {

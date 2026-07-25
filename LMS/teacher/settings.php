@@ -62,7 +62,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 $courseStmt = db()->prepare('SELECT COUNT(*) FROM courses WHERE teacher_id = ?');
-$courseStmt->execute([$user['id']]);
+$courseStmt->execute([$user['teacher_id']]);
 $courseCount = (int) $courseStmt->fetchColumn();
 
 $studentStmt = db()->prepare(
@@ -71,7 +71,7 @@ $studentStmt = db()->prepare(
      JOIN courses c ON c.course_id = e.course_id
      WHERE c.teacher_id = ?'
 );
-$studentStmt->execute([$user['id']]);
+$studentStmt->execute([$user['teacher_id']]);
 $studentCount = (int) $studentStmt->fetchColumn();
 
 $initials = strtoupper(substr((string) $user['name'], 0, 2));
@@ -98,7 +98,7 @@ require_once __DIR__ . '/../includes/header.php';
             <?php endif; ?>
             <div class="settings-profile-name"><?= e($user['name']) ?></div>
             <div class="settings-profile-role"><?= e(ucfirst($user['role'])) ?></div>
-            <div class="settings-profile-email"><?= e($user['email']) ?></div>
+            <div class="settings-profile-email"><?= e($user['login_id']) ?></div>
         </div>
 
         <div class="settings-stats-card">
@@ -124,7 +124,7 @@ require_once __DIR__ . '/../includes/header.php';
             </div>
             <div class="settings-meta-row">
                 <span class="settings-meta-key">Member since</span>
-                <span class="settings-meta-val"><?= e(date('M Y', strtotime((string) $user['created_at']))) ?></span>
+                <span class="settings-meta-val"><?= e(date('M Y', strtotime((string) ($user['created_at'] ?? '')))) ?></span>
             </div>
         </div>
     </aside>
@@ -174,7 +174,7 @@ require_once __DIR__ . '/../includes/header.php';
                     </div>
                     <div class="settings-field">
                         <label for="email">Email Address <span class="settings-readonly-badge">Read-only</span></label>
-                        <input id="email" value="<?= e($user['email']) ?>" disabled placeholder="your@email.com">
+                        <input id="email" value="<?= e($user['login_id']) ?>" disabled placeholder="your@email.com">
                     </div>
                     <div class="settings-field">
                         <label for="department">Department</label>

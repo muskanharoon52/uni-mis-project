@@ -11,7 +11,7 @@ $message = '';
 $error = '';
 
 $coursesStmt = db()->prepare('SELECT course_id, course_code, course_title FROM courses WHERE teacher_id = ? ORDER BY course_code');
-$coursesStmt->execute([$user['id']]);
+$coursesStmt->execute([$user['teacher_id']]);
 $courses = $coursesStmt->fetchAll();
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -28,14 +28,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
 
         if ($scope === 'course') {
-            if ($courseId <= 0 || !teacher_owns_course((int) $user['id'], $courseId)) {
+            if ($courseId <= 0 || !teacher_owns_course((int) $user['teacher_id'], $courseId)) {
                 throw new RuntimeException('Select one of your courses.');
             }
 
-            $recipientIds = teacher_course_student_ids((int) $user['id'], $courseId);
+            $recipientIds = teacher_course_student_ids((int) $user['teacher_id'], $courseId);
             $linkUrl = app_url('student/courses.php?course_id=' . $courseId);
         } else {
-            $recipientIds = teacher_course_student_ids((int) $user['id']);
+            $recipientIds = teacher_course_student_ids((int) $user['teacher_id']);
             $linkUrl = app_url('student/dashboard.php');
         }
 

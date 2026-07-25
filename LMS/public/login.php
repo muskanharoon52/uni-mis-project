@@ -22,7 +22,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $dbUser = null;
 
     try {
-        $stmt = db()->prepare('SELECT u.*, r.role_name AS role FROM users u JOIN roles r ON r.role_id = u.role_id WHERE r.role_name = ? AND u.login_id = ? LIMIT 1');
+        $stmt = db()->prepare('SELECT u.*, r.role_name AS role, t.teacher_id FROM users u JOIN roles r ON r.role_id = u.role_id LEFT JOIN teachers t ON t.user_id = u.user_id WHERE r.role_name = ? AND u.login_id = ? LIMIT 1');
         $stmt->execute([$role, $loginId]);
         $dbUser = $stmt->fetch();
     } catch (Throwable $e) {
@@ -39,14 +39,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     if ($fallbackValid) {
+        $fbTeacherId = 0;
+        $fbUserId = 0;
+        try {
+            $fbUserStmt = db()->prepare('SELECT user_id FROM users WHERE login_id = ? LIMIT 1');
+            $fbUserStmt->execute([$loginId]);
+            $fbUserId = (int) ($fbUserStmt->fetchColumn() ?: 0);
+            if ($fbUserId > 0 && $role === 'teacher') {
+                $fbTStmt = db()->prepare('SELECT teacher_id FROM teachers WHERE user_id = ? LIMIT 1');
+                $fbTStmt->execute([$fbUserId]);
+                $fbTeacherId = (int) ($fbTStmt->fetchColumn() ?: 0);
+            }
+        } catch (Throwable $e) {
+            $fbTeacherId = 0;
+        }
         auth_login([
-            'id' => 0,
+            'id' => $fbUserId,
             'login_id' => $loginId,
             'role' => $role,
             'name' => $fallback['display_name'],
             'department' => 'Computer Science',
             'program' => null,
             'profile_photo' => null,
+            'teacher_id' => $fbTeacherId,
         ]);
         header('Location: ' . ($role === 'teacher' ? app_url('teacher/dashboard.php') : app_url('student/dashboard.php')));
         exit;
@@ -64,7 +79,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="../public/assets/style.css">
+    <link rel="stylesheet" href="<?= asset_url('style.css') ?>">
 </head>
 <body class="login-page">
 

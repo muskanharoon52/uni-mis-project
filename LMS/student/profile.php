@@ -16,13 +16,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $photoPath = save_uploaded_file('profile_photo', 'profiles', ['jpg', 'jpeg', 'png', 'webp']);
         $stmt = db()->prepare(
             'UPDATE users
-             SET full_name = ?, department_id = ?, program = ?, profile_photo = COALESCE(?, profile_photo)
+             SET full_name = ?, department_id = ?, profile_photo = COALESCE(?, profile_photo)
              WHERE user_id = ?'
         );
         $stmt->execute([
             trim((string) ($_POST['name'] ?? '')),
             trim((string) ($_POST['department'] ?? '')),
-            trim((string) ($_POST['program'] ?? '')),
             $photoPath,
             $user['id'],
         ]);
@@ -52,11 +51,9 @@ require_once __DIR__ . '/../includes/header.php';
         <label for="name">Name</label>
         <input id="name" name="name" value="<?= e($user['name']) ?>" required>
         <label for="email">Email</label>
-        <input id="email" value="<?= e($user['email']) ?>" disabled>
+        <input id="email" value="<?= e($user['login_id']) ?>" disabled>
         <label for="department">Department</label>
         <input id="department" name="department" value="<?= e((string) $user['department']) ?>">
-        <label for="program">Program</label>
-        <input id="program" name="program" value="<?= e((string) $user['program']) ?>">
         <button class="btn btn-primary" type="submit">Save Profile</button>
     </div>
 </form>

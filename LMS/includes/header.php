@@ -11,7 +11,6 @@ $userInitial = strtoupper(substr($user['name'] ?? 'G', 0, 1));
 $teacherLinks = [
     'dashboard'    => ['Dashboard', 'teacher/dashboard.php', '&#127968;'],
     'courses'      => ['My Courses', 'teacher/courses.php', '&#128218;'],
-    'students'     => ['Students', 'teacher/students.php', '&#128101;'],
     'attendance'   => ['Attendance', 'teacher/attendance.php', '&#128197;'],
     'assignments'  => ['Assignments', 'teacher/assignments.php', '&#128221;'],
     'grading'      => ['Grading', 'teacher/grading.php', '&#9997;'],
@@ -73,9 +72,6 @@ $links = $role === 'teacher' ? $teacherLinks : ($role === 'student' ? $studentLi
                 <a class="<?= $active === 'courses' ? 'active' : '' ?>" href="<?= app_url('teacher/courses.php') ?>">
                     <span class="nav-icon">&#128218;</span> My Courses
                 </a>
-                <a class="<?= $active === 'students' ? 'active' : '' ?>" href="<?= app_url('teacher/students.php') ?>">
-                    <span class="nav-icon">&#128101;</span> Students
-                </a>
                 <a class="<?= $active === 'attendance' ? 'active' : '' ?>" href="<?= app_url('teacher/attendance.php') ?>">
                     <span class="nav-icon">&#128197;</span> Attendance
                 </a>
@@ -132,9 +128,6 @@ $links = $role === 'teacher' ? $teacherLinks : ($role === 'student' ? $studentLi
                 </a>
                 <a class="<?= $active === 'applications' ? 'active' : '' ?>" href="<?= app_url('student/applications.php') ?>">
                     <span class="nav-icon">&#128203;</span> Applications
-                </a>
-                <a class="<?= $active === 'profile' ? 'active' : '' ?>" href="<?= app_url('student/profile.php') ?>">
-                    <span class="nav-icon">&#128100;</span> Profile
                 </a>
             <?php endif; ?>
         </nav>

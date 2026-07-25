@@ -28,19 +28,18 @@ $internalMarkTotals = array_map(static function (array $row): array {
 }, $internalMarks);
 
 $attendanceStmt = db()->prepare(
-    'SELECT
+    "SELECT
         c.course_code,
         c.course_title,
         COUNT(a.attendance_id) AS total_classes,
-        SUM(a.status = \'Present\') AS present_count,
-        SUM(a.status = \'Late\') AS late_count,
-        SUM(a.status = \'Absent\') AS absent_count
+        SUM(a.status = 'Present') AS present_count,
+        SUM(a.status = 'Absent') AS absent_count
      FROM lms_enrollments e
      JOIN courses c ON c.course_id = e.course_id
      LEFT JOIN attendance a ON a.course_id = c.course_id AND a.student_id = e.student_user_id
      WHERE e.student_user_id = ?
      GROUP BY c.course_id, c.course_code, c.course_title
-     ORDER BY c.course_code'
+     ORDER BY c.course_code"
 );
 $attendanceStmt->execute([$user['id']]);
 $attendanceRows = $attendanceStmt->fetchAll();
@@ -49,7 +48,7 @@ $totalPresent = 0;
 $totalClasses = 0;
 foreach ($attendanceRows as $row) {
     $totalClasses += (int) $row['total_classes'];
-    $totalPresent += (int) $row['present_count'] + (int) $row['late_count'];
+    $totalPresent += (int) $row['present_count'];
 }
 $overallAttendance = $totalClasses > 0 ? round(($totalPresent / $totalClasses) * 100, 1) : 0;
 
@@ -153,13 +152,13 @@ require_once __DIR__ . '/../includes/header.php';
     <div class="table-responsive">
         <table class="table">
             <thead>
-                <tr><th>Course</th><th>Title</th><th>Total</th><th>Present</th><th>Late</th><th>Absent</th><th>Rate</th></tr>
+                <tr><th>Course</th><th>Title</th><th>Total</th><th>Present</th><th>Absent</th><th>Rate</th></tr>
             </thead>
             <tbody>
                 <?php foreach ($attendanceRows as $row): ?>
                     <?php
                     $total = (int) $row['total_classes'];
-                    $present = (int) $row['present_count'] + (int) $row['late_count'];
+                    $present = (int) $row['present_count'];
                     $percent = $total > 0 ? round(($present / $total) * 100, 1) : 0;
                     ?>
                     <tr>
@@ -167,7 +166,6 @@ require_once __DIR__ . '/../includes/header.php';
                         <td><?= e($row['course_title']) ?></td>
                         <td><?= $total ?></td>
                         <td><span class="badge badge-active"><?= (int) $row['present_count'] ?></span></td>
-                        <td><span class="badge badge-draft"><?= (int) $row['late_count'] ?></span></td>
                         <td><span class="badge badge-inactive"><?= (int) $row['absent_count'] ?></span></td>
                         <td><strong><?= e((string) $percent) ?>%</strong></td>
                     </tr>

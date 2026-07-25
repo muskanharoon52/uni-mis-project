@@ -11,19 +11,19 @@ $message = '';
 $error = '';
 
 $coursesStmt = db()->prepare('SELECT * FROM courses WHERE teacher_id = ? ORDER BY course_code');
-$coursesStmt->execute([$user['id']]);
+$coursesStmt->execute([$user['teacher_id']]);
 $courses = $coursesStmt->fetchAll();
 $selectedCourseId = (int) ($_POST['course_id'] ?? $_GET['course_id'] ?? ($courses[0]['course_id'] ?? 0));
 $selectedDate = (string) ($_POST['class_date'] ?? $_GET['class_date'] ?? date('Y-m-d'));
 
-if ($selectedCourseId && !teacher_owns_course((int) $user['id'], $selectedCourseId)) {
+if ($selectedCourseId && !teacher_owns_course((int) $user['teacher_id'], $selectedCourseId)) {
     $selectedCourseId = (int) ($courses[0]['course_id'] ?? 0);
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     try {
         verify_csrf();
-        if (!$selectedCourseId || !teacher_owns_course((int) $user['id'], $selectedCourseId)) {
+        if (!$selectedCourseId || !teacher_owns_course((int) $user['teacher_id'], $selectedCourseId)) {
             throw new RuntimeException('Select one of your courses first.');
         }
 
@@ -36,7 +36,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         foreach (($_POST['status'] ?? []) as $studentId => $status) {
             $studentId = (int) $studentId;
             $status = (string) $status;
-            if (in_array($status, ['Present', 'Late', 'Absent'], true) && student_enrolled_in_course($studentId, $selectedCourseId)) {
+            if (in_array($status, ['Present', 'Absent'], true) && student_enrolled_in_course($studentId, $selectedCourseId)) {
                 $stmt->execute([$selectedCourseId, $studentId, $selectedDate, $status]);
             }
         }
@@ -69,7 +69,7 @@ $records = db()->prepare(
      ORDER BY a.class_date DESC, c.course_code, u.full_name
      LIMIT 40'
 );
-$records->execute([$user['id']]);
+$records->execute([$user['teacher_id']]);
 
 require_once __DIR__ . '/../includes/header.php';
 ?>
@@ -113,7 +113,6 @@ require_once __DIR__ . '/../includes/header.php';
                     <td>
                         <select name="status[<?= (int) $student['user_id'] ?>]">
                             <option value="Present" <?= $student['status'] === 'Present' ? 'selected' : '' ?>>Present</option>
-                            <option value="Late" <?= $student['status'] === 'Late' ? 'selected' : '' ?>>Late</option>
                             <option value="Absent" <?= $student['status'] === 'Absent' ? 'selected' : '' ?>>Absent</option>
                         </select>
                     </td>
@@ -135,7 +134,7 @@ require_once __DIR__ . '/../includes/header.php';
                     <td><?= e($record['class_date']) ?></td>
                     <td><?= e($record['course_code']) ?></td>
                     <td><?= e($record['student_name']) ?></td>
-                    <td><span class="badge badge-<?= $record['status'] === 'Present' ? 'active' : ($record['status'] === 'Late' ? 'draft' : 'inactive') ?>"><?= e($record['status']) ?></span></td>
+                    <td><span class="badge badge-<?= $record['status'] === 'Present' ? 'active' : 'inactive' ?>"><?= e($record['status']) ?></span></td>
                 </tr>
             <?php endforeach; ?>
         </table>
