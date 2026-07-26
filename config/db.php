@@ -15,7 +15,7 @@ if (!$conn) {
 mysqli_set_charset($conn, "utf8mb4");
 
 // ✅ CORRECT BASE_URL for your project
-define('BASE_URL', 'http://localhost/university_mis/');
+define('BASE_URL', 'http://localhost/uni-mis-project/');
 
 function getConnection() {
     global $conn;
