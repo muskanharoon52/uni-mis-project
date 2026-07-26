@@ -3,6 +3,7 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
+// Fix BASE_URL - remove trailing slash
 define('BASE_URL', '/uni-mis-project/modules/admission/');
 define('DB_HOST', 'localhost');
 define('DB_NAME', 'university_mis');
@@ -18,6 +19,21 @@ try {
     );
 } catch (PDOException $e) {
     die("Database Connection Failed: " . $e->getMessage());
+}
+
+// =============================================
+// AUTHENTICATION FUNCTIONS
+// =============================================
+
+function isLoggedIn() {
+    return isset($_SESSION['user_id']) && !empty($_SESSION['user_id']);
+}
+
+function requireLogin() {
+    if (!isLoggedIn()) {
+        header('Location: ' . BASE_URL . 'auth/login.php');
+        exit();
+    }
 }
 
 // =============================================
@@ -66,21 +82,6 @@ function generateStudentId() {
 }
 
 // =============================================
-// AUTHENTICATION FUNCTIONS
-// =============================================
-
-function isLoggedIn() {
-    return isset($_SESSION['user_id']) && !empty($_SESSION['user_id']);
-}
-
-function requireLogin() {
-    if (!isLoggedIn()) {
-        header('Location: ' . BASE_URL . 'auth/login.php');
-        exit();
-    }
-}
-
-// =============================================
 // FLASH MESSAGES
 // =============================================
 
@@ -116,6 +117,7 @@ function getStatusBadge($status) {
     ];
     return $map[$status] ?? 'secondary';
 }
+
 // =============================================
 // CURRENCY FORMATTING
 // =============================================
@@ -123,6 +125,7 @@ function getStatusBadge($status) {
 function formatCurrency($amount) {
     return 'PKR ' . number_format($amount, 0);
 }
+
 // =============================================
 // SCHOLARSHIP CALCULATION
 // =============================================

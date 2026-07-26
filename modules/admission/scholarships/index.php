@@ -1,7 +1,10 @@
 <?php
+// Correct path: Go up 1 level to admission folder, then into config
 require_once __DIR__ . '/../config/database.php';
 $page_title = 'Scholarships';
 include __DIR__ . '/../includes/header.php';
+
+// REMOVED: formatCurrency() function is already defined in database.php
 
 $flash = getFlash();
 if ($flash): ?>
@@ -23,7 +26,13 @@ if ($flash): ?>
 <h6 class="mt-3"><i class="fas fa-check-circle text-success"></i> Active Scholarships</h6>
 <div class="row">
     <?php 
-    $active = $pdo->query("SELECT * FROM admission_scholarships WHERE status='active' ORDER BY id DESC")->fetchAll();
+    try {
+        $active = $pdo->query("SELECT * FROM admission_scholarships WHERE status='active' ORDER BY id DESC")->fetchAll();
+    } catch (PDOException $e) {
+        $active = [];
+        echo '<div class="col-12"><div class="alert alert-danger">Error loading scholarships: ' . $e->getMessage() . '</div></div>';
+    }
+    
     if (empty($active)): 
     ?>
         <div class="col-12"><div class="alert alert-info">No active scholarships available.</div></div>
@@ -32,11 +41,11 @@ if ($flash): ?>
         <div class="col-md-4 mb-3">
             <div class="card h-100 border-success">
                 <div class="card-header bg-success text-white d-flex justify-content-between align-items-center">
-                    <strong><?= $s['scholarship_name'] ?></strong>
-                    <span class="badge bg-light text-dark"><?= $s['scholarship_type'] ?? 'Merit' ?></span>
+                    <strong><?= htmlspecialchars($s['scholarship_name']) ?></strong>
+                    <span class="badge bg-light text-dark"><?= htmlspecialchars($s['scholarship_type'] ?? 'Merit') ?></span>
                 </div>
                 <div class="card-body">
-                    <p><?= $s['description'] ?? 'No description' ?></p>
+                    <p><?= htmlspecialchars($s['description'] ?? 'No description') ?></p>
                     <hr>
                     <div class="row">
                         <div class="col-6">
@@ -45,7 +54,7 @@ if ($flash): ?>
                         </div>
                         <div class="col-6">
                             <small class="text-muted">Min %</small><br>
-                            <strong><?= $s['min_marks_percentage'] ?? 0 ?>%</strong>
+                            <strong><?= number_format($s['min_marks_percentage'] ?? 0, 2) ?>%</strong>
                         </div>
                     </div>
                     <div class="row mt-2">
@@ -58,6 +67,15 @@ if ($flash): ?>
                             <strong><?= isset($s['deadline']) ? date('d M Y', strtotime($s['deadline'])) : 'N/A' ?></strong>
                         </div>
                     </div>
+                    <div class="mt-2">
+                        <small class="text-muted">Scholarship %</small><br>
+                        <strong><?= number_format($s['scholarship_percentage'] ?? 0, 2) ?>%</strong>
+                    </div>
+                </div>
+                <div class="card-footer">
+                    <a href="apply.php?scholarship_id=<?= $s['id'] ?>" class="btn btn-success btn-sm w-100">
+                        <i class="fas fa-hand-holding-heart"></i> Apply Now
+                    </a>
                 </div>
             </div>
         </div>
@@ -82,13 +100,19 @@ if ($flash): ?>
             </thead>
             <tbody>
                 <?php 
-                $apps = $pdo->query("
-                    SELECT sa.*, s.student_name, sch.scholarship_name 
-                    FROM admission_scholarship_applications sa
-                    LEFT JOIN admission_students s ON sa.student_id = s.id
-                    LEFT JOIN admission_scholarships sch ON sa.scholarship_id = sch.id
-                    ORDER BY sa.application_date DESC
-                ")->fetchAll();
+                try {
+                    $apps = $pdo->query("
+                        SELECT sa.*, 
+                               COALESCE(s.full_name, s.student_name, 'N/A') AS student_name, 
+                               sch.scholarship_name 
+                        FROM admission_scholarship_applications sa
+                        LEFT JOIN admission_students s ON sa.student_id = s.id
+                        LEFT JOIN admission_scholarships sch ON sa.scholarship_id = sch.id
+                        ORDER BY sa.application_date DESC
+                    ")->fetchAll();
+                } catch (PDOException $e) {
+                    $apps = [];
+                }
                 
                 if (empty($apps)): 
                 ?>
@@ -96,8 +120,8 @@ if ($flash): ?>
                 <?php else: ?>
                     <?php foreach($apps as $app): ?>
                     <tr>
-                        <td><?= $app['student_name'] ?? 'N/A' ?></td>
-                        <td><?= $app['scholarship_name'] ?? 'N/A' ?></td>
+                        <td><?= htmlspecialchars($app['student_name'] ?? 'N/A') ?></td>
+                        <td><?= htmlspecialchars($app['scholarship_name'] ?? 'N/A') ?></td>
                         <td><strong><?= number_format($app['percentage'] ?? 0, 2) ?>%</strong></td>
                         <td><?= isset($app['application_date']) ? date('d M Y', strtotime($app['application_date'])) : 'N/A' ?></td>
                         <td>
@@ -113,9 +137,13 @@ if ($flash): ?>
                             <span class="badge bg-<?= $badge_color ?>"><?= ucfirst($status) ?></span>
                         </td>
                         <td>
-                            <a href="view_application.php?id=<?= $app['id'] ?? 0 ?>" class="btn btn-sm btn-info"><i class="fas fa-eye"></i></a>
+                            <a href="view_application.php?id=<?= $app['id'] ?? 0 ?>" class="btn btn-sm btn-info">
+                                <i class="fas fa-eye"></i>
+                            </a>
                             <?php if($status == 'pending'): ?>
-                            <a href="review_application.php?id=<?= $app['id'] ?? 0 ?>" class="btn btn-sm btn-primary"><i class="fas fa-check"></i></a>
+                            <a href="review_application.php?id=<?= $app['id'] ?? 0 ?>" class="btn btn-sm btn-primary">
+                                <i class="fas fa-check"></i>
+                            </a>
                             <?php endif; ?>
                         </td>
                     </tr>
@@ -125,9 +153,5 @@ if ($flash): ?>
         </table>
     </div>
 </div>
-<!-- In the card display -->
-<div class="col-6">
-    <small class="text-muted">Scholarship</small><br>
-    <strong><?= $s['scholarship_percentage'] ?? '0' ?>%</strong>
-</div>
+
 <?php include __DIR__ . '/../includes/footer.php'; ?>

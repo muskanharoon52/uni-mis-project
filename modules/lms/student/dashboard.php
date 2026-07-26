@@ -52,11 +52,11 @@ foreach ($attendanceRows as $row) {
 }
 $overallAttendance = $totalClasses > 0 ? round(($totalPresent / $totalClasses) * 100, 1) : 0;
 
-$feesStmt = db()->prepare('SELECT * FROM lms_fee_records WHERE student_user_id = ? ORDER BY due_date DESC');
+$feesStmt = db()->prepare('SELECT * FROM lms_fees WHERE student_user_id = ? ORDER BY due_date DESC');
 $feesStmt->execute([$user['id']]);
 $feeRows = $feesStmt->fetchAll();
 $totalAmount = array_sum(array_map(static fn (array $row): float => (float) $row['amount'], $feeRows));
-$paidAmount = array_sum(array_map(static fn (array $row): float => (float) $row['paid_amount'], $feeRows));
+$paidAmount = array_sum(array_map(static fn (array $row): float => $row['status'] === 'paid' ? (float) $row['amount'] : ($row['status'] === 'partial' ? (float) $row['amount'] * 0.5 : 0.0), $feeRows));
 $balance = $totalAmount - $paidAmount;
 
 $studentCode = 'LMS-' . str_pad((string) $user['id'], 5, '0', STR_PAD_LEFT);
@@ -189,8 +189,8 @@ require_once __DIR__ . '/../includes/header.php';
         <?php if ($feeRows): ?>
             <?php $latestFee = $feeRows[0]; ?>
             <div style="flex:1;min-width:180px;">
-                <div class="stat-label">Latest Installment</div>
-                <div class="muted" style="font-size:.85rem;"><?= e($latestFee['description']) ?> (<?= e($latestFee['semester']) ?>)</div>
+                <div class="stat-label">Latest Fee</div>
+                <div class="muted" style="font-size:.85rem;"><?= e((string) $latestFee['course_id']) ?></div>
                 <div class="stat-hint">PKR <?= number_format((float) $latestFee['amount']) ?></div>
                 <span class="badge badge-<?= $latestFee['status'] === 'paid' ? 'active' : 'draft' ?>" style="margin-top:4px;"><?= e($latestFee['status']) ?></span>
             </div>

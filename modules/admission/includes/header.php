@@ -1,5 +1,10 @@
 <?php
-requireLogin();
+// Check if user is logged in
+if (!isset($_SESSION['user_id']) || empty($_SESSION['user_id'])) {
+    header('Location: /uni-mis-project/modules/admission/auth/login.php');
+    exit();
+}
+
 $page_title = $page_title ?? 'Dashboard';
 ?>
 <!DOCTYPE html>
@@ -28,6 +33,9 @@ $page_title = $page_title ?? 'Dashboard';
         .user-info { color: #a8b2c9; padding: 15px 20px; border-top: 1px solid #2d3b4f; margin-top: 20px; position: absolute; bottom: 0; width: 100%; }
         .user-info a { color: #a8b2c9; text-decoration: none; }
         .user-info a:hover { color: white; }
+        .card { background: white; border-radius: 12px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); padding: 20px; margin-bottom: 20px; }
+        .table-responsive { overflow-x: auto; }
+        .alert { margin-bottom: 20px; }
     </style>
 </head>
 <body>
@@ -38,29 +46,32 @@ $page_title = $page_title ?? 'Dashboard';
             <small>Management System</small>
         </div>
         <nav>
-            <a class="nav-link <?= basename(dirname($_SERVER['PHP_SELF'])) == 'dashboard' ? 'active' : '' ?>" 
-               href="<?= BASE_URL ?>modules/dashboard/">
+            <a class="nav-link <?= basename(dirname($_SERVER['PHP_SELF'])) == 'admission' ? 'active' : '' ?>" 
+               href="/uni-mis-project/modules/admission/index.php">
                 <i class="fas fa-home"></i> Dashboard
             </a>
             <a class="nav-link <?= basename(dirname($_SERVER['PHP_SELF'])) == 'applications' ? 'active' : '' ?>" 
-               href="<?= BASE_URL ?>modules/applications/">
+               href="/uni-mis-project/modules/admission/applications/index.php">
                 <i class="fas fa-file-alt"></i> Applications
             </a>
             <a class="nav-link <?= basename(dirname($_SERVER['PHP_SELF'])) == 'students' ? 'active' : '' ?>" 
-               href="<?= BASE_URL ?>modules/students/">
+               href="/uni-mis-project/modules/admission/students/index.php">
                 <i class="fas fa-users"></i> Students
             </a>
             <a class="nav-link <?= basename(dirname($_SERVER['PHP_SELF'])) == 'fees' ? 'active' : '' ?>" 
-               href="<?= BASE_URL ?>modules/fees/">
+               href="/uni-mis-project/modules/admission/fees/index.php">
                 <i class="fas fa-money-bill"></i> Fees
             </a>
             <a class="nav-link <?= basename(dirname($_SERVER['PHP_SELF'])) == 'scholarships' ? 'active' : '' ?>" 
-               href="<?= BASE_URL ?>modules/scholarships/">
+               href="/uni-mis-project/modules/admission/scholarships/index.php">
                 <i class="fas fa-trophy"></i> Scholarships
             </a>
             <a class="nav-link <?= basename(dirname($_SERVER['PHP_SELF'])) == 'reports' ? 'active' : '' ?>" 
-               href="<?= BASE_URL ?>modules/reports/">
+               href="/uni-mis-project/modules/admission/reports/index.php">
                 <i class="fas fa-chart-bar"></i> Reports
+            </a>
+            <a class="nav-link" href="/uni-mis-project/modules/admission/settings/index.php">
+                <i class="fas fa-cog"></i> Settings
             </a>
         </nav>
         <div class="user-info">

@@ -1,7 +1,7 @@
 <?php
-require_once __DIR__ . '/../config/database.php';
+require_once __DIR__ . '/config/database.php';
 $page_title = 'Dashboard';
-include __DIR__ . '/../includes/header.php';
+include __DIR__ . '/includes/header.php';
 
 try {
     $stats['applications'] = $pdo->query("SELECT COUNT(*) FROM admission_applications")->fetchColumn();
@@ -90,8 +90,7 @@ if ($flash): ?>
                         <td><?= isset($app['submitted_at']) ? date('d M Y', strtotime($app['submitted_at'])) : 'N/A' ?></td>
                         <td><span class="badge bg-<?= getStatusBadge($app['application_status'] ?? 'Submitted') ?>"><?= $app['application_status'] ?? 'Submitted' ?></span></td>
                         <td>
-                            <!-- FIXED: Updated URL to correct path -->
-                            <a href="../applications/view.php?id=<?= $app['application_id'] ?? 0 ?>" class="btn btn-sm btn-info">View</a>
+                            <a href="applications/view.php?id=<?= $app['application_id'] ?? 0 ?>" class="btn btn-sm btn-info">View</a>
                         </td>
                     </tr>
                     <?php endforeach; ?>
@@ -100,4 +99,5 @@ if ($flash): ?>
         </table>
     </div>
 </div>
-<?php include __DIR__ . '/../includes/footer.php'; ?>
+
+<?php include __DIR__ . '/includes/footer.php'; ?>

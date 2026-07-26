@@ -13,7 +13,8 @@ $error = '';
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     try {
         verify_csrf();
-        $stmt = db()->prepare('INSERT INTO lms_queries (user_id, subject, message) VALUES (?, ?, ?)');
+        // FIXED: Changed user_id to student_user_id
+        $stmt = db()->prepare('INSERT INTO lms_queries (student_user_id, subject, message) VALUES (?, ?, ?)');
         $stmt->execute([$user['id'], trim((string) $_POST['subject']), trim((string) $_POST['message'])]);
         $message = 'Query submitted.';
     } catch (RuntimeException $exception) {
@@ -21,7 +22,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-$queriesStmt = db()->prepare('SELECT * FROM lms_queries WHERE user_id = ? ORDER BY created_at DESC');
+// FIXED: Changed user_id to student_user_id
+$queriesStmt = db()->prepare('SELECT * FROM lms_queries WHERE student_user_id = ? ORDER BY created_at DESC');
 $queriesStmt->execute([$user['id']]);
 $queries = $queriesStmt->fetchAll();
 
@@ -45,7 +47,12 @@ require_once __DIR__ . '/../includes/header.php';
         <table>
             <tr><th>Subject</th><th>Message</th><th>Status</th><th>Reply</th></tr>
             <?php foreach ($queries as $query): ?>
-                <tr><td><?= e($query['subject']) ?></td><td><?= e($query['message']) ?></td><td><span class="badge badge-<?= $query['status'] === 'answered' ? 'active' : 'draft' ?>"><?= e($query['status']) ?></span></td><td><?= e($query['reply'] ?: 'No reply yet') ?></td></tr>
+                <tr>
+                    <td><?= e($query['subject']) ?></td>
+                    <td><?= e($query['message']) ?></td>
+                    <td><span class="badge badge-<?= $query['status'] === 'answered' ? 'active' : 'draft' ?>"><?= e($query['status']) ?></span></td>
+                    <td><?= e($query['reply'] ?: 'No reply yet') ?></td>
+                </tr>
             <?php endforeach; ?>
             <?php if (!$queries): ?>
                 <tr><td colspan="4" class="muted text-center">No queries submitted yet.</td></tr>

@@ -84,9 +84,11 @@ $demo_auth = [
     'teacher' => [
         '5001' => ['password' => 'teacher123', 'display_name' => 'Dr. Sara Khan'],
         '5002' => ['password' => 'teacher123', 'display_name' => 'Teacher 5002'],
+        'teacher' => ['password' => 'password123', 'display_name' => 'Teacher'],
     ],
     'student' => [
         '9001' => ['password' => 'student123', 'display_name' => 'Ali Raza'],
         '9002' => ['password' => 'student123', 'display_name' => 'Student 9002'],
+        'student' => ['password' => 'password123', 'display_name' => 'Student'],
     ],
 ];

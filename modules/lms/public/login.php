@@ -149,7 +149,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         </form>
 
         <div class="login-footer">
-            <p class="small">Demo: 5001 / teacher123 &nbsp;&middot;&nbsp; 9001 / student123</p>
+            <p class="small">Demo: 5001 / teacher123 &nbsp;or&nbsp; 9001 / student123</p>
         </div>
     </aside>
 </div>
@@ -159,6 +159,9 @@ function setRole(role, btn) {
     document.querySelectorAll('.login-tab').forEach(t => t.classList.remove('active'));
     btn.classList.add('active');
     document.getElementById('selected-role').value = role;
+    document.querySelector('input[name="login_id"]').value = '';
+    document.querySelector('input[name="password"]').value = '';
+    document.querySelector('input[name="login_id"]').focus();
 }
 function togglePass() {
     const input = document.getElementById('pass-field');
