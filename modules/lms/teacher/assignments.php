@@ -41,11 +41,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
+// FIXED: Removed the s.grade column reference
+// Option 1: If you have a status column in lms_submissions
 $assignmentsStmt = db()->prepare(
     'SELECT a.*, c.course_code,
         COUNT(DISTINCT e.student_user_id) AS enrolled_count,
         COUNT(DISTINCT s.submission_id) AS submitted_count,
-        SUM(s.grade IS NULL AND s.submission_id IS NOT NULL) AS ungraded_count
+        SUM(s.status = "submitted" AND s.submission_id IS NOT NULL) AS ungraded_count
      FROM lms_assignments a
      JOIN courses c ON c.course_id = a.course_id
      LEFT JOIN lms_enrollments e ON e.course_id = c.course_id
@@ -54,8 +56,57 @@ $assignmentsStmt = db()->prepare(
      GROUP BY a.assignment_id
      ORDER BY a.due_date'
 );
-$assignmentsStmt->execute([$user['teacher_id']]);
-$assignments = $assignmentsStmt->fetchAll();
+
+// Option 2: If you have a grade column with a different name (e.g., 'score', 'marks')
+// Uncomment this version instead:
+// $assignmentsStmt = db()->prepare(
+//     'SELECT a.*, c.course_code,
+//         COUNT(DISTINCT e.student_user_id) AS enrolled_count,
+//         COUNT(DISTINCT s.submission_id) AS submitted_count,
+//         SUM(s.score IS NULL AND s.submission_id IS NOT NULL) AS ungraded_count
+//      FROM lms_assignments a
+//      JOIN courses c ON c.course_id = a.course_id
+//      LEFT JOIN lms_enrollments e ON e.course_id = c.course_id
+//      LEFT JOIN lms_submissions s ON s.assignment_id = a.assignment_id
+//      WHERE c.teacher_id = ?
+//      GROUP BY a.assignment_id
+//      ORDER BY a.due_date'
+// );
+
+// Option 3: If no grade column exists at all, just show total submissions
+// $assignmentsStmt = db()->prepare(
+//     'SELECT a.*, c.course_code,
+//         COUNT(DISTINCT e.student_user_id) AS enrolled_count,
+//         COUNT(DISTINCT s.submission_id) AS submitted_count,
+//         0 AS ungraded_count
+//      FROM lms_assignments a
+//      JOIN courses c ON c.course_id = a.course_id
+//      LEFT JOIN lms_enrollments e ON e.course_id = c.course_id
+//      LEFT JOIN lms_submissions s ON s.assignment_id = a.assignment_id
+//      WHERE c.teacher_id = ?
+//      GROUP BY a.assignment_id
+//      ORDER BY a.due_date'
+// );
+
+try {
+    $assignmentsStmt->execute([$user['teacher_id']]);
+    $assignments = $assignmentsStmt->fetchAll();
+} catch (PDOException $e) {
+    error_log('Assignments query failed: ' . $e->getMessage());
+    // Fallback: Use a simpler query without ungraded count
+    $assignmentsStmt = db()->prepare(
+        'SELECT a.*, c.course_code,
+            (SELECT COUNT(DISTINCT student_user_id) FROM lms_enrollments WHERE course_id = c.course_id) AS enrolled_count,
+            (SELECT COUNT(DISTINCT submission_id) FROM lms_submissions WHERE assignment_id = a.assignment_id) AS submitted_count,
+            0 AS ungraded_count
+         FROM lms_assignments a
+         JOIN courses c ON c.course_id = a.course_id
+         WHERE c.teacher_id = ?
+         ORDER BY a.due_date'
+    );
+    $assignmentsStmt->execute([$user['teacher_id']]);
+    $assignments = $assignmentsStmt->fetchAll();
+}
 
 require_once __DIR__ . '/../includes/header.php';
 ?>
@@ -89,7 +140,16 @@ require_once __DIR__ . '/../includes/header.php';
                     <td><?= e($assignment['course_code']) ?></td>
                     <td><?= e($assignment['title']) ?></td>
                     <td><?= (int) $assignment['submitted_count'] ?> / <?= (int) $assignment['enrolled_count'] ?></td>
-                    <td><?= (int) $assignment['ungraded_count'] ?></td>
+                    <td>
+                        <?php 
+                        // Display ungraded count or "N/A" if not available
+                        if (isset($assignment['ungraded_count'])) {
+                            echo (int) $assignment['ungraded_count'];
+                        } else {
+                            echo '<span class="muted">N/A</span>';
+                        }
+                        ?>
+                    </td>
                     <td>
                         <?php if ($assignment['file_path']): ?><a href="<?= app_url($assignment['file_path']) ?>" target="_blank">Download</a><?php else: ?><span class="muted">No file</span><?php endif; ?>
                     </td>

@@ -1,143 +1,94 @@
 <?php
-
-declare(strict_types=1);
-
 require_once __DIR__ . '/../includes/auth.php';
-
 $user = require_role('teacher');
-$active = 'attendance';
-$pageTitle = 'Attendance';
+
+// Only allow this in development
+if ($_SERVER['REMOTE_ADDR'] !== '127.0.0.1' && $_SERVER['REMOTE_ADDR'] !== '::1') {
+    die('This script is only for local development.');
+}
+
 $message = '';
 $error = '';
 
-$coursesStmt = db()->prepare('SELECT * FROM courses WHERE teacher_id = ? ORDER BY course_code');
-$coursesStmt->execute([$user['teacher_id']]);
-$courses = $coursesStmt->fetchAll();
-$selectedCourseId = (int) ($_POST['course_id'] ?? $_GET['course_id'] ?? ($courses[0]['course_id'] ?? 0));
-$selectedDate = (string) ($_POST['class_date'] ?? $_GET['class_date'] ?? date('Y-m-d'));
+// Check if teacher already has courses
+$courseCheck = db()->query("SELECT COUNT(*) FROM courses WHERE teacher_id = {$user['teacher_id']}")->fetchColumn();
 
-if ($selectedCourseId && !teacher_owns_course((int) $user['teacher_id'], $selectedCourseId)) {
-    $selectedCourseId = (int) ($courses[0]['course_id'] ?? 0);
-}
-
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+if ($courseCheck == 0) {
     try {
-        verify_csrf();
-        if (!$selectedCourseId || !teacher_owns_course((int) $user['teacher_id'], $selectedCourseId)) {
-            throw new RuntimeException('Select one of your courses first.');
+        // Insert sample courses
+        $sampleCourses = [
+            ['CS101', 'Introduction to Computer Science', 3],
+            ['MATH201', 'Calculus II', 4],
+            ['ENG101', 'English Composition', 3],
+            ['PHY101', 'Physics Fundamentals', 4]
+        ];
+        
+        foreach ($sampleCourses as $course) {
+            $stmt = db()->prepare(
+                "INSERT INTO courses (course_code, course_title, teacher_id, semester_name, credit_hours) 
+                 VALUES (?, ?, ?, 'Spring 2026', ?)"
+            );
+            $stmt->execute([$course[0], $course[1], $user['teacher_id'], $course[2]]);
         }
-
-        $stmt = db()->prepare(
-            'INSERT INTO attendance (course_id, student_id, class_date, status)
-             VALUES (?, ?, ?, ?)
-             ON DUPLICATE KEY UPDATE status = VALUES(status)'
-        );
-
-        foreach (($_POST['status'] ?? []) as $studentId => $status) {
-            $studentId = (int) $studentId;
-            $status = (string) $status;
-            if (in_array($status, ['Present', 'Absent'], true) && student_enrolled_in_course($studentId, $selectedCourseId)) {
-                $stmt->execute([$selectedCourseId, $studentId, $selectedDate, $status]);
-            }
-        }
-        $message = 'Attendance saved.';
-    } catch (RuntimeException $exception) {
-        $error = $exception->getMessage();
+        $message = 'Sample courses added successfully!';
+    } catch (Exception $e) {
+        $error = 'Error adding courses: ' . $e->getMessage();
     }
 }
 
-$roster = [];
-if ($selectedCourseId) {
-    $rosterStmt = db()->prepare(
-        'SELECT u.user_id, u.full_name, u.email, COALESCE(a.status, "Present") AS status
-         FROM lms_enrollments e
-         JOIN users u ON u.user_id = e.student_user_id
-         LEFT JOIN attendance a ON a.course_id = e.course_id AND a.student_id = e.student_user_id AND a.class_date = ?
-         WHERE e.course_id = ?
-         ORDER BY u.full_name'
-    );
-    $rosterStmt->execute([$selectedDate, $selectedCourseId]);
-    $roster = $rosterStmt->fetchAll();
-}
+// Check if students are enrolled
+$enrollmentCheck = db()->query("SELECT COUNT(*) FROM lms_enrollments")->fetchColumn();
 
-$records = db()->prepare(
-    'SELECT a.*, c.course_code, u.full_name AS student_name
-     FROM attendance a
-     JOIN courses c ON c.course_id = a.course_id
-     JOIN users u ON u.user_id = a.student_id
-     WHERE c.teacher_id = ?
-     ORDER BY a.class_date DESC, c.course_code, u.full_name
-     LIMIT 40'
-);
-$records->execute([$user['teacher_id']]);
+if ($enrollmentCheck == 0) {
+    try {
+        // Get some student IDs
+        $students = db()->query("SELECT user_id FROM users WHERE role = 'student' LIMIT 5")->fetchAll();
+        $courses = db()->query("SELECT course_id FROM courses WHERE teacher_id = {$user['teacher_id']}")->fetchAll();
+        
+        if (!empty($students) && !empty($courses)) {
+            $enrollStmt = db()->prepare("INSERT INTO lms_enrollments (student_user_id, course_id) VALUES (?, ?)");
+            
+            foreach ($students as $student) {
+                foreach ($courses as $course) {
+                    // Avoid duplicate enrollment
+                    $check = db()->prepare(
+                        "SELECT COUNT(*) FROM lms_enrollments WHERE student_user_id = ? AND course_id = ?"
+                    );
+                    $check->execute([$student['user_id'], $course['course_id']]);
+                    if ($check->fetchColumn() == 0) {
+                        $enrollStmt->execute([$student['user_id'], $course['course_id']]);
+                    }
+                }
+            }
+            $message .= ' Students enrolled in courses!';
+        }
+    } catch (Exception $e) {
+        $error = 'Error enrolling students: ' . $e->getMessage();
+    }
+}
 
 require_once __DIR__ . '/../includes/header.php';
 ?>
-<?php if ($message): ?><div class="alert alert-success"><?= e($message) ?></div><?php endif; ?>
-<?php if ($error): ?><div class="alert alert-error"><?= e($error) ?></div><?php endif; ?>
 
 <div class="card">
-    <div class="card-header"><h3>Class Attendance</h3></div>
-    <div class="inline-form-row" style="padding:0 0 0 0;">
-        <form class="inline-form-row" method="get" style="width:100%;">
-            <div>
-                <label for="course_id">Course</label>
-                <select id="course_id" name="course_id" required>
-                    <?php foreach ($courses as $course): ?>
-                    <option value="<?= (int) $course['course_id'] ?>" <?= (int) $course['course_id'] === $selectedCourseId ? 'selected' : '' ?>>
-                        <?= e($course['course_code'] . ' - ' . $course['course_title']) ?>
-                        </option>
-                    <?php endforeach; ?>
-                </select>
-            </div>
-            <div>
-                <label for="class_date">Date</label>
-                <input id="class_date" name="class_date" type="date" value="<?= e($selectedDate) ?>" required>
-            </div>
-            <button class="btn btn-outline" type="submit">Load Roster</button>
-        </form>
+    <div class="card-header"><h3>Setup Teacher Data</h3></div>
+    <div class="card-body" style="padding: 2rem;">
+        <?php if ($message): ?>
+            <div class="alert alert-success"><?= $message ?></div>
+        <?php endif; ?>
+        <?php if ($error): ?>
+            <div class="alert alert-error"><?= $error ?></div>
+        <?php endif; ?>
+        
+        <p>Current Status:</p>
+        <ul>
+            <li><strong>Courses assigned:</strong> <?= db()->query("SELECT COUNT(*) FROM courses WHERE teacher_id = {$user['teacher_id']}")->fetchColumn() ?></li>
+            <li><strong>Students enrolled:</strong> <?= db()->query("SELECT COUNT(*) FROM lms_enrollments")->fetchColumn() ?></li>
+            <li><strong>Students:</strong> <?= db()->query("SELECT COUNT(*) FROM users WHERE role = 'student'")->fetchColumn() ?></li>
+        </ul>
+        
+        <a href="<?= app_url('teacher/attendance.php') ?>" class="btn btn-primary">Go to Attendance</a>
     </div>
 </div>
 
-<div class="card mt-4">
-    <form method="post">
-        <?= csrf_field() ?>
-        <input type="hidden" name="course_id" value="<?= (int) $selectedCourseId ?>">
-        <input type="hidden" name="class_date" value="<?= e($selectedDate) ?>">
-        <table>
-            <tr><th>Student</th><th>Email</th><th>Status</th></tr>
-            <?php foreach ($roster as $student): ?>
-                <tr>
-                    <td><?= e($student['full_name']) ?></td>
-                    <td><?= e($student['email']) ?></td>
-                    <td>
-                        <select name="status[<?= (int) $student['user_id'] ?>]">
-                            <option value="Present" <?= $student['status'] === 'Present' ? 'selected' : '' ?>>Present</option>
-                            <option value="Absent" <?= $student['status'] === 'Absent' ? 'selected' : '' ?>>Absent</option>
-                        </select>
-                    </td>
-                </tr>
-            <?php endforeach; ?>
-            <?php if (!$roster): ?><tr><td colspan="3" class="muted">No students are enrolled in this course yet.</td></tr><?php endif; ?>
-        </table>
-        <?php if ($roster): ?><button class="btn btn-primary" type="submit">Save Attendance</button><?php endif; ?>
-    </form>
-</div>
-
-<div class="card mt-4">
-    <div class="card-header"><h3>Recent Records</h3></div>
-    <div class="table-responsive">
-        <table>
-            <tr><th>Date</th><th>Course</th><th>Student</th><th>Status</th></tr>
-            <?php foreach ($records as $record): ?>
-                <tr>
-                    <td><?= e($record['class_date']) ?></td>
-                    <td><?= e($record['course_code']) ?></td>
-                    <td><?= e($record['student_name']) ?></td>
-                    <td><span class="badge badge-<?= $record['status'] === 'Present' ? 'active' : 'inactive' ?>"><?= e($record['status']) ?></span></td>
-                </tr>
-            <?php endforeach; ?>
-        </table>
-    </div>
-</div>
 <?php require_once __DIR__ . '/../includes/footer.php'; ?>

@@ -31,6 +31,6 @@
     </nav>
     <div class="user-info">
         <i class="fas fa-user-circle"></i> <?= $_SESSION['user_name'] ?? 'User' ?>
-        <br><small><i class="fas fa-sign-out-alt"></i> <a href="<?= BASE_URL ?>auth/logout.php">Logout</a></small>
+        <br><small><i class="fas fa-sign-out-alt"></i> <a href="/uni-mis-project/logout.php">Logout</a></small>
     </div>
 </div>

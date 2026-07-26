@@ -53,13 +53,14 @@ $links = $role === 'teacher' ? $teacherLinks : ($role === 'student' ? $studentLi
 
 <div class="app-shell">
     <aside class="sidebar" id="sidebar">
-        <div class="brand">
+        <!-- Brand/Logo links to root index.php -->
+        <a href="<?= app_url('index.php') ?>" class="brand" style="text-decoration: none; display: flex; align-items: center; gap: 0.75rem;">
             <div class="brand-mark">LMS</div>
             <div>
                 <h1><?= APP_NAME ?></h1>
                 <p>University ERP</p>
             </div>
-        </div>
+        </a>
 
         <nav class="nav">
             <?php if ($role === 'teacher'): ?>
@@ -143,7 +144,7 @@ $links = $role === 'teacher' ? $teacherLinks : ($role === 'student' ? $studentLi
                 </div>
                 <div class="actions">
                     <a class="btn btn-ghost btn-sm" href="<?= app_url(($role === 'teacher' ? 'teacher' : 'student') . '/profile.php') ?>"><?= $role === 'teacher' ? '&#9881; Profile' : '&#128100; Profile' ?></a>
-                    <a class="btn btn-ghost btn-sm" href="<?= app_url('public/assets/logout.php') ?>">Logout</a>
+                    <a class="btn btn-ghost btn-sm" href="/uni-mis-project/logout.php">Logout</a>
                 </div>
             <?php else: ?>
                 <a class="btn btn-primary btn-sm" href="<?= app_url('public/login.php') ?>" style="width:100%;justify-content:center;">Sign In</a>

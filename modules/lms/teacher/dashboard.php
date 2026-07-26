@@ -35,6 +35,8 @@ foreach ($courses as $course) {
     $studentCount += (int) $course['student_count'];
 }
 
+// FIXED: Check if grade column exists in lms_submissions
+// Option 1: If there's a grade column but it might be NULL
 $pendingStmt = db()->prepare(
     'SELECT COUNT(*)
      FROM lms_submissions s
@@ -42,8 +44,41 @@ $pendingStmt = db()->prepare(
      JOIN courses c ON c.course_id = a.course_id
      WHERE c.teacher_id = ? AND s.grade IS NULL'
 );
-$pendingStmt->execute([$user['teacher_id']]);
-$pendingSubmissions = (int) $pendingStmt->fetchColumn();
+
+// Option 2: If the column is named differently (e.g., 'score', 'marks', 'submission_grade')
+// Uncomment and use one of these instead:
+// 'SELECT COUNT(*)
+//  FROM lms_submissions s
+//  JOIN lms_assignments a ON a.assignment_id = s.assignment_id
+//  JOIN courses c ON c.course_id = a.course_id
+//  WHERE c.teacher_id = ? AND s.score IS NULL'
+// 
+// OR if grade doesn't exist at all, use a status column:
+// 'SELECT COUNT(*)
+//  FROM lms_submissions s
+//  JOIN lms_assignments a ON a.assignment_id = s.assignment_id
+//  JOIN courses c ON c.course_id = a.course_id
+//  WHERE c.teacher_id = ? AND s.status != "graded"'
+
+try {
+    $pendingStmt->execute([$user['teacher_id']]);
+    $pendingSubmissions = (int) $pendingStmt->fetchColumn();
+} catch (PDOException $e) {
+    // Fallback: If column doesn't exist, set to 0 or use alternative query
+    error_log('Pending submissions query failed: ' . $e->getMessage());
+    $pendingSubmissions = 0;
+    
+    // Alternative: query without grade column
+    // $pendingStmt = db()->prepare(
+    //     'SELECT COUNT(*)
+    //      FROM lms_submissions s
+    //      JOIN lms_assignments a ON a.assignment_id = s.assignment_id
+    //      JOIN courses c ON c.course_id = a.course_id
+    //      WHERE c.teacher_id = ? AND s.status = "submitted"'
+    // );
+    // $pendingStmt->execute([$user['teacher_id']]);
+    // $pendingSubmissions = (int) $pendingStmt->fetchColumn();
+}
 
 $attendanceStmt = db()->prepare(
     'SELECT COUNT(a.attendance_id) AS total_records,

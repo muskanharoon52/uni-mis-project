@@ -14,10 +14,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     try {
         verify_csrf();
         $queryId = (int) ($_POST['query_id'] ?? 0);
+        
+        // FIXED: Changed q.user_id to q.student_user_id
         $allowedStmt = db()->prepare(
-            'SELECT q.user_id
+            'SELECT q.student_user_id
              FROM lms_queries q
-             JOIN lms_enrollments e ON e.student_user_id = q.user_id
+             JOIN lms_enrollments e ON e.student_user_id = q.student_user_id
              JOIN courses c ON c.course_id = e.course_id
              WHERE q.query_id = ? AND c.teacher_id = ?
              LIMIT 1'
@@ -37,11 +39,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
+// FIXED: Changed q.user_id to q.student_user_id in the main query as well
 $queriesStmt = db()->prepare(
     'SELECT DISTINCT q.*, u.full_name, u.email
      FROM lms_queries q
-     JOIN users u ON u.user_id = q.user_id
-     JOIN lms_enrollments e ON e.student_user_id = q.user_id
+     JOIN users u ON u.user_id = q.student_user_id
+     JOIN lms_enrollments e ON e.student_user_id = q.student_user_id
      JOIN courses c ON c.course_id = e.course_id
      WHERE c.teacher_id = ?
      ORDER BY q.created_at DESC'
@@ -64,16 +67,20 @@ require_once __DIR__ . '/../includes/header.php';
                     <td><?= e($query['subject']) ?></td>
                     <td><?= e($query['message']) ?></td>
                     <td><span class="badge badge-<?= $query['status'] === 'answered' ? 'active' : 'draft' ?>"><?= e($query['status']) ?></span></td>
-                <td>
-                    <form method="post">
-                        <?= csrf_field() ?>
-                        <input type="hidden" name="query_id" value="<?= (int) $query['query_id'] ?>">
-                        <textarea name="reply"><?= e($query['reply']) ?></textarea>
-                        <button class="btn btn-primary btn-sm" type="submit">Reply</button>
-                    </form>
-                </td>
-            </tr>
-        <?php endforeach; ?>
+                    <td>
+                        <form method="post">
+                            <?= csrf_field() ?>
+                            <input type="hidden" name="query_id" value="<?= (int) $query['query_id'] ?>">
+                            <textarea name="reply"><?= e($query['reply']) ?></textarea>
+                            <button class="btn btn-primary btn-sm" type="submit">Reply</button>
+                        </form>
+                    </td>
+                </tr>
+            <?php endforeach; ?>
+            <?php if (!$queries): ?>
+                <tr><td colspan="5" class="muted text-center">No student queries found.</td></tr>
+            <?php endif; ?>
+        </table>
     </div>
 </div>
 <?php require_once __DIR__ . '/../includes/footer.php'; ?>
