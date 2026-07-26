@@ -62,8 +62,8 @@ function loginUser($username, $password) {
         return false;
     }
     
-    // ✅ DIRECT COMPARE - Plain password
-    if ($password === $user['password_hash']) {
+    // Check with password_verify (bcrypt) or fallback to plain text
+    if (password_verify($password, $user['password_hash']) || $password === $user['password_hash']) {
         $_SESSION['user_id'] = $user['user_id'];
         $_SESSION['role_id'] = $user['role_id'] ?? 0;
         $_SESSION['role_name'] = $user['role_name'] ?? 'user';

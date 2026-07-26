@@ -67,8 +67,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         <hr>
         <div class="credentials-box">
             <p class="mb-1"><strong>Demo Credentials:</strong></p>
-            <p class="mb-0">Finance Officer: <strong>finance_admin / password123</strong></p>
-            <p class="mb-0">Staff: <strong>staff_demo / password123</strong></p>
+            <p class="mb-0">Finance Officer: <strong>finance / password123</strong></p>
+            <p class="mb-0">Admin: <strong>admin / admin123</strong></p>
         </div>
     </div>
 </body>

@@ -1,24 +1,43 @@
 # Demo Credentials - University MIS
 
-| Role | Username | Password | Module Access URL |
-|------|----------|----------|-------------------|
-| SSO Admin | sso_admin | password123 | `modules/sso/login.php` → `dashboard.php` |
-| Exam Officer | exam_admin | password123 | `modules/examination/login.php` → `examination/dashboard.php` |
-| Finance Officer | finance_admin | password123 | `modules/finance/login.php` → `dashboard.php` |
-| Student | student_demo | password123 | `modules/sso/login.php` (student portal) |
-| Teacher | teacher_demo | password123 | `modules/sso/login.php` (teacher portal) |
+All modules share the `university_mis` database `users` table.
 
-## How to Use
+## Main Users (shared across SSO, Examination, Finance, Admission)
 
-1. Visit your module's login page:
-   - **SSO**: `http://localhost/uni-mis-project/modules/sso/login.php`
-   - **Examination**: `http://localhost/uni-mis-project/modules/examination/login.php`
-   - **Finance**: `http://localhost/uni-mis-project/modules/finance/login.php`
-   - **MIS Portal**: `http://localhost/uni-mis-project/mis.php`
+| Role | Username | Password | Module Login |
+|------|----------|----------|--------------|
+| Admin | admin | admin123 | SSO / Admission |
+| SSO Admin | sso_admin | password123 | `modules/sso/login.php` |
+| Examiner | exam_admin | password123 | `modules/examination/login.php` |
+| Examiner | examiner | examiner123 | `modules/examination/login.php` |
+| Finance Officer | finance | password123 | `modules/finance/login.php` |
+| Teacher | teacher | password123 | SSO / Examination |
+| Student | student | password123 | SSO / Examination |
 
-2. Use the credentials above to log in.
-3. You will be redirected to the module dashboard on successful authentication.
+## LMS Users (login via User ID, not username)
 
-## Database Setup
+| Role | User ID | Password | Login |
+|------|---------|----------|-------|
+| Teacher | 5001 | teacher123 | `modules/lms/public/login.php` |
+| Teacher | 5002 | teacher123 | `modules/lms/public/login.php` |
+| Student | 9001 | student123 | `modules/lms/public/login.php` |
+| Student | 9002 | student123 | `modules/lms/public/login.php` |
 
-Ensure these demo user accounts exist in the `university_mis` database with proper role assignments (role_id). The shared connection file is at `config/db_connect.php`.
+## SBE Users (login via User ID)
+
+| Role | User ID | Password | Login |
+|------|---------|----------|-------|
+| Teacher | 5001 | teacher123 | `modules/sbe/login.php` |
+| Teacher | 5002 | teacher123 | `modules/sbe/login.php` |
+| Student | 9001 | student123 | `modules/sbe/login.php` |
+| Student | 9002 | student123 | `modules/sbe/login.php` |
+
+## Login URLs
+
+- **Home**: `http://localhost/uni-mis-project/`
+- **LMS**: `http://localhost/uni-mis-project/modules/lms/public/login.php`
+- **SBE**: `http://localhost/uni-mis-project/modules/sbe/login.php`
+- **Admission**: `http://localhost/uni-mis-project/modules/admission/auth/login.php`
+- **Examination**: `http://localhost/uni-mis-project/modules/examination/login.php`
+- **SSO**: `http://localhost/uni-mis-project/modules/sso/login.php`
+- **Finance**: `http://localhost/uni-mis-project/modules/finance/login.php`

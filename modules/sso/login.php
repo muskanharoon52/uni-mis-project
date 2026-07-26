@@ -105,6 +105,10 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             <p class="mb-1"><strong>SSO Credentials:</strong></p>
             <p class="mb-0">Username: <strong>sso_admin</strong></p>
             <p class="mb-0">Password: <strong>password123</strong></p>
+            <hr>
+            <p class="mb-0">Admin: <strong>admin / admin123</strong></p>
+            <p class="mb-0">Teacher: <strong>teacher / password123</strong></p>
+            <p class="mb-0">Student: <strong>student / password123</strong></p>
         </div>
     </div>
 </body>

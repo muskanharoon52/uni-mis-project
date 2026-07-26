@@ -68,14 +68,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             </div>
             <div class="mb-3">
                 <label class="form-label">Password</label>
-                <input type="password" name="password" class="form-control" required value="123456">
+                <input type="password" name="password" class="form-control" required value="password123">
             </div>
             <button type="submit" class="btn btn-primary w-100">
                 <i class="fas fa-sign-in-alt"></i> Login
             </button>
         </form>
         <div class="mt-3 text-center text-muted small">
-            Demo: <strong>finance</strong> / <strong>123456</strong>
+            Demo: <strong>finance / password123</strong><br>
+            Also: <strong>admin / admin123</strong> &middot; <strong>teacher / password123</strong>
         </div>
     </div>
 </body>
