@@ -1,0 +1,252 @@
+<?php
+require_once '../../config/database.php';
+$page_title = 'Apply Scholarship';
+include '../../includes/header.php';
+
+// Get all students
+$students = $pdo->query("
+    SELECT s.*, d.department_name 
+    FROM admission_students s 
+    LEFT JOIN departments d ON s.program_id = d.department_id 
+    WHERE s.status='active' 
+    ORDER BY s.student_name
+")->fetchAll();
+
+// Get active scholarships
+$scholarships = $pdo->query("SELECT * FROM admission_scholarships WHERE status='active' ORDER BY deadline ASC")->fetchAll();
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    try {
+        $student_id = $_POST['student_id'];
+        $scholarship_id = $_POST['scholarship_id'];
+        $marks_obtained = $_POST['marks_obtained'];
+        $total_marks = $_POST['total_marks'];
+        $percentage = ($total_marks > 0) ? ($marks_obtained / $total_marks) * 100 : 0;
+        
+        // Check if already applied
+        $check = $pdo->prepare("SELECT id FROM admission_scholarship_applications WHERE student_id = ? AND scholarship_id = ?");
+        $check->execute([$student_id, $scholarship_id]);
+        if ($check->fetch()) {
+            setFlash('error', 'Student has already applied for this scholarship');
+            header('Location: apply.php');
+            exit();
+        }
+        
+        // Get student's program fee
+        $student = $pdo->prepare("SELECT program_id FROM admission_students WHERE id = ?");
+        $student->execute([$student_id]);
+        $student_data = $student->fetch();
+        
+        // Get fee amount from departments
+        $fee = $pdo->prepare("SELECT fee_amount FROM departments WHERE department_id = ?");
+        $fee->execute([$student_data['program_id'] ?? 0]);
+        $fee_data = $fee->fetch();
+        $fee_amount = $fee_data['fee_amount'] ?? 0;
+        
+        // Calculate scholarship
+        $scholarship_result = calculateScholarship($percentage, $fee_amount);
+        
+        $data = [
+            'student_id' => $student_id,
+            'scholarship_id' => $scholarship_id,
+            'marks_obtained' => $marks_obtained,
+            'total_marks' => $total_marks,
+            'percentage' => $percentage,
+            'scholarship_percentage' => $scholarship_result['percentage'],
+            'scholarship_amount' => $scholarship_result['amount'],
+            'fee_after_scholarship' => $scholarship_result['fee_after_scholarship'],
+            'status' => 'pending'
+        ];
+        
+        $sql = "INSERT INTO admission_scholarship_applications SET ";
+        $set_parts = [];
+        foreach ($data as $key => $value) {
+            $set_parts[] = "$key = :$key";
+        }
+        $sql .= implode(", ", $set_parts);
+        
+        $stmt = $pdo->prepare($sql);
+        if ($stmt->execute($data)) {
+            setFlash('success', 
+                'Scholarship application submitted!<br>' .
+                'Percentage: ' . number_format($percentage, 2) . '%<br>' .
+                'Scholarship: ' . $scholarship_result['label'] . ' (' . $scholarship_result['percentage'] . '%)<br>' .
+                'Amount: ' . formatCurrency($scholarship_result['amount'])
+            );
+            header('Location: index.php');
+            exit();
+        }
+    } catch (PDOException $e) {
+        setFlash('error', 'Database Error: ' . $e->getMessage());
+    }
+}
+?>
+<div class="page-header"><h5><i class="fas fa-hand-holding-heart"></i> Apply for Scholarship</h5></div>
+
+<?php
+$flash = getFlash();
+if ($flash): ?>
+    <div class="alert alert-<?= $flash['type'] ?> alert-dismissible fade show">
+        <?= $flash['message'] ?>
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+<?php endif; ?>
+
+<div class="row">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <h6 class="mb-0"><i class="fas fa-calculator"></i> Scholarship Application Form</h6>
+            </div>
+            <div class="card-body">
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle"></i> 
+                    Scholarship is calculated based on your 12th class percentage:
+                    <ul class="mb-0 mt-1">
+                        <li>90%+ → 100% Scholarship</li>
+                        <li>80%+ → 75% Scholarship</li>
+                        <li>70%+ → 50% Scholarship</li>
+                        <li>60%+ → 25% Scholarship</li>
+                        <li>Below 60% → No Scholarship</li>
+                    </ul>
+                </div>
+                
+                <form method="POST">
+                    <div class="mb-3">
+                        <label class="form-label">Select Student *</label>
+                        <select name="student_id" class="form-select" required>
+                            <option value="">-- Select Student --</option>
+                            <?php foreach($students as $s): ?>
+                            <option value="<?= $s['id'] ?>">
+                                <?= $s['student_name'] ?> (<?= $s['student_id'] ?>) - <?= $s['department_name'] ?? 'N/A' ?>
+                            </option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Select Scholarship *</label>
+                        <select name="scholarship_id" class="form-select" required id="scholarshipSelect">
+                            <option value="">-- Select Scholarship --</option>
+                            <?php foreach($scholarships as $s): ?>
+                            <option value="<?= $s['id'] ?>">
+                                <?= $s['scholarship_name'] ?> - <?= $s['scholarship_type'] ?? 'Merit' ?>
+                            </option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Marks Obtained (12th) *</label>
+                                <input type="number" step="0.01" name="marks_obtained" class="form-control" required id="marksObtained" placeholder="e.g. 776">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Total Marks *</label>
+                                <input type="number" step="0.01" name="total_marks" class="form-control" required id="totalMarks" placeholder="e.g. 1100">
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <div class="card">
+                            <div class="card-body">
+                                <div class="row">
+                                    <div class="col-md-4">
+                                        <small class="text-muted">Percentage</small>
+                                        <h5><span id="percentageDisplay">0.00%</span></h5>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <small class="text-muted">Scholarship</small>
+                                        <h5><span id="scholarshipLabelDisplay">-</span></h5>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <small class="text-muted">Amount</small>
+                                        <h5><span id="scholarshipAmountDisplay">PKR 0</span></h5>
+                                    </div>
+                                </div>
+                                <div id="eligibilityDisplay" class="mt-2"></div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-success"><i class="fas fa-paper-plane"></i> Submit Application</button>
+                    <a href="index.php" class="btn btn-secondary">Cancel</a>
+                </form>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header bg-info text-white"><h6 class="mb-0">Scholarship Slabs</h6></div>
+            <div class="card-body">
+                <table class="table table-sm">
+                    <thead>
+                        <tr><th>Percentage</th><th>Scholarship</th></tr>
+                    </thead>
+                    <tbody>
+                        <tr class="table-success"><td>90% - 100%</td><td>100%</td></tr>
+                        <tr class="table-primary"><td>80% - 89.99%</td><td>75%</td></tr>
+                        <tr class="table-info"><td>70% - 79.99%</td><td>50%</td></tr>
+                        <tr class="table-warning"><td>60% - 69.99%</td><td>25%</td></tr>
+                        <tr class="table-secondary"><td>Below 60%</td><td>No Scholarship</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.getElementById('marksObtained').addEventListener('input', calculateScholarship);
+document.getElementById('totalMarks').addEventListener('input', calculateScholarship);
+
+function calculateScholarship() {
+    const obtained = parseFloat(document.getElementById('marksObtained').value) || 0;
+    const total = parseFloat(document.getElementById('totalMarks').value) || 1;
+    const percentage = (obtained / total) * 100;
+    
+    document.getElementById('percentageDisplay').textContent = percentage.toFixed(2) + '%';
+    
+    // Calculate scholarship based on percentage
+    let scholarshipPercentage = 0;
+    let label = 'No Scholarship';
+    let amount = 0;
+    
+    if (percentage >= 90) {
+        scholarshipPercentage = 100;
+        label = 'Full Scholarship';
+        amount = 100000; // Example fee
+    } else if (percentage >= 80) {
+        scholarshipPercentage = 75;
+        label = '75% Scholarship';
+        amount = 75000;
+    } else if (percentage >= 70) {
+        scholarshipPercentage = 50;
+        label = '50% Scholarship';
+        amount = 50000;
+    } else if (percentage >= 60) {
+        scholarshipPercentage = 25;
+        label = '25% Scholarship';
+        amount = 25000;
+    } else {
+        scholarshipPercentage = 0;
+        label = 'No Scholarship';
+        amount = 0;
+    }
+    
+    document.getElementById('scholarshipLabelDisplay').textContent = label;
+    document.getElementById('scholarshipAmountDisplay').textContent = 'PKR ' + amount.toLocaleString();
+    
+    const eligibilityDiv = document.getElementById('eligibilityDisplay');
+    if (scholarshipPercentage > 0) {
+        eligibilityDiv.innerHTML = '<span class="text-success">✅ Eligible for ' + label + '</span>';
+    } else {
+        eligibilityDiv.innerHTML = '<span class="text-danger">❌ Not eligible for any scholarship (Need 60% minimum)</span>';
+    }
+}
+</script>
+<?php include '../../includes/footer.php'; ?>
