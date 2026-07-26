@@ -1,29 +1,68 @@
 <?php
-require_once __DIR__ . '../config/db_connect.php';
-require_once __DIR__ . '/../includes/auth.php';
+// Fixed the path - added missing slash and correct auth path
+require_once __DIR__ . '/../config/db_connect.php';
+require_once __DIR__ . '/../modules/sso/includes/auth.php';
 requireLogin();
 
 $conn = getConnection();
 
+// Helper function to check if column exists
+if (!function_exists('columnExists')) {
+    function columnExists($conn, $table, $column) {
+        try {
+            $query = "SHOW COLUMNS FROM $table LIKE '$column'";
+            $result = mysqli_query($conn, $query);
+            return ($result && mysqli_num_rows($result) > 0);
+        } catch (Exception $e) {
+            return false;
+        }
+    }
+}
+
+// Check which columns exist in teachers table
+$hasTeacherSpecialization = columnExists($conn, 'teachers', 'specialization');
+$hasTeacherDesignation = columnExists($conn, 'teachers', 'designation');
+$hasTeacherEmail = columnExists($conn, 'teachers', 'email');
+
+// Build the SELECT query dynamically
+$selectFields = "
+    t.id,
+    t.day_of_week,
+    t.start_time,
+    t.end_time,
+    t.room_no,
+    t.section,
+    c.course_id,
+    c.course_code,
+    c.course_name as course_title,
+    c.credit_hours,
+    tch.teacher_name";
+
+// Add specialization/designation field if it exists
+if ($hasTeacherSpecialization) {
+    $selectFields .= ", tch.specialization as designation";
+} elseif ($hasTeacherDesignation) {
+    $selectFields .= ", tch.designation as designation";
+} else {
+    $selectFields .= ", NULL as designation";
+}
+
+// Add email if it exists
+if ($hasTeacherEmail) {
+    $selectFields .= ", tch.email as teacher_email";
+} else {
+    $selectFields .= ", NULL as teacher_email";
+}
+
+// Add remaining fields
+$selectFields .= ",
+    s.semester_name,
+    ses.session_name,
+    d.department_name,
+    p.program_name";
+
 // Fetch all timetable entries with joins
-$sql = "SELECT 
-            t.id,
-            t.day_of_week,
-            t.start_time,
-            t.end_time,
-            t.room_no,
-            t.section,
-            c.course_id,
-            c.course_code,
-            c.course_name as course_title,
-            c.credit_hours,
-            tch.teacher_name,
-            tch.specialization as designation,
-            tch.email as teacher_email,
-            s.semester_name,
-            ses.session_name,
-            d.department_name,
-            p.program_name
+$sql = "SELECT $selectFields
         FROM timetable t
         LEFT JOIN courses c ON t.course_id = c.course_id
         LEFT JOIN teachers tch ON t.teacher_id = tch.teacher_id
@@ -370,8 +409,11 @@ include __DIR__ . '/../includes/sidebar.php';
                                     </td>
                                     <td>
                                         <?php echo htmlspecialchars($row['teacher_name']); ?>
-                                        <?php if($row['designation']): ?>
+                                        <?php if(!empty($row['designation']) && $row['designation'] != 'N/A'): ?>
                                             <br><small class="designation-text"><?php echo htmlspecialchars($row['designation']); ?></small>
+                                        <?php endif; ?>
+                                        <?php if(!empty($row['teacher_email']) && $row['teacher_email'] != 'N/A'): ?>
+                                            <br><small class="text-muted"><?php echo htmlspecialchars($row['teacher_email']); ?></small>
                                         <?php endif; ?>
                                     </td>
                                     <td>

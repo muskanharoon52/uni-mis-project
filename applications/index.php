@@ -1,9 +1,41 @@
 <?php
-require_once __DIR__ . '../config/db_connect.php';
-require_once __DIR__ . '/../includes/auth.php';
+require_once __DIR__ . '/../config/db_connect.php';
+require_once __DIR__ . '/../modules/sso/includes/auth.php';
 requireLogin();
 
 $conn = getConnection();
+
+// Helper function to check if column exists
+if (!function_exists('columnExists')) {
+    function columnExists($conn, $table, $column) {
+        try {
+            $query = "SHOW COLUMNS FROM $table LIKE '$column'";
+            $result = mysqli_query($conn, $query);
+            return ($result && mysqli_num_rows($result) > 0);
+        } catch (Exception $e) {
+            return false;
+        }
+    }
+}
+
+// Helper function to get table columns
+if (!function_exists('getTableColumns')) {
+    function getTableColumns($conn, $table) {
+        try {
+            $columns = [];
+            $query = "SHOW COLUMNS FROM $table";
+            $result = mysqli_query($conn, $query);
+            if ($result) {
+                while ($row = mysqli_fetch_assoc($result)) {
+                    $columns[] = $row['Field'];
+                }
+            }
+            return $columns;
+        } catch (Exception $e) {
+            return [];
+        }
+    }
+}
 
 // Get filter parameters
 $search = isset($_GET['search']) ? trim($_GET['search']) : '';
@@ -17,71 +49,242 @@ $user_id = $_SESSION['user_id'] ?? 0;
 $role_id = $_SESSION['role_id'] ?? 0;
 $is_sso = in_array($role_id, [1, 2]); // Admin or SSO
 
-// Fetch applications
-$sql = "SELECT 
-            a.application_id,
-            a.application_type,
-            a.subject,
-            a.description,
-            a.attachment,
-            a.status,
-            a.remarks,
-            a.created_at,
-            a.review_date,
-            s.student_id,
-            s.roll_no,
-            u.full_name as student_name,
-            u.email as student_email,
-            u.phone as student_phone,
-            p.program_name,
-            u2.full_name as reviewer_name
-        FROM applications a
-        LEFT JOIN students s ON a.student_id = s.student_id
-        LEFT JOIN users u ON s.user_id = u.user_id
-        LEFT JOIN programs p ON s.program_id = p.program_id
-        LEFT JOIN users u2 ON a.reviewed_by = u2.user_id
-        WHERE 1=1";
+// Check which columns exist in applications table
+$appColumns = getTableColumns($conn, 'applications');
+$hasSubject = in_array('subject', $appColumns);
+$hasDescription = in_array('description', $appColumns);
+$hasAttachment = in_array('attachment', $appColumns);
+$hasRemarks = in_array('remarks', $appColumns);
+$hasReviewedBy = in_array('reviewed_by', $appColumns);
+$hasReviewDate = in_array('review_date', $appColumns);
+$hasStudentId = in_array('student_id', $appColumns);
+$hasApplicationType = in_array('application_type', $appColumns);
+$hasStatus = in_array('status', $appColumns);
+$hasCreatedAt = in_array('created_at', $appColumns);
+
+// Check which columns exist in students table
+$studentColumns = getTableColumns($conn, 'students');
+$hasStudentUserId = in_array('user_id', $studentColumns);
+$hasStudentRollNo = in_array('roll_no', $studentColumns);
+$hasStudentProgramId = in_array('program_id', $studentColumns);
+$hasStudentFullName = in_array('full_name', $studentColumns);
+
+// Check which columns exist in users table
+$userColumns = getTableColumns($conn, 'users');
+$hasUserPhone = in_array('phone', $userColumns);
+$hasUserEmail = in_array('email', $userColumns);
+$hasUserFullName = in_array('full_name', $userColumns);
+
+// Build SELECT query based on available columns
+$selectFields = [
+    'a.application_id'
+];
+
+if ($hasApplicationType) {
+    $selectFields[] = 'a.application_type';
+} else {
+    $selectFields[] = "'N/A' as application_type";
+}
+
+if ($hasSubject) {
+    $selectFields[] = 'a.subject';
+} else {
+    $selectFields[] = "'' as subject";
+}
+
+if ($hasDescription) {
+    $selectFields[] = 'a.description';
+} else {
+    $selectFields[] = "'' as description";
+}
+
+if ($hasAttachment) {
+    $selectFields[] = 'a.attachment';
+} else {
+    $selectFields[] = "NULL as attachment";
+}
+
+if ($hasStatus) {
+    $selectFields[] = 'a.status';
+} else {
+    $selectFields[] = "'Pending' as status";
+}
+
+if ($hasRemarks) {
+    $selectFields[] = 'a.remarks';
+} else {
+    $selectFields[] = "NULL as remarks";
+}
+
+if ($hasCreatedAt) {
+    $selectFields[] = 'a.created_at';
+} else {
+    $selectFields[] = "NOW() as created_at";
+}
+
+if ($hasReviewDate) {
+    $selectFields[] = 'a.review_date';
+} else {
+    $selectFields[] = "NULL as review_date";
+}
+
+if ($hasReviewedBy) {
+    $selectFields[] = 'a.reviewed_by';
+} else {
+    $selectFields[] = "NULL as reviewed_by";
+}
+
+// Add student fields - check what's available
+if ($hasStudentId) {
+    $selectFields[] = 'a.student_id';
+} else {
+    $selectFields[] = "NULL as student_id";
+}
+
+if ($hasStudentRollNo) {
+    $selectFields[] = 's.roll_no';
+} else {
+    $selectFields[] = "'N/A' as roll_no";
+}
+
+// Check if we can get student name from students table or users table
+if ($hasStudentFullName) {
+    $selectFields[] = 's.full_name as student_name';
+} elseif ($hasUserFullName && $hasStudentUserId) {
+    $selectFields[] = 'u.full_name as student_name';
+} else {
+    $selectFields[] = "'N/A' as student_name";
+}
+
+if ($hasUserEmail && $hasStudentUserId) {
+    $selectFields[] = 'u.email as student_email';
+} else {
+    $selectFields[] = "'N/A' as student_email";
+}
+
+if ($hasUserPhone && $hasStudentUserId) {
+    $selectFields[] = 'u.phone as student_phone';
+} else {
+    $selectFields[] = "'N/A' as student_phone";
+}
+
+// Program name - only if students table has program_id and programs table exists
+if ($hasStudentProgramId) {
+    $selectFields[] = 'p.program_name';
+} else {
+    $selectFields[] = "'N/A' as program_name";
+}
+
+// Reviewer name
+$selectFields[] = 'u2.full_name as reviewer_name';
+
+// Build the SQL query
+$sql = "SELECT \n            " . implode(",\n            ", $selectFields);
+$sql .= "\n        FROM applications a";
+
+// Join students - only if student_id exists in applications
+if ($hasStudentId) {
+    $sql .= "\n        LEFT JOIN students s ON a.student_id = s.student_id";
+    
+    // Join users - only if user_id exists in students
+    if ($hasStudentUserId) {
+        $sql .= "\n        LEFT JOIN users u ON s.user_id = u.user_id";
+    }
+    
+    // Join programs - only if program_id exists in students
+    if ($hasStudentProgramId) {
+        $sql .= "\n        LEFT JOIN programs p ON s.program_id = p.program_id";
+    }
+} else {
+    // If no student_id, just add empty joins
+    $sql .= "\n        LEFT JOIN students s ON 1=0";
+    $sql .= "\n        LEFT JOIN users u ON 1=0";
+    $sql .= "\n        LEFT JOIN programs p ON 1=0";
+}
+
+// Join users for reviewer
+if ($hasReviewedBy) {
+    $sql .= "\n        LEFT JOIN users u2 ON a.reviewed_by = u2.user_id";
+} else {
+    $sql .= "\n        LEFT JOIN users u2 ON 1=0";
+}
+
+$sql .= "\n        WHERE 1=1";
 
 $params = [];
 $types = "";
 
-// Add search filter
+// Add search filter - adjust based on available columns
 if (!empty($search)) {
-    $sql .= " AND (u.full_name LIKE ? OR s.student_id LIKE ? OR a.subject LIKE ?)";
+    $searchConditions = [];
+    
+    if ($hasStudentId) {
+        $searchConditions[] = "a.student_id LIKE ?";
+    }
+    
+    if ($hasStudentRollNo) {
+        $searchConditions[] = "s.roll_no LIKE ?";
+    }
+    
+    if ($hasSubject) {
+        $searchConditions[] = "a.subject LIKE ?";
+    }
+    
+    if ($hasUserFullName && $hasStudentUserId) {
+        $searchConditions[] = "u.full_name LIKE ?";
+    }
+    
+    if ($hasUserEmail && $hasStudentUserId) {
+        $searchConditions[] = "u.email LIKE ?";
+    }
+    
+    // If no search conditions available, search by application_id
+    if (empty($searchConditions)) {
+        $searchConditions[] = "a.application_id LIKE ?";
+    }
+    
+    $sql .= " AND (" . implode(" OR ", $searchConditions) . ")";
     $searchParam = "%$search%";
-    $params[] = $searchParam;
-    $params[] = $searchParam;
-    $params[] = $searchParam;
-    $types .= "sss";
+    
+    // Add params for each condition
+    foreach ($searchConditions as $condition) {
+        $params[] = $searchParam;
+        $types .= "s";
+    }
 }
 
 // Add type filter
-if (!empty($type_filter)) {
+if (!empty($type_filter) && $hasApplicationType) {
     $sql .= " AND a.application_type = ?";
     $params[] = $type_filter;
     $types .= "s";
 }
 
 // Add status filter
-if (!empty($status_filter)) {
+if (!empty($status_filter) && $hasStatus) {
     $sql .= " AND a.status = ?";
     $params[] = $status_filter;
     $types .= "s";
 }
 
 // Add date range filter
-if (!empty($date_from)) {
+if (!empty($date_from) && $hasCreatedAt) {
     $sql .= " AND DATE(a.created_at) >= ?";
     $params[] = $date_from;
     $types .= "s";
 }
-if (!empty($date_to)) {
+if (!empty($date_to) && $hasCreatedAt) {
     $sql .= " AND DATE(a.created_at) <= ?";
     $params[] = $date_to;
     $types .= "s";
 }
 
-$sql .= " ORDER BY a.created_at DESC";
+$sql .= " ORDER BY a.application_id DESC";
+
+// Debug: Uncomment to see the query
+// echo "<pre>$sql</pre>";
+// print_r($params);
+// exit;
 
 $stmt = $conn->prepare($sql);
 if ($stmt === false) {
@@ -97,13 +300,19 @@ $result = $stmt->get_result();
 $applications = $result ? $result->fetch_all(MYSQLI_ASSOC) : [];
 $stmt->close();
 
-// Get stats
+// Get stats - simplified query
 $stats_query = "SELECT 
-                    COUNT(*) as total,
-                    SUM(CASE WHEN status = 'Pending' THEN 1 ELSE 0 END) as pending,
+                    COUNT(*) as total";
+if ($hasStatus) {
+    $stats_query .= ",\n                    SUM(CASE WHEN status = 'Pending' THEN 1 ELSE 0 END) as pending,
                     SUM(CASE WHEN status = 'Approved' THEN 1 ELSE 0 END) as approved,
-                    SUM(CASE WHEN status = 'Rejected' THEN 1 ELSE 0 END) as rejected
-                FROM applications";
+                    SUM(CASE WHEN status = 'Rejected' THEN 1 ELSE 0 END) as rejected";
+} else {
+    $stats_query .= ",\n                    0 as pending,
+                    0 as approved,
+                    0 as rejected";
+}
+$stats_query .= "\n                FROM applications";
 $stats_result = $conn->query($stats_query);
 $stats = $stats_result ? $stats_result->fetch_assoc() : ['total' => 0, 'pending' => 0, 'approved' => 0, 'rejected' => 0];
 
@@ -364,38 +573,50 @@ include __DIR__ . '/../includes/sidebar.php';
                                         <td>
                                             <strong><?= htmlspecialchars($app['student_name'] ?? 'N/A') ?></strong>
                                             <br>
-                                            <small class="text-muted"><?= htmlspecialchars($app['student_id']) ?></small>
+                                            <small class="text-muted">ID: <?= htmlspecialchars($app['student_id'] ?? 'N/A') ?></small>
+                                            <?php if (!empty($app['roll_no']) && $app['roll_no'] != 'N/A'): ?>
+                                                <br>
+                                                <small class="text-muted">Roll: <?= htmlspecialchars($app['roll_no']) ?></small>
+                                            <?php endif; ?>
+                                            <?php if (!empty($app['student_phone']) && $app['student_phone'] != 'N/A'): ?>
+                                                <br>
+                                                <small class="text-muted"><i class="fas fa-phone"></i> <?= htmlspecialchars($app['student_phone']) ?></small>
+                                            <?php endif; ?>
                                         </td>
                                         <td>
-                                            <span class="type-badge"><?= htmlspecialchars($app['application_type']) ?></span>
+                                            <span class="type-badge"><?= htmlspecialchars($app['application_type'] ?? 'N/A') ?></span>
                                         </td>
                                         <td>
-                                            <?= htmlspecialchars($app['subject']) ?>
-                                            <br>
-                                            <small class="text-muted"><?= htmlspecialchars(substr($app['description'], 0, 50)) ?>...</small>
+                                            <?= htmlspecialchars($app['subject'] ?? 'N/A') ?>
+                                            <?php if (!empty($app['description'])): ?>
+                                                <br>
+                                                <small class="text-muted"><?= htmlspecialchars(substr($app['description'], 0, 50)) ?>...</small>
+                                            <?php endif; ?>
                                         </td>
                                         <td>
-                                            <span class="status-badge <?= $app['status'] ?>">
-                                                <?= $app['status'] ?>
+                                            <span class="status-badge <?= $app['status'] ?? 'Pending' ?>">
+                                                <?= $app['status'] ?? 'Pending' ?>
                                             </span>
                                         </td>
                                         <td>
-                                            <?= date('d M Y', strtotime($app['created_at'])) ?>
-                                            <br>
-                                            <small class="text-muted"><?= date('h:i A', strtotime($app['created_at'])) ?></small>
+                                            <?= isset($app['created_at']) && $app['created_at'] != 'NULL' && !empty($app['created_at']) ? date('d M Y', strtotime($app['created_at'])) : 'N/A' ?>
+                                            <?php if (isset($app['created_at']) && $app['created_at'] != 'NULL' && !empty($app['created_at'])): ?>
+                                                <br>
+                                                <small class="text-muted"><?= date('h:i A', strtotime($app['created_at'])) ?></small>
+                                            <?php endif; ?>
                                         </td>
                                         <td class="table-actions">
                                             <a href="view.php?id=<?= $app['application_id'] ?>" 
                                                class="btn btn-info btn-sm" title="View">
                                                 <i class="fas fa-eye"></i>
                                             </a>
-                                            <?php if ($app['status'] == 'Pending' && in_array($role_id, [1, 2])): ?>
+                                            <?php if (($app['status'] ?? '') == 'Pending' && in_array($role_id, [1, 2])): ?>
                                                 <a href="review.php?id=<?= $app['application_id'] ?>" 
                                                    class="btn btn-warning btn-sm" title="Review">
                                                     <i class="fas fa-check-double"></i>
                                                 </a>
                                             <?php endif; ?>
-                                            <?php if ($app['status'] == 'Pending'): ?>
+                                            <?php if (($app['status'] ?? '') == 'Pending'): ?>
                                                 <a href="edit.php?id=<?= $app['application_id'] ?>" 
                                                    class="btn btn-primary btn-sm" title="Edit">
                                                     <i class="fas fa-edit"></i>

@@ -1,10 +1,18 @@
 <?php
-require_once __DIR__ . '../config/db_connect.php';
-require_once __DIR__ . '/../includes/auth.php';
-requireSSO();
+require_once __DIR__ . '/../config/db_connect.php';
+require_once __DIR__ . '/../modules/sso/includes/auth.php';
 
-// Use global connection
-global $conn;
+// Check if logged in
+if (!function_exists('isLoggedIn')) {
+    die("isLoggedIn() function not found in auth.php");
+}
+
+if (!isLoggedIn()) {
+    header('Location: ../modules/sso/login.php');
+    exit;
+}
+
+$conn = getConnection();
 
 // Get filter parameters
 $search = isset($_GET['search']) ? trim($_GET['search']) : '';
@@ -12,22 +20,65 @@ $program = isset($_GET['program']) ? (int)$_GET['program'] : 0;
 $status = isset($_GET['status']) ? $_GET['status'] : '';
 $format = isset($_GET['format']) ? $_GET['format'] : '';
 
-// Build query with correct column names based on your database
-$query = "SELECT s.student_id, s.roll_no, 
-          u.full_name, u.email, u.phone,
-          s.father_name, s.batch_year, s.semester, 
-          s.section, s.status, s.enrollment_date,
-          p.program_name, p.program_code
-          FROM students s
-          LEFT JOIN users u ON s.user_id = u.user_id
-          LEFT JOIN programs p ON s.program_id = p.program_id
+// First, let's check what columns actually exist in the students table
+$check_columns = "SHOW COLUMNS FROM students";
+$columns_result = $conn->query($check_columns);
+$existing_columns = [];
+if ($columns_result) {
+    while ($col = $columns_result->fetch_assoc()) {
+        $existing_columns[] = $col['Field'];
+    }
+}
+
+// Build query dynamically based on existing columns
+$select_fields = ['s.student_id', 's.roll_no', 's.full_name', 's.email', 's.father_name', 's.status'];
+$joins = [];
+$select_fields[] = 'p.program_name';
+$select_fields[] = 'p.program_code';
+$joins[] = "LEFT JOIN programs p ON s.program_id = p.program_id";
+
+// Check if section_id exists and join with sections
+if (in_array('section_id', $existing_columns)) {
+    $select_fields[] = 'sec.section_name';
+    $joins[] = "LEFT JOIN sections sec ON s.section_id = sec.section_id";
+} else {
+    $select_fields[] = "'' as section_name";
+}
+
+// Check if semester_id exists and join with semesters
+if (in_array('semester_id', $existing_columns)) {
+    $select_fields[] = 'sm.semester_name';
+    $joins[] = "LEFT JOIN semesters sm ON s.semester_id = sm.semester_id";
+} else {
+    $select_fields[] = "'' as semester_name";
+}
+
+// Check for date column
+if (in_array('created_at', $existing_columns)) {
+    $select_fields[] = 's.created_at as enrollment_date';
+} elseif (in_array('enrollment_date', $existing_columns)) {
+    $select_fields[] = 's.enrollment_date';
+} elseif (in_array('registration_date', $existing_columns)) {
+    $select_fields[] = 's.registration_date as enrollment_date';
+} elseif (in_array('join_date', $existing_columns)) {
+    $select_fields[] = 's.join_date as enrollment_date';
+} else {
+    $select_fields[] = "CURDATE() as enrollment_date";
+}
+
+$select_str = implode(', ', $select_fields);
+$join_str = implode(' ', $joins);
+
+$query = "SELECT $select_str 
+          FROM students s 
+          $join_str
           WHERE 1=1";
 
 $params = [];
 $types = "";
 
 if (!empty($search)) {
-    $query .= " AND (u.full_name LIKE ? OR s.roll_no LIKE ? OR u.email LIKE ? OR s.father_name LIKE ?)";
+    $query .= " AND (s.full_name LIKE ? OR s.roll_no LIKE ? OR s.email LIKE ? OR s.father_name LIKE ?)";
     $searchParam = "%$search%";
     $params[] = $searchParam;
     $params[] = $searchParam;
@@ -83,6 +134,13 @@ include __DIR__ . '/../includes/sidebar.php';
 ?>
 
 <style>
+    .main-content {
+        margin-left: 250px;
+        padding: 20px;
+        min-height: 100vh;
+        background: #f5f6fa;
+    }
+    
     .export-container {
         max-width: 900px;
         margin: 30px auto;
@@ -185,6 +243,13 @@ include __DIR__ . '/../includes/sidebar.php';
         border-radius: 12px;
         display: inline-block;
         margin-top: 5px;
+    }
+    
+    @media (max-width: 768px) {
+        .main-content {
+            margin-left: 0;
+            padding: 15px;
+        }
     }
 </style>
 
@@ -299,31 +364,24 @@ function exportCSV($students) {
     
     // Headers
     fputcsv($output, [
-        'Student ID', 'Roll No', 'Full Name', 'Email', 'Phone',
-        "Father's Name", 'Program', 'Batch Year', 'Semester',
+        'Student ID', 'Roll No', 'Full Name', 'Email',
+        "Father's Name", 'Program', 'Semester',
         'Section', 'Status', 'Enrollment Date'
     ]);
     
     // Data
     foreach ($students as $student) {
-        $ordinal = ['1st', '2nd', '3rd', '4th', '5th', '6th', '7th', '8th'];
-        $semester_text = isset($student['semester']) && $student['semester'] >= 1 && $student['semester'] <= 8 
-            ? $ordinal[$student['semester'] - 1] . ' Semester' 
-            : 'Semester ' . ($student['semester'] ?? 'N/A');
-        
         fputcsv($output, [
             $student['student_id'] ?? 'N/A',
             $student['roll_no'] ?? 'N/A',
             $student['full_name'] ?? 'N/A',
             $student['email'] ?? 'N/A',
-            $student['phone'] ?? 'N/A',
             $student['father_name'] ?? 'N/A',
             $student['program_name'] ?? 'N/A',
-            $student['batch_year'] ?? 'N/A',
-            $semester_text,
-            $student['section'] ?? 'N/A',
+            $student['semester_name'] ?? 'N/A',
+            $student['section_name'] ?? 'N/A',
             ucfirst($student['status'] ?? 'N/A'),
-            $student['enrollment_date'] ?? 'N/A'
+            $student['enrollment_date'] ?? date('Y-m-d')
         ]);
     }
     
@@ -363,10 +421,8 @@ function exportExcel($students) {
     echo '<th>Roll No</th>';
     echo '<th>Full Name</th>';
     echo '<th>Email</th>';
-    echo '<th>Phone</th>';
     echo "<th>Father's Name</th>";
     echo '<th>Program</th>';
-    echo '<th>Batch Year</th>';
     echo '<th>Semester</th>';
     echo '<th>Section</th>';
     echo '<th>Status</th>';
@@ -377,11 +433,6 @@ function exportExcel($students) {
     
     $i = 1;
     foreach ($students as $student) {
-        $ordinal = ['1st', '2nd', '3rd', '4th', '5th', '6th', '7th', '8th'];
-        $semester_text = isset($student['semester']) && $student['semester'] >= 1 && $student['semester'] <= 8 
-            ? $ordinal[$student['semester'] - 1] . ' Semester' 
-            : 'Semester ' . ($student['semester'] ?? 'N/A');
-        
         $status = $student['status'] ?? 'N/A';
         $status_class = 'status-' . strtolower($status);
         
@@ -391,14 +442,12 @@ function exportExcel($students) {
         echo '<td>' . htmlspecialchars($student['roll_no'] ?? 'N/A') . '</td>';
         echo '<td><strong>' . htmlspecialchars($student['full_name'] ?? 'N/A') . '</strong></td>';
         echo '<td>' . htmlspecialchars($student['email'] ?? 'N/A') . '</td>';
-        echo '<td>' . htmlspecialchars($student['phone'] ?? 'N/A') . '</td>';
         echo '<td>' . htmlspecialchars($student['father_name'] ?? 'N/A') . '</td>';
         echo '<td>' . htmlspecialchars($student['program_name'] ?? 'N/A') . '</td>';
-        echo '<td>' . htmlspecialchars($student['batch_year'] ?? 'N/A') . '</td>';
-        echo '<td>' . htmlspecialchars($semester_text) . '</td>';
-        echo '<td>' . htmlspecialchars($student['section'] ?? 'N/A') . '</td>';
+        echo '<td>' . htmlspecialchars($student['semester_name'] ?? 'N/A') . '</td>';
+        echo '<td>' . htmlspecialchars($student['section_name'] ?? 'N/A') . '</td>';
         echo '<td class="' . $status_class . '">' . ucfirst($status) . '</td>';
-        echo '<td>' . htmlspecialchars($student['enrollment_date'] ?? 'N/A') . '</td>';
+        echo '<td>' . htmlspecialchars($student['enrollment_date'] ?? date('Y-m-d')) . '</td>';
         echo '</tr>';
     }
     
@@ -563,25 +612,19 @@ function generatePDFHTML($students) {
                     <th>Roll No</th>
                     <th>Full Name</th>
                     <th>Email</th>
-                    <th>Phone</th>
                     <th>Father\'s Name</th>
                     <th>Program</th>
-                    <th>Batch</th>
                     <th>Semester</th>
                     <th>Section</th>
                     <th>Status</th>
+                    <th>Enrollment Date</th>
                 </tr>
             </thead>
             <tbody>';
         
         $i = 1;
-        $ordinal = ['1st', '2nd', '3rd', '4th', '5th', '6th', '7th', '8th'];
         
         foreach ($students as $student) {
-            $semester_text = isset($student['semester']) && $student['semester'] >= 1 && $student['semester'] <= 8 
-                ? $ordinal[$student['semester'] - 1] . ' Sem' 
-                : 'Sem ' . ($student['semester'] ?? 'N/A');
-            
             $status = strtolower($student['status'] ?? 'N/A');
             $status_class = 'status-' . $status;
             $status_display = ucfirst($status);
@@ -592,13 +635,12 @@ function generatePDFHTML($students) {
                 <td>' . htmlspecialchars($student['roll_no'] ?? 'N/A') . '</td>
                 <td><strong>' . htmlspecialchars($student['full_name'] ?? 'N/A') . '</strong></td>
                 <td>' . htmlspecialchars($student['email'] ?? 'N/A') . '</td>
-                <td>' . htmlspecialchars($student['phone'] ?? 'N/A') . '</td>
                 <td>' . htmlspecialchars($student['father_name'] ?? 'N/A') . '</td>
                 <td>' . htmlspecialchars($student['program_name'] ?? 'N/A') . '</td>
-                <td>' . htmlspecialchars($student['batch_year'] ?? 'N/A') . '</td>
-                <td>' . htmlspecialchars($semester_text) . '</td>
-                <td>' . htmlspecialchars($student['section'] ?? 'N/A') . '</td>
+                <td>' . htmlspecialchars($student['semester_name'] ?? 'N/A') . '</td>
+                <td>' . htmlspecialchars($student['section_name'] ?? 'N/A') . '</td>
                 <td class="' . $status_class . '">' . $status_display . '</td>
+                <td>' . htmlspecialchars($student['enrollment_date'] ?? date('Y-m-d')) . '</td>
             </tr>';
         }
         

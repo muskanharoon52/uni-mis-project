@@ -1,7 +1,16 @@
 <?php
-require_once __DIR__ . '../config/db_connect.php';
-require_once __DIR__ . '/../includes/auth.php';
-requireLogin();
+require_once __DIR__ . '/../config/db_connect.php';
+require_once __DIR__ . '/../modules/sso/includes/auth.php';
+
+// Check if logged in
+if (!function_exists('isLoggedIn')) {
+    die("isLoggedIn() function not found in auth.php");
+}
+
+if (!isLoggedIn()) {
+    header('Location: ../modules/sso/login.php');
+    exit;
+}
 
 $conn = getConnection();
 $error = '';
@@ -110,6 +119,10 @@ include __DIR__ . '/../includes/sidebar.php';
 
         <?php if ($error): ?>
             <div class="alert alert-danger"><?= htmlspecialchars($error) ?></div>
+        <?php endif; ?>
+
+        <?php if (isset($_GET['success'])): ?>
+            <div class="alert alert-success"><?= htmlspecialchars($_GET['success']) ?></div>
         <?php endif; ?>
 
         <div class="form-container">

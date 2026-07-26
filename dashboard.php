@@ -1,94 +1,309 @@
 <?php
-// dashboard.php - ULTIMATE DASHBOARD
+// dashboard.php - ULTIMATE DASHBOARD WITH ERROR HANDLING
 
-session_start();
-require_once __DIR__ . 'config/db_connect.php';
-require_once __DIR__ . '/modules/sso/includes/auth.php';
+// Enable error reporting for debugging
+error_reporting(E_ALL);
+ini_set('display_errors', 1);
+
+// Start session only if not already started
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+
+// Include database connection
+require_once __DIR__ . '/config/db_connect.php';
+
+// Check if auth.php exists
+$authFile = __DIR__ . '/modules/sso/includes/auth.php';
+if (!file_exists($authFile)) {
+    die("Authentication file not found: " . $authFile);
+}
+require_once $authFile;
 
 // Check if logged in
+if (!function_exists('isLoggedIn')) {
+    die("isLoggedIn() function not found in auth.php");
+}
+
 if (!isLoggedIn()) {
     header('Location: modules/sso/login.php');
     exit;
 }
 
+// Get user
 $user = getCurrentUser();
 $role = $user['role_name'] ?? 'User';
+
+// Get database connection
 $conn = getConnection();
 
-// ============================================
-// GET ALL STATS
-// ============================================
+// Check if connection is valid
+if (!$conn) {
+    die("Database connection failed!");
+}
 
-// Total Students
-$result = mysqli_query($conn, "SELECT COUNT(*) as count FROM students");
-$stats['students'] = ($result && mysqli_num_rows($result) > 0) ? mysqli_fetch_assoc($result)['count'] : 0;
+// Function to safely get count from a table
+if (!function_exists('getTableCount')) {
+    function getTableCount($conn, $tableName) {
+        try {
+            $check = mysqli_query($conn, "SHOW TABLES LIKE '$tableName'");
+            if (!$check || mysqli_num_rows($check) == 0) {
+                return 0;
+            }
+            
+            $result = mysqli_query($conn, "SELECT COUNT(*) as count FROM $tableName");
+            if ($result && mysqli_num_rows($result) > 0) {
+                $row = mysqli_fetch_assoc($result);
+                return $row['count'];
+            }
+            return 0;
+        } catch (Exception $e) {
+            return 0;
+        }
+    }
+}
 
-// Total Courses
-$result = mysqli_query($conn, "SELECT COUNT(*) as count FROM courses");
-$stats['courses'] = ($result && mysqli_num_rows($result) > 0) ? mysqli_fetch_assoc($result)['count'] : 0;
+// Function to safely query with try-catch
+if (!function_exists('safeQuery')) {
+    function safeQuery($conn, $query, $default = 0) {
+        try {
+            $result = mysqli_query($conn, $query);
+            if ($result && mysqli_num_rows($result) > 0) {
+                $row = mysqli_fetch_assoc($result);
+                return $row['count'] ?? $row['total'] ?? $default;
+            }
+            return $default;
+        } catch (Exception $e) {
+            return $default;
+        }
+    }
+}
 
-// Total Teachers
-$result = mysqli_query($conn, "SELECT COUNT(*) as count FROM teachers");
-$stats['teachers'] = ($result && mysqli_num_rows($result) > 0) ? mysqli_fetch_assoc($result)['count'] : 0;
+// Helper function to check if table exists
+if (!function_exists('tableExists')) {
+    function tableExists($conn, $tableName) {
+        $check = mysqli_query($conn, "SHOW TABLES LIKE '$tableName'");
+        return ($check && mysqli_num_rows($check) > 0);
+    }
+}
 
-// Total Applications
-$result = mysqli_query($conn, "SELECT COUNT(*) as count FROM applications");
-$stats['applications'] = ($result && mysqli_num_rows($result) > 0) ? mysqli_fetch_assoc($result)['count'] : 0;
+// Helper function to check if column exists
+if (!function_exists('columnExists')) {
+    function columnExists($conn, $table, $column) {
+        try {
+            $query = "SHOW COLUMNS FROM $table LIKE '$column'";
+            $result = mysqli_query($conn, $query);
+            return ($result && mysqli_num_rows($result) > 0);
+        } catch (Exception $e) {
+            return false;
+        }
+    }
+}
 
-// Total Fee Records
-$result = mysqli_query($conn, "SELECT COUNT(*) as count FROM fee_records");
-$stats['fee_records'] = ($result && mysqli_num_rows($result) > 0) ? mysqli_fetch_assoc($result)['count'] : 0;
+// Helper function to get table columns
+if (!function_exists('getTableColumns')) {
+    function getTableColumns($conn, $table) {
+        try {
+            $columns = [];
+            $query = "SHOW COLUMNS FROM $table";
+            $result = mysqli_query($conn, $query);
+            if ($result) {
+                while ($row = mysqli_fetch_assoc($result)) {
+                    $columns[] = $row['Field'];
+                }
+            }
+            return $columns;
+        } catch (Exception $e) {
+            return [];
+        }
+    }
+}
 
-// Total Sections
-$result = mysqli_query($conn, "SELECT COUNT(*) as count FROM sections");
-$stats['sections'] = ($result && mysqli_num_rows($result) > 0) ? mysqli_fetch_assoc($result)['count'] : 0;
+// Initialize stats array with default values
+$stats = [
+    'students' => 0,
+    'courses' => 0,
+    'teachers' => 0,
+    'applications' => 0,
+    'fee_records' => 0,
+    'sections' => 0,
+    'enrollments' => 0,
+    'attendance_today' => 0,
+    'new_students_today' => 0,
+    'new_apps_today' => 0,
+    'total_fee' => 0,
+    'pending_apps' => 0
+];
 
-// Total Enrollments
-$result = mysqli_query($conn, "SELECT COUNT(*) as count FROM student_enrollments");
-$stats['enrollments'] = ($result && mysqli_num_rows($result) > 0) ? mysqli_fetch_assoc($result)['count'] : 0;
+// Get counts safely
+$stats['students'] = getTableCount($conn, 'students');
+$stats['courses'] = getTableCount($conn, 'courses');
+$stats['teachers'] = getTableCount($conn, 'teachers');
+$stats['applications'] = getTableCount($conn, 'applications');
+$stats['fee_records'] = getTableCount($conn, 'fee_records');
+$stats['sections'] = getTableCount($conn, 'sections');
+$stats['enrollments'] = getTableCount($conn, 'student_enrollments');
 
 // Today's Stats
 $today = date('Y-m-d');
-$result = mysqli_query($conn, "SELECT COUNT(*) as count FROM attendance WHERE class_date = '$today'");
-$stats['attendance_today'] = ($result && mysqli_num_rows($result) > 0) ? mysqli_fetch_assoc($result)['count'] : 0;
 
-$result = mysqli_query($conn, "SELECT COUNT(*) as count FROM students WHERE enrollment_date = '$today'");
-$stats['new_students_today'] = ($result && mysqli_num_rows($result) > 0) ? mysqli_fetch_assoc($result)['count'] : 0;
+// Check if attendance table exists
+if (tableExists($conn, 'attendance')) {
+    if (columnExists($conn, 'attendance', 'class_date')) {
+        $stats['attendance_today'] = safeQuery($conn, "SELECT COUNT(*) as count FROM attendance WHERE class_date = '$today'");
+    }
+}
 
-$result = mysqli_query($conn, "SELECT COUNT(*) as count FROM applications WHERE DATE(created_at) = '$today'");
-$stats['new_apps_today'] = ($result && mysqli_num_rows($result) > 0) ? mysqli_fetch_assoc($result)['count'] : 0;
+// Check if students table exists and handle enrollment date
+if (tableExists($conn, 'students')) {
+    $studentColumns = getTableColumns($conn, 'students');
+    
+    // Find the date column
+    $dateColumn = 'enrollment_date';
+    if (!in_array('enrollment_date', $studentColumns)) {
+        if (in_array('created_at', $studentColumns)) {
+            $dateColumn = 'created_at';
+        } elseif (in_array('registration_date', $studentColumns)) {
+            $dateColumn = 'registration_date';
+        } elseif (in_array('join_date', $studentColumns)) {
+            $dateColumn = 'join_date';
+        } else {
+            $dateColumn = null;
+        }
+    }
+    
+    if ($dateColumn) {
+        $stats['new_students_today'] = safeQuery($conn, "SELECT COUNT(*) as count FROM students WHERE $dateColumn = '$today'");
+    }
+}
+
+// Check if applications table exists
+if (tableExists($conn, 'applications')) {
+    $appColumns = getTableColumns($conn, 'applications');
+    
+    if (in_array('created_at', $appColumns)) {
+        $stats['new_apps_today'] = safeQuery($conn, "SELECT COUNT(*) as count FROM applications WHERE DATE(created_at) = '$today'");
+    }
+    if (in_array('status', $appColumns)) {
+        $stats['pending_apps'] = safeQuery($conn, "SELECT COUNT(*) as count FROM applications WHERE status = 'Pending'");
+    }
+}
 
 // Total Fee Collected
-$result = mysqli_query($conn, "SELECT SUM(paid_amount) as total FROM fee_records");
-$stats['total_fee'] = ($result && mysqli_num_rows($result) > 0) ? mysqli_fetch_assoc($result)['total'] : 0;
+if (tableExists($conn, 'fee_records')) {
+    $feeColumns = getTableColumns($conn, 'fee_records');
+    if (in_array('paid_amount', $feeColumns)) {
+        $stats['total_fee'] = safeQuery($conn, "SELECT SUM(paid_amount) as total FROM fee_records");
+    }
+}
 
-// Pending Applications
-$result = mysqli_query($conn, "SELECT COUNT(*) as count FROM applications WHERE status = 'Pending'");
-$stats['pending_apps'] = ($result && mysqli_num_rows($result) > 0) ? mysqli_fetch_assoc($result)['count'] : 0;
-
-// Recent Students (Last 5)
-$recent_query = "SELECT s.student_id, s.roll_no, u.full_name, s.enrollment_date, s.status 
-                 FROM students s 
-                 LEFT JOIN users u ON s.user_id = u.user_id 
-                 ORDER BY s.enrollment_date DESC LIMIT 5";
-$recent_result = mysqli_query($conn, $recent_query);
+// Recent Students (Last 5) - Handle missing columns properly
 $recent_students = [];
-if ($recent_result) {
-    while ($row = mysqli_fetch_assoc($recent_result)) {
-        $recent_students[] = $row;
+if (tableExists($conn, 'students')) {
+    $studentColumns = getTableColumns($conn, 'students');
+    
+    // Check if users table exists and has full_name
+    $userTableExists = tableExists($conn, 'users');
+    $userColumns = $userTableExists ? getTableColumns($conn, 'users') : [];
+    
+    // Build the SELECT query based on available columns
+    $selectFields = [];
+    $selectFields[] = 's.student_id';
+    
+    if (in_array('roll_no', $studentColumns)) {
+        $selectFields[] = 's.roll_no';
+    }
+    
+    if (in_array('full_name', $studentColumns)) {
+        $selectFields[] = 's.full_name';
+    } elseif ($userTableExists && in_array('full_name', $userColumns)) {
+        $selectFields[] = 'u.full_name';
+        $joinUser = true;
+    } else {
+        $selectFields[] = "'N/A' as full_name";
+    }
+    
+    if (in_array('status', $studentColumns)) {
+        $selectFields[] = 's.status';
+    }
+    
+    // Find date column for ordering
+    $orderColumn = 'student_id';
+    if (in_array('enrollment_date', $studentColumns)) {
+        $orderColumn = 'enrollment_date';
+    } elseif (in_array('created_at', $studentColumns)) {
+        $orderColumn = 'created_at';
+    } elseif (in_array('registration_date', $studentColumns)) {
+        $orderColumn = 'registration_date';
+    }
+    $selectFields[] = "s.$orderColumn as order_date";
+    
+    // Build the query
+    $selectStr = implode(', ', $selectFields);
+    $joinStr = isset($joinUser) && $userTableExists ? "LEFT JOIN users u ON s.user_id = u.user_id" : "";
+    
+    $recent_query = "SELECT $selectStr 
+                     FROM students s 
+                     $joinStr
+                     ORDER BY s.$orderColumn DESC LIMIT 5";
+    
+    try {
+        $recent_result = mysqli_query($conn, $recent_query);
+        if ($recent_result) {
+            while ($row = mysqli_fetch_assoc($recent_result)) {
+                $recent_students[] = $row;
+            }
+        }
+    } catch (Exception $e) {
+        // If query fails, try a simpler query without joins
+        try {
+            $simple_query = "SELECT * FROM students ORDER BY student_id DESC LIMIT 5";
+            $recent_result = mysqli_query($conn, $simple_query);
+            if ($recent_result) {
+                while ($row = mysqli_fetch_assoc($recent_result)) {
+                    $recent_students[] = $row;
+                }
+            }
+        } catch (Exception $e2) {
+            $recent_students = [];
+        }
     }
 }
 
 // Recent Applications (Last 5)
-$app_query = "SELECT a.*, s.full_name as student_name 
-              FROM applications a 
-              LEFT JOIN students s ON a.student_id = s.student_id 
-              ORDER BY a.created_at DESC LIMIT 5";
-$app_result = mysqli_query($conn, $app_query);
 $recent_apps = [];
-if ($app_result) {
-    while ($row = mysqli_fetch_assoc($app_result)) {
-        $recent_apps[] = $row;
+if (tableExists($conn, 'applications')) {
+    $appColumns = getTableColumns($conn, 'applications');
+    
+    // Check if students table has full_name
+    $studentColumns = tableExists($conn, 'students') ? getTableColumns($conn, 'students') : [];
+    
+    $app_query = "SELECT a.*";
+    if (in_array('full_name', $studentColumns)) {
+        $app_query .= ", s.full_name as student_name";
+    } else {
+        $app_query .= ", 'N/A' as student_name";
+    }
+    $app_query .= " FROM applications a";
+    if (in_array('full_name', $studentColumns)) {
+        $app_query .= " LEFT JOIN students s ON a.student_id = s.student_id";
+    }
+    
+    if (in_array('created_at', $appColumns)) {
+        $app_query .= " ORDER BY a.created_at DESC LIMIT 5";
+    } else {
+        $app_query .= " ORDER BY a.application_id DESC LIMIT 5";
+    }
+    
+    try {
+        $app_result = mysqli_query($conn, $app_query);
+        if ($app_result) {
+            while ($row = mysqli_fetch_assoc($app_result)) {
+                $recent_apps[] = $row;
+            }
+        }
+    } catch (Exception $e) {
+        $recent_apps = [];
     }
 }
 
@@ -96,58 +311,108 @@ if ($app_result) {
 $chart_labels = [];
 $chart_present = [];
 $chart_absent = [];
-for ($i = 6; $i >= 0; $i--) {
-    $date = date('Y-m-d', strtotime("-$i days"));
-    $chart_labels[] = date('D', strtotime($date));
-    
-    $p_result = mysqli_query($conn, "SELECT COUNT(*) as count FROM attendance WHERE class_date = '$date' AND status = 'Present'");
-    $p_count = ($p_result && mysqli_num_rows($p_result) > 0) ? mysqli_fetch_assoc($p_result)['count'] : 0;
-    $chart_present[] = $p_count;
-    
-    $a_result = mysqli_query($conn, "SELECT COUNT(*) as count FROM attendance WHERE class_date = '$date' AND status = 'Absent'");
-    $a_count = ($a_result && mysqli_num_rows($a_result) > 0) ? mysqli_fetch_assoc($a_result)['count'] : 0;
-    $chart_absent[] = $a_count;
+if (tableExists($conn, 'attendance')) {
+    $attColumns = getTableColumns($conn, 'attendance');
+    if (in_array('class_date', $attColumns) && in_array('status', $attColumns)) {
+        for ($i = 6; $i >= 0; $i--) {
+            $date = date('Y-m-d', strtotime("-$i days"));
+            $chart_labels[] = date('D', strtotime($date));
+            
+            $p_count = safeQuery($conn, "SELECT COUNT(*) as count FROM attendance WHERE class_date = '$date' AND status = 'Present'");
+            $chart_present[] = $p_count;
+            
+            $a_count = safeQuery($conn, "SELECT COUNT(*) as count FROM attendance WHERE class_date = '$date' AND status = 'Absent'");
+            $chart_absent[] = $a_count;
+        }
+    } else {
+        // Default empty chart data
+        for ($i = 6; $i >= 0; $i--) {
+            $date = date('Y-m-d', strtotime("-$i days"));
+            $chart_labels[] = date('D', strtotime($date));
+            $chart_present[] = 0;
+            $chart_absent[] = 0;
+        }
+    }
+} else {
+    // Default empty chart data
+    for ($i = 6; $i >= 0; $i--) {
+        $date = date('Y-m-d', strtotime("-$i days"));
+        $chart_labels[] = date('D', strtotime($date));
+        $chart_present[] = 0;
+        $chart_absent[] = 0;
+    }
 }
 
 // Today's Attendance Status
 $today_present = 0;
 $today_absent = 0;
 $today_late = 0;
-$p_result = mysqli_query($conn, "SELECT COUNT(*) as count FROM attendance WHERE class_date = '$today' AND status = 'Present'");
-if ($p_result) $today_present = mysqli_fetch_assoc($p_result)['count'] ?? 0;
-$a_result = mysqli_query($conn, "SELECT COUNT(*) as count FROM attendance WHERE class_date = '$today' AND status = 'Absent'");
-if ($a_result) $today_absent = mysqli_fetch_assoc($a_result)['count'] ?? 0;
-$l_result = mysqli_query($conn, "SELECT COUNT(*) as count FROM attendance WHERE class_date = '$today' AND status = 'Late'");
-if ($l_result) $today_late = mysqli_fetch_assoc($l_result)['count'] ?? 0;
+if (tableExists($conn, 'attendance')) {
+    $attColumns = getTableColumns($conn, 'attendance');
+    if (in_array('class_date', $attColumns) && in_array('status', $attColumns)) {
+        $today_present = safeQuery($conn, "SELECT COUNT(*) as count FROM attendance WHERE class_date = '$today' AND status = 'Present'");
+        $today_absent = safeQuery($conn, "SELECT COUNT(*) as count FROM attendance WHERE class_date = '$today' AND status = 'Absent'");
+        $today_late = safeQuery($conn, "SELECT COUNT(*) as count FROM attendance WHERE class_date = '$today' AND status = 'Late'");
+    }
+}
 
 // Fee Collection Stats
 $fee_paid = $stats['total_fee'] ?? 0;
-$fee_total = mysqli_query($conn, "SELECT SUM(total_fee) as total FROM fee_records");
-$fee_total = ($fee_total && mysqli_num_rows($fee_total) > 0) ? mysqli_fetch_assoc($fee_total)['total'] : 0;
+$fee_total = 0;
+if (tableExists($conn, 'fee_records')) {
+    $feeColumns = getTableColumns($conn, 'fee_records');
+    if (in_array('total_fee', $feeColumns)) {
+        $fee_total = safeQuery($conn, "SELECT SUM(total_fee) as total FROM fee_records");
+    }
+}
 $fee_remaining = $fee_total - $fee_paid;
 
 // Top Courses (by enrollment)
 $top_courses = [];
-$top_query = "SELECT c.course_code, c.course_name, COUNT(sc.student_id) as enrolled 
-              FROM student_courses sc
-              JOIN courses c ON sc.course_id = c.course_id
-              GROUP BY c.course_id
-              ORDER BY enrolled DESC LIMIT 5";
-$top_result = mysqli_query($conn, $top_query);
-if ($top_result) {
-    while ($row = mysqli_fetch_assoc($top_result)) {
-        $top_courses[] = $row;
+if (tableExists($conn, 'student_courses') && tableExists($conn, 'courses')) {
+    try {
+        $top_query = "SELECT c.course_code, c.course_name, COUNT(sc.student_id) as enrolled 
+                      FROM student_courses sc
+                      JOIN courses c ON sc.course_id = c.course_id
+                      GROUP BY c.course_id
+                      ORDER BY enrolled DESC LIMIT 5";
+        $top_result = mysqli_query($conn, $top_query);
+        if ($top_result) {
+            while ($row = mysqli_fetch_assoc($top_result)) {
+                $top_courses[] = $row;
+            }
+        }
+    } catch (Exception $e) {
+        $top_courses = [];
     }
 }
 
 // ============================================
 // INCLUDE HEADER
 // ============================================
-include __DIR__ . '/includes/header.php';
+$headerFile = __DIR__ . '/includes/header.php';
+if (file_exists($headerFile)) {
+    include $headerFile;
+} else {
+    echo '<!DOCTYPE html><html><head><title>Dashboard</title>';
+    echo '<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">';
+    echo '<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">';
+    echo '<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>';
+    echo '</head><body>';
+}
+
 $page_title = 'Dashboard';
-include __DIR__ . '/includes/sidebar.php';
+$sidebarFile = __DIR__ . '/includes/sidebar.php';
+if (file_exists($sidebarFile)) {
+    include $sidebarFile;
+} else {
+    echo '<div class="main-content" style="margin-left:0;padding:20px;">';
+}
 ?>
 
+<!-- ============================================ -->
+<!-- STYLES -->
+<!-- ============================================ -->
 <style>
     /* ============================================
        ROOT VARIABLES
@@ -293,22 +558,6 @@ include __DIR__ . '/includes/sidebar.php';
     .status-rejected { background: #f8d7da; color: #721c24; }
     .status-active { background: #d4edda; color: #155724; }
     
-    /* Quick Actions */
-    .quick-action {
-        display: inline-flex; flex-direction: column; align-items: center;
-        padding: 15px 18px; background: var(--bg-color); 
-        border-radius: 12px; text-decoration: none; color: var(--text-color);
-        transition: var(--transition); border: 1px solid var(--border-color);
-        min-width: 90px; font-size: 12px; font-weight: 500;
-    }
-    .quick-action:hover {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        color: white; transform: translateY(-4px); 
-        box-shadow: 0 8px 25px rgba(102, 126, 234, 0.35);
-        border-color: transparent;
-    }
-    .quick-action i { font-size: 22px; margin-bottom: 6px; }
-    
     /* Chart container */
     .chart-container { height: 200px; position: relative; }
     
@@ -319,8 +568,6 @@ include __DIR__ . '/includes/sidebar.php';
         .main-content { margin-left: 0; padding: 15px; }
         .stat-card .number { font-size: 24px; }
         .welcome-text { font-size: 18px; }
-        .quick-action { min-width: 70px; padding: 12px 12px; font-size: 11px; }
-        .quick-action i { font-size: 18px; }
     }
     @media (max-width: 576px) {
         .topbar { flex-wrap: wrap; gap: 10px; }
@@ -476,10 +723,10 @@ include __DIR__ . '/includes/sidebar.php';
     </div>
 
     <!-- ========================================== -->
-    <!-- CHARTS + QUICK ACTIONS -->
+    <!-- CHARTS ONLY (Quick Actions Removed) -->
     <!-- ========================================== -->
-    <div class="row g-3 mb-4">
-        <div class="col-xl-7 col-lg-12">
+    <div class="row g-3">
+        <div class="col-12">
             <div class="card-custom">
                 <div class="card-title"><i class="fas fa-chart-line text-primary"></i> Attendance Trend (Last 7 Days)</div>
                 <div class="chart-container">
@@ -487,244 +734,124 @@ include __DIR__ . '/includes/sidebar.php';
                 </div>
             </div>
         </div>
-        <div class="col-xl-5 col-lg-12">
-            <div class="card-custom" style="height:100%;">
-                <div class="card-title"><i class="fas fa-bolt text-warning"></i> Quick Actions</div>
-                <div class="d-flex flex-wrap gap-2">
-                    <a href="<?php echo BASE_URL; ?>students/add.php" class="quick-action">
-                        <i class="fas fa-user-plus"></i> Add Student
-                    </a>
-                    <a href="<?php echo BASE_URL; ?>attendance/take.php" class="quick-action">
-                        <i class="fas fa-clipboard-check"></i> Attendance
-                    </a>
-                    <a href="<?php echo BASE_URL; ?>fee_management/payment.php" class="quick-action">
-                        <i class="fas fa-money-bill-wave"></i> Payment
-                    </a>
-                    <a href="<?php echo BASE_URL; ?>applications/index.php" class="quick-action">
-                        <i class="fas fa-file-alt"></i> Applications
-                    </a>
-                    <a href="<?php echo BASE_URL; ?>reports/index.php" class="quick-action">
-                        <i class="fas fa-chart-bar"></i> Reports
-                    </a>
-                    <a href="<?php echo BASE_URL; ?>teacher_assignment/add_teacher.php" class="quick-action">
-                        <i class="fas fa-user-tie"></i> Add Teacher
-                    </a>
-                    <a href="<?php echo BASE_URL; ?>fee_management/structure_add.php" class="quick-action">
-                        <i class="fas fa-money-bill-wave"></i> Fee Structure
-                    </a>
-                    <a href="<?php echo BASE_URL; ?>Courses/add.php" class="quick-action">
-                        <i class="fas fa-book"></i> Add Course
-                    </a>
-                </div>
-                <div class="mt-3 pt-3 border-top" style="border-color:var(--border-color);">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <span class="text-muted small">Today's Stats</span>
-                        <div class="d-flex gap-3">
-                            <span><i class="fas fa-user-plus text-success"></i> <?php echo $stats['new_students_today']; ?> New</span>
-                            <span><i class="fas fa-file-alt text-primary"></i> <?php echo $stats['new_apps_today']; ?> Apps</span>
-                            <span><i class="fas fa-clock text-warning"></i> <?php echo $stats['pending_apps']; ?> Pending</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
     </div>
 
     <!-- ========================================== -->
-    <!-- RECENT ACTIVITY + TOP COURSES -->
+    <!-- JAVASCRIPT -->
     <!-- ========================================== -->
-    <div class="row g-3">
-        <div class="col-lg-6">
-            <div class="card-custom">
-                <div class="card-title d-flex justify-content-between align-items-center">
-                    <span><i class="fas fa-user-graduate text-primary"></i> Recent Students</span>
-                    <a href="<?php echo BASE_URL; ?>students/index.php" class="btn btn-sm btn-outline-primary">View All</a>
-                </div>
-                <?php if (!empty($recent_students)): ?>
-                    <?php foreach ($recent_students as $student): ?>
-                    <div class="activity-item">
-                        <div class="activity-icon" style="background:#e3f2fd; color:#1976d2;">
-                            <i class="fas fa-user"></i>
-                        </div>
-                        <div class="activity-text">
-                            <div class="title"><?php echo htmlspecialchars($student['full_name'] ?? 'N/A'); ?></div>
-                            <div class="time">
-                                <i class="far fa-id-card"></i> <?php echo htmlspecialchars($student['student_id'] ?? 'N/A'); ?> 
-                                | <i class="far fa-calendar"></i> <?php echo isset($student['enrollment_date']) ? date('d M Y', strtotime($student['enrollment_date'])) : 'N/A'; ?>
-                            </div>
-                        </div>
-                        <span class="status-badge status-active"><?php echo ucfirst($student['status'] ?? 'Active'); ?></span>
-                    </div>
-                    <?php endforeach; ?>
-                <?php else: ?>
-                    <p class="text-muted text-center py-3">No recent students</p>
-                <?php endif; ?>
-            </div>
-        </div>
-        <div class="col-lg-6">
-            <div class="card-custom">
-                <div class="card-title d-flex justify-content-between align-items-center">
-                    <span><i class="fas fa-file-alt text-success"></i> Recent Applications</span>
-                    <a href="<?php echo BASE_URL; ?>applications/index.php" class="btn btn-sm btn-outline-primary">View All</a>
-                </div>
-                <?php if (!empty($recent_apps)): ?>
-                    <?php foreach ($recent_apps as $app): 
-                        $status_class = '';
-                        $status_text = $app['status'] ?? 'Pending';
-                        if ($status_text == 'Approved') $status_class = 'status-approved';
-                        elseif ($status_text == 'Rejected') $status_class = 'status-rejected';
-                        else $status_class = 'status-pending';
-                    ?>
-                    <div class="activity-item">
-                        <div class="activity-icon" style="background:#fce4ec; color:#c62828;">
-                            <i class="fas fa-file-alt"></i>
-                        </div>
-                        <div class="activity-text">
-                            <div class="title"><?php echo htmlspecialchars($app['student_name'] ?? 'N/A'); ?></div>
-                            <div class="time">
-                                <i class="fas fa-tag"></i> <?php echo htmlspecialchars($app['application_type'] ?? 'N/A'); ?>
-                                | <i class="far fa-calendar"></i> <?php echo isset($app['created_at']) ? date('d M Y', strtotime($app['created_at'])) : 'N/A'; ?>
-                            </div>
-                        </div>
-                        <span class="status-badge <?php echo $status_class; ?>"><?php echo $status_text; ?></span>
-                    </div>
-                    <?php endforeach; ?>
-                <?php else: ?>
-                    <p class="text-muted text-center py-3">No recent applications</p>
-                <?php endif; ?>
-            </div>
-        </div>
-    </div>
-
-    <!-- ========================================== -->
-    <!-- FOOTER -->
-    <!-- ========================================== -->
-    <div class="text-center text-muted small mt-4" style="border-top:1px solid var(--border-color); padding-top:20px;">
-        <i class="fas fa-copyright"></i> <?php echo date('Y'); ?> University MIS - SSO Module | 
-        <i class="fas fa-code"></i> Built with <i class="fas fa-heart text-danger"></i> | v2.0
-    </div>
-</div>
-
-<!-- ============================================ -->
-<!-- SCRIPTS -->
-<!-- ============================================ -->
-<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-
-<!-- Counter Animation -->
-<script>
-$(document).ready(function() {
-    function animateCounter(id, target) {
-        if (target == 0) { $('#' + id).text('0'); return; }
-        let current = 0;
-        let increment = Math.ceil(target / 50);
-        let interval = setInterval(function() {
-            current += increment;
-            if (current >= target) {
-                current = target;
-                clearInterval(interval);
-            }
-            $('#' + id).text(current);
-        }, 30);
-    }
-
-    animateCounter('countStudents', <?php echo $stats['students']; ?>);
-    animateCounter('countCourses', <?php echo $stats['courses']; ?>);
-    animateCounter('countTeachers', <?php echo $stats['teachers']; ?>);
-    animateCounter('countApps', <?php echo $stats['applications']; ?>);
-});
-
-// ============================================
-// DARK MODE TOGGLE
-// ============================================
-const themeToggle = document.getElementById('themeToggle');
-const currentTheme = localStorage.getItem('theme') || 'light';
-if (currentTheme === 'dark') {
-    document.documentElement.setAttribute('data-theme', 'dark');
-    themeToggle.innerHTML = '<i class="fas fa-sun"></i>';
-}
-
-themeToggle.addEventListener('click', function() {
-    const theme = document.documentElement.getAttribute('data-theme');
-    if (theme === 'dark') {
-        document.documentElement.removeAttribute('data-theme');
-        localStorage.setItem('theme', 'light');
-        this.innerHTML = '<i class="fas fa-moon"></i>';
-    } else {
-        document.documentElement.setAttribute('data-theme', 'dark');
-        localStorage.setItem('theme', 'dark');
-        this.innerHTML = '<i class="fas fa-sun"></i>';
-    }
-});
-</script>
-
-<!-- ============================================ -->
-<!-- CHART.JS - Attendance Trend -->
-<!-- ============================================ -->
-<script>
-const ctx2 = document.getElementById('attendanceTrendChart').getContext('2d');
-new Chart(ctx2, {
-    type: 'line',
-    data: {
-        labels: <?php echo json_encode($chart_labels); ?>,
-        datasets: [
-            {
-                label: 'Present',
-                data: <?php echo json_encode($chart_present); ?>,
-                borderColor: '#43e97b',
-                backgroundColor: 'rgba(67, 233, 123, 0.1)',
-                tension: 0.4,
-                fill: true,
-                pointBackgroundColor: '#43e97b',
-                pointRadius: 4,
-                borderWidth: 2
-            },
-            {
-                label: 'Absent',
-                data: <?php echo json_encode($chart_absent); ?>,
-                borderColor: '#f5576c',
-                backgroundColor: 'rgba(245, 87, 108, 0.1)',
-                tension: 0.4,
-                fill: true,
-                pointBackgroundColor: '#f5576c',
-                pointRadius: 4,
-                borderWidth: 2
-            }
-        ]
-    },
-    options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-            legend: {
-                position: 'top',
-                labels: {
-                    boxWidth: 12,
-                    padding: 15,
-                    font: { size: 12, weight: '600' },
-                    usePointStyle: true,
-                    pointStyle: 'circle'
+    <script>
+        // Animated Counter
+        function animateCounter(elementId, target, duration = 1000) {
+            const element = document.getElementById(elementId);
+            if (!element) return;
+            let start = 0;
+            const startTime = performance.now();
+            
+            function update(currentTime) {
+                const elapsed = currentTime - startTime;
+                const progress = Math.min(elapsed / duration, 1);
+                const current = Math.floor(progress * target);
+                element.textContent = current;
+                if (progress < 1) {
+                    requestAnimationFrame(update);
+                } else {
+                    element.textContent = target;
                 }
             }
-        },
-        scales: {
-            y: {
-                beginAtZero: true,
-                ticks: { stepSize: 1, font: { size: 11 } },
-                grid: { color: 'rgba(0,0,0,0.05)' }
-            },
-            x: {
-                grid: { display: false },
-                ticks: { font: { size: 11 } }
-            }
-        },
-        interaction: {
-            intersect: false,
-            mode: 'index'
+            requestAnimationFrame(update);
         }
-    }
-});
-</script>
+
+        // Start animations
+        document.addEventListener('DOMContentLoaded', function() {
+            animateCounter('countStudents', <?php echo $stats['students']; ?>, 1200);
+            animateCounter('countCourses', <?php echo $stats['courses']; ?>, 1200);
+            animateCounter('countTeachers', <?php echo $stats['teachers']; ?>, 1200);
+            animateCounter('countApps', <?php echo $stats['applications']; ?>, 1200);
+        });
+
+        // Dark Mode Toggle
+        const themeToggle = document.getElementById('themeToggle');
+        if (themeToggle) {
+            const currentTheme = localStorage.getItem('theme') || 'light';
+            if (currentTheme === 'dark') {
+                document.documentElement.setAttribute('data-theme', 'dark');
+                themeToggle.innerHTML = '<i class="fas fa-sun"></i>';
+            }
+            themeToggle.addEventListener('click', function() {
+                const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+                if (isDark) {
+                    document.documentElement.removeAttribute('data-theme');
+                    localStorage.setItem('theme', 'light');
+                    this.innerHTML = '<i class="fas fa-moon"></i>';
+                } else {
+                    document.documentElement.setAttribute('data-theme', 'dark');
+                    localStorage.setItem('theme', 'dark');
+                    this.innerHTML = '<i class="fas fa-sun"></i>';
+                }
+            });
+        }
+
+        // Attendance Chart
+        (function() {
+            const ctx = document.getElementById('attendanceTrendChart');
+            if (!ctx) return;
+            
+            const labels = <?php echo json_encode($chart_labels); ?>;
+            const presentData = <?php echo json_encode($chart_present); ?>;
+            const absentData = <?php echo json_encode($chart_absent); ?>;
+            
+            new Chart(ctx.getContext('2d'), {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: 'Present',
+                            data: presentData,
+                            backgroundColor: 'rgba(67, 233, 123, 0.7)',
+                            borderColor: '#43e97b',
+                            borderWidth: 2,
+                            borderRadius: 6,
+                        },
+                        {
+                            label: 'Absent',
+                            data: absentData,
+                            backgroundColor: 'rgba(245, 87, 108, 0.7)',
+                            borderColor: '#f5576c',
+                            borderWidth: 2,
+                            borderRadius: 6,
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'top',
+                            labels: { 
+                                boxWidth: 12, 
+                                padding: 15,
+                                font: { size: 12 }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: { 
+                            beginAtZero: true,
+                            ticks: { stepSize: 1, font: { size: 11 } },
+                            grid: { color: 'var(--border-color)' }
+                        },
+                        x: {
+                            grid: { display: false }
+                        }
+                    }
+                }
+            });
+        })();
+    </script>
+
+</div>
 
 </body>
 </html>

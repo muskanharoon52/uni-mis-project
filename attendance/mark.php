@@ -1,7 +1,27 @@
 <?php
-require_once __DIR__ . '../config/db_connect.php';
-require_once __DIR__ . '/../includes/auth.php';
-requireLogin();
+// attendance/mark.php - Mark Attendance
+
+require_once __DIR__ . '/../config/db_connect.php';
+require_once __DIR__ . '/../modules/sso/includes/auth.php';
+
+// Check if logged in
+if (!function_exists('isLoggedIn')) {
+    die("isLoggedIn() function not found in auth.php");
+}
+
+if (!isLoggedIn()) {
+    header('Location: ../modules/sso/login.php');
+    exit;
+}
+
+$user = getCurrentUser();
+$role = $user['role_name'] ?? 'User';
+
+// Check if user has permission
+if (!in_array($role, ['sso', 'admin', 'teacher'])) {
+    header('Location: ../dashboard.php');
+    exit;
+}
 
 $conn = getConnection();
 $error = '';
@@ -14,19 +34,38 @@ $courses = $conn->query("SELECT course_id, course_code, course_name FROM courses
 
 // If course selected, fetch students enrolled in that course
 if ($course_id > 0) {
-    $students_query = "SELECT DISTINCT s.student_id, s.roll_no, u.full_name 
-                       FROM students s
-                       LEFT JOIN users u ON s.user_id = u.user_id
-                       LEFT JOIN student_courses sc ON s.student_id = sc.student_id
-                       WHERE sc.course_id = ? AND s.status = 'active'
-                       ORDER BY u.full_name";
-    $stmt = $conn->prepare($students_query);
-    if ($stmt) {
-        $stmt->bind_param("i", $course_id);
-        $stmt->execute();
-        $students_result = $stmt->get_result();
-        $students = $students_result->fetch_all(MYSQLI_ASSOC);
-        $stmt->close();
+    // First, check if student_courses table exists
+    $check_table = $conn->query("SHOW TABLES LIKE 'student_courses'");
+    if ($check_table && $check_table->num_rows > 0) {
+        // Use student_courses table
+        $students_query = "SELECT DISTINCT s.student_id, s.roll_no, s.full_name 
+                           FROM students s
+                           LEFT JOIN student_courses sc ON s.student_id = sc.student_id
+                           WHERE sc.course_id = ? AND s.status = 'active'
+                           ORDER BY s.full_name";
+        $stmt = $conn->prepare($students_query);
+        if ($stmt) {
+            $stmt->bind_param("i", $course_id);
+            $stmt->execute();
+            $students_result = $stmt->get_result();
+            $students = $students_result->fetch_all(MYSQLI_ASSOC);
+            $stmt->close();
+        }
+    } else {
+        // Fallback: Get students by program (if courses are linked to programs)
+        $students_query = "SELECT DISTINCT s.student_id, s.roll_no, s.full_name 
+                           FROM students s
+                           WHERE s.program_id IN (SELECT program_id FROM courses WHERE course_id = ?) 
+                           AND s.status = 'active'
+                           ORDER BY s.full_name";
+        $stmt = $conn->prepare($students_query);
+        if ($stmt) {
+            $stmt->bind_param("i", $course_id);
+            $stmt->execute();
+            $students_result = $stmt->get_result();
+            $students = $students_result->fetch_all(MYSQLI_ASSOC);
+            $stmt->close();
+        }
     }
 }
 
@@ -60,7 +99,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $remark = $remarks[$student_id] ?? '';
 
                 if ($check_result->num_rows > 0) {
-                    // Update existing record - without faculty_id
+                    // Update existing record
                     $row = $check_result->fetch_assoc();
                     $update_query = "UPDATE attendance SET status = ?, remark = ? 
                                      WHERE attendance_id = ?";
@@ -75,7 +114,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         $update_stmt->close();
                     }
                 } else {
-                    // Insert new record - without faculty_id
+                    // Insert new record
                     $insert_query = "INSERT INTO attendance 
                                     (student_id, course_id, date, status, remark) 
                                     VALUES (?, ?, ?, ?, ?)";
@@ -115,7 +154,7 @@ include __DIR__ . '/../includes/sidebar.php';
 ?>
 
 <style>
-    .mark-content {
+    .main-content {
         margin-left: 250px;
         padding: 20px;
         min-height: 100vh;
@@ -168,7 +207,7 @@ include __DIR__ . '/../includes/sidebar.php';
     }
     
     @media (max-width: 768px) {
-        .mark-content {
+        .main-content {
             margin-left: 0;
             padding: 15px;
         }
@@ -183,7 +222,7 @@ include __DIR__ . '/../includes/sidebar.php';
     }
 </style>
 
-<div class="mark-content">
+<div class="main-content">
     <div class="container-fluid">
         
         <div class="d-flex justify-content-between align-items-center mb-4">
@@ -195,6 +234,10 @@ include __DIR__ . '/../includes/sidebar.php';
 
         <?php if ($error): ?>
             <div class="alert alert-danger"><?= htmlspecialchars($error) ?></div>
+        <?php endif; ?>
+
+        <?php if (isset($_GET['success'])): ?>
+            <div class="alert alert-success"><?= htmlspecialchars($_GET['success']) ?></div>
         <?php endif; ?>
 
         <div class="form-container">
@@ -300,6 +343,11 @@ include __DIR__ . '/../includes/sidebar.php';
                 <div class="text-center py-4">
                     <i class="fas fa-users fa-3x text-muted mb-3"></i>
                     <p>No students found for this course.</p>
+                </div>
+            <?php else: ?>
+                <div class="text-center py-4">
+                    <i class="fas fa-hand-pointer fa-3x text-muted mb-3"></i>
+                    <p>Select a course and click "Load Students" to start marking attendance.</p>
                 </div>
             <?php endif; ?>
         </div>

@@ -1,11 +1,27 @@
 <?php
-require_once __DIR__ . '../config/db_connect.php';
-require_once __DIR__ . '/../includes/auth.php';
-requireLogin();
+// Courses/add.php - Add Course
 
-// ============================================
-// SARI PROCESSING PEHLE KAREIN
-// ============================================
+require_once __DIR__ . '/../config/db_connect.php';
+require_once __DIR__ . '/../modules/sso/includes/auth.php';
+
+// Check if logged in
+if (!function_exists('isLoggedIn')) {
+    die("isLoggedIn() function not found in auth.php");
+}
+
+if (!isLoggedIn()) {
+    header('Location: ../modules/sso/login.php');
+    exit;
+}
+
+$user = getCurrentUser();
+$role = $user['role_name'] ?? 'User';
+
+// Check if user has permission
+if (!in_array($role, ['sso', 'admin'])) {
+    header('Location: ../dashboard.php');
+    exit;
+}
 
 $conn = getConnection();
 $errors = [];
@@ -26,7 +42,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $course_name = trim($_POST['course_name'] ?? '');
     $credit_hours = (int)($_POST['credit_hours'] ?? 3);
     $program_id = (int)($_POST['program_id'] ?? 0);
-    // FIX: Convert 0 to NULL for department_id
+    // Convert 0 to NULL for department_id
     $department_id = !empty($_POST['department_id']) && $_POST['department_id'] != 0 ? (int)$_POST['department_id'] : NULL;
     $description = trim($_POST['description'] ?? '');
 
@@ -49,12 +65,57 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $check_stmt->close();
     }
 
-    // Insert course - WITHOUT semester field
+    // Insert course
     if (empty($errors)) {
-        $insert_query = "INSERT INTO courses (
-            course_code, course_name, credit_hours, 
-            program_id, department_id, description
-        ) VALUES (?, ?, ?, ?, ?, ?)";
+        // Check what columns exist in courses table
+        $check_columns = "SHOW COLUMNS FROM courses";
+        $columns_result = $conn->query($check_columns);
+        $course_columns = [];
+        if ($columns_result) {
+            while ($col = $columns_result->fetch_assoc()) {
+                $course_columns[] = $col['Field'];
+            }
+        }
+        
+        // Build insert query based on existing columns
+        $fields = ['course_code', 'course_name', 'credit_hours', 'program_id'];
+        $values = ['?', '?', '?', '?'];
+        $params = [$course_code, $course_name, $credit_hours, $program_id];
+        $types = "ssii";
+        
+        if (in_array('department_id', $course_columns)) {
+            $fields[] = 'department_id';
+            $values[] = '?';
+            $params[] = $department_id;
+            $types .= "i";
+        }
+        
+        if (in_array('description', $course_columns)) {
+            $fields[] = 'description';
+            $values[] = '?';
+            $params[] = $description;
+            $types .= "s";
+        }
+        
+        // Check for created_at or created_date
+        if (in_array('created_at', $course_columns)) {
+            $fields[] = 'created_at';
+            $values[] = 'NOW()';
+        } elseif (in_array('created_date', $course_columns)) {
+            $fields[] = 'created_date';
+            $values[] = 'NOW()';
+        }
+        
+        // Check for status column
+        if (in_array('status', $course_columns)) {
+            $fields[] = 'status';
+            $values[] = '?';
+            $params[] = 'Active';
+            $types .= "s";
+        }
+        
+        $insert_query = "INSERT INTO courses (" . implode(', ', $fields) . ") 
+                        VALUES (" . implode(', ', $values) . ")";
 
         $stmt = $conn->prepare($insert_query);
 
@@ -62,17 +123,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             die("Error in insert query: " . $conn->error);
         }
 
-        // FIX: Changed bind_param types - "siiss" instead of "ssiiss"
-        // The parameters are: string, string, integer, integer, string, string
-        $stmt->bind_param(
-            "ssiiss",  // s=string, s=string, i=integer, i=integer, s=string, s=string
-            $course_code,
-            $course_name,
-            $credit_hours,
-            $program_id,
-            $department_id,  // This will be NULL if no department selected
-            $description
-        );
+        $stmt->bind_param($types, ...$params);
 
         if ($stmt->execute()) {
             $stmt->close();
@@ -86,7 +137,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 // ============================================
-// AB HEADER.PHP INCLUDE KAREIN
+// HEADER INCLUDE
 // ============================================
 require_once __DIR__ . '/../includes/header.php';
 
@@ -99,6 +150,13 @@ include __DIR__ . '/../includes/sidebar.php';
 ?>
 
 <style>
+    .main-content {
+        margin-left: 250px;
+        padding: 20px;
+        min-height: 100vh;
+        background: #f5f6fa;
+    }
+    
     .form-section {
         background: white;
         padding: 25px;
@@ -121,26 +179,16 @@ include __DIR__ . '/../includes/sidebar.php';
         margin-left: 4px;
     }
     
-    .courses-content {
-        margin-left: 250px;
-        padding: 20px;
-        min-height: 100vh;
-        background: #f5f6fa;
-    }
-    
     @media (max-width: 768px) {
-        .courses-content {
+        .main-content {
             margin-left: 0;
             padding: 15px;
         }
     }
 </style>
 
-<!-- ============================================ -->
-<!-- CONTENT WITH MARGIN-LEFT TO PUSH RIGHT -->
-<!-- ============================================ -->
-<div class="courses-content">
-    <div class="container-fluid" style="padding: 0 !important;">
+<div class="main-content">
+    <div class="container-fluid">
         
         <!-- Page Header -->
         <div class="d-flex justify-content-between align-items-center mb-4">
@@ -223,7 +271,6 @@ include __DIR__ . '/../includes/sidebar.php';
                     <div class="col-md-6 mb-3">
                         <label>Department</label>
                         <select name="department_id" class="form-select">
-                            <!-- FIX: Changed value from "0" to "" -->
                             <option value="">Select Department (Optional)</option>
                             <?php foreach ($departments as $dept): ?>
                                 <option value="<?php echo $dept['id']; ?>" 

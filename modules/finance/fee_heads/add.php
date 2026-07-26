@@ -1,19 +1,21 @@
 <?php
 session_start();
+
 if (!isset($_SESSION['user_id'])) {
-    header('Location: ../auth/login.php');
+    header('Location: ../../../auth/login.php');
     exit();
 }
+
 if ($_SESSION['role_id'] != 3 && $_SESSION['role_id'] != 1) {
-    header('Location: ../auth/login.php?error=Access denied. Finance Officer only.');
+    header('Location: ../../../auth/login.php?error=Access denied. Finance Officer only.');
     exit();
 }
 
-// Include database connection
-include __DIR__ . '../../../config/db_connect.php';
+// Include database connection - FIXED: Added slash
+include_once __DIR__ . '/../../../config/db_connect.php';
 
-// Include header
-include __DIR__ . '/../includes/header.php';
+// Include header - FIXED: Use include_once
+include_once __DIR__ . '/../includes/header.php';
 
 $error = '';
 $success = '';
@@ -47,46 +49,59 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 }
 ?>
 
-<div class="d-flex justify-content-between align-items-center mb-3">
-    <h2><i class="fas fa-plus-circle text-success"></i> Add New Fee Head</h2>
-    <a href="index.php" class="btn btn-secondary"><i class="fas fa-arrow-left"></i> Back to List</a>
-</div>
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h2><i class="fas fa-plus-circle text-success"></i> Add New Fee Head</h2>
+        <a href="index.php" class="btn btn-secondary"><i class="fas fa-arrow-left"></i> Back to List</a>
+    </div>
 
-<?php if(!empty($error)): ?>
-    <div class="alert alert-danger"><?php echo $error; ?></div>
-<?php endif; ?>
+    <?php if(!empty($error)): ?>
+        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+            <i class="fas fa-exclamation-circle"></i> <?php echo htmlspecialchars($error); ?>
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    <?php endif; ?>
 
-<?php if(!empty($success)): ?>
-    <div class="alert alert-success"><?php echo $success; ?></div>
-<?php endif; ?>
+    <?php if(!empty($success)): ?>
+        <div class="alert alert-success alert-dismissible fade show" role="alert">
+            <i class="fas fa-check-circle"></i> <?php echo htmlspecialchars($success); ?>
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    <?php endif; ?>
 
-<div class="card shadow">
-    <div class="card-body">
-        <form method="POST" action="">
-            <div class="mb-3">
-                <label for="fee_head_name" class="form-label">Fee Head Name <span class="text-danger">*</span></label>
-                <input type="text" class="form-control" id="fee_head_name" name="fee_head_name" 
-                       placeholder="e.g. Tuition Fee, Admission Fee, Library Fee" required>
-            </div>
+    <div class="card shadow">
+        <div class="card-header bg-success text-white">
+            <i class="fas fa-plus"></i> Fee Head Details
+        </div>
+        <div class="card-body">
+            <form method="POST" action="">
+                <div class="mb-3">
+                    <label for="fee_head_name" class="form-label">Fee Head Name <span class="text-danger">*</span></label>
+                    <input type="text" class="form-control" id="fee_head_name" name="fee_head_name" 
+                           placeholder="e.g. Tuition Fee, Admission Fee, Library Fee" required>
+                    <small class="text-muted">Enter a unique name for this fee head.</small>
+                </div>
 
-            <div class="mb-3">
-                <label for="description" class="form-label">Description</label>
-                <textarea class="form-control" id="description" name="description" rows="3" 
-                          placeholder="Optional: Describe this fee head"></textarea>
-            </div>
+                <div class="mb-3">
+                    <label for="description" class="form-label">Description</label>
+                    <textarea class="form-control" id="description" name="description" rows="3" 
+                              placeholder="Optional: Describe this fee head"></textarea>
+                </div>
 
-            <div class="mb-3">
-                <label for="status" class="form-label">Status</label>
-                <select class="form-select" id="status" name="status">
-                    <option value="Active">Active</option>
-                    <option value="Inactive">Inactive</option>
-                </select>
-            </div>
+                <div class="mb-3">
+                    <label for="status" class="form-label">Status</label>
+                    <select class="form-select" id="status" name="status">
+                        <option value="Active">Active</option>
+                        <option value="Inactive">Inactive</option>
+                    </select>
+                    <small class="text-muted">Inactive fee heads won't appear in dropdown lists.</small>
+                </div>
 
-            <button type="submit" class="btn btn-success"><i class="fas fa-save"></i> Save Fee Head</button>
-            <a href="index.php" class="btn btn-secondary"><i class="fas fa-times"></i> Cancel</a>
-        </form>
+                <button type="submit" class="btn btn-success"><i class="fas fa-save"></i> Save Fee Head</button>
+                <a href="index.php" class="btn btn-secondary"><i class="fas fa-times"></i> Cancel</a>
+            </form>
+        </div>
     </div>
 </div>
 
-<?php include __DIR__ . '/../includes/footer.php'; ?>
+<?php include_once __DIR__ . '/../includes/footer.php'; ?>

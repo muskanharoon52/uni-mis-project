@@ -1,12 +1,12 @@
 <?php
 // students/add.php - Add Student (COMPLETE FIXED)
 
-require_once __DIR__ . '../config/db_connect.php';
-require_once __DIR__ . '/../includes/auth.php';
+require_once __DIR__ . '/../config/db_connect.php';
+require_once __DIR__ . '/../modules/sso/includes/auth.php';
 
 // Check if logged in
 if (!isLoggedIn()) {
-    header('Location: ' . BASE_URL . 'login.php');
+    header('Location: ../modules/sso/login.php');
     exit;
 }
 
@@ -15,7 +15,7 @@ $role = $user['role_name'] ?? 'User';
 
 // Only SSO and Admin can add students
 if (!in_array($role, ['sso', 'admin'])) {
-    header('Location: ' . BASE_URL . 'dashboard.php');
+    header('Location: ../dashboard.php');
     exit;
 }
 
@@ -140,40 +140,52 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             // 4. Insert into users table
             $password_hash = password_hash($password, PASSWORD_DEFAULT);
             
-            // ✅ FIXED: Check column names in users table
-            // Option A: If users table has 'status' column
-            $insert_user = "INSERT INTO users (email, password_hash, full_name, phone, role_id, status) 
-                            VALUES (?, ?, ?, ?, 4, 'Active')";
+            // Check what columns exist in users table
+            $check_columns = "SHOW COLUMNS FROM users";
+            $columns_result = mysqli_query($conn, $check_columns);
+            $user_columns = [];
+            if ($columns_result) {
+                while ($col = mysqli_fetch_assoc($columns_result)) {
+                    $user_columns[] = $col['Field'];
+                }
+            }
             
-            // ✅ FIX: Check if prepare fails
+            // Build insert query based on existing columns
+            $user_fields = ['email', 'password_hash', 'full_name', 'phone', 'role_id'];
+            $user_values = ['?', '?', '?', '?', '4'];
+            $bind_params = [$email, $password_hash, $full_name, $phone];
+            
+            // Check if status column exists
+            if (in_array('status', $user_columns)) {
+                $user_fields[] = 'status';
+                $user_values[] = '?';
+                $bind_params[] = 'Active';
+            }
+            
+            // Check if is_active column exists
+            if (in_array('is_active', $user_columns)) {
+                $user_fields[] = 'is_active';
+                $user_values[] = '?';
+                $bind_params[] = 1;
+            }
+            
+            // Check if created_at column exists
+            if (in_array('created_at', $user_columns)) {
+                $user_fields[] = 'created_at';
+                $user_values[] = 'NOW()';
+            }
+            
+            $insert_user = "INSERT INTO users (" . implode(', ', $user_fields) . ") 
+                            VALUES (" . implode(', ', $user_values) . ")";
+            
             $stmt = mysqli_prepare($conn, $insert_user);
-            if ($stmt === false) {
-                // Option B: If users table has 'is_active' column instead
-                $insert_user = "INSERT INTO users (email, password_hash, full_name, phone, role_id, is_active) 
-                                VALUES (?, ?, ?, ?, 4, 1)";
-                $stmt = mysqli_prepare($conn, $insert_user);
-            }
-            
-            if ($stmt === false) {
-                // Option C: If no status column at all
-                $insert_user = "INSERT INTO users (email, password_hash, full_name, phone, role_id) 
-                                VALUES (?, ?, ?, ?, 4)";
-                $stmt = mysqli_prepare($conn, $insert_user);
-            }
-            
-            // Check if prepare finally worked
             if ($stmt === false) {
                 throw new Exception("Error preparing user insert: " . mysqli_error($conn));
             }
             
-            // Bind parameters based on which query was used
-            if (strpos($insert_user, 'status') !== false) {
-                mysqli_stmt_bind_param($stmt, "ssss", $email, $password_hash, $full_name, $phone);
-            } elseif (strpos($insert_user, 'is_active') !== false) {
-                mysqli_stmt_bind_param($stmt, "ssss", $email, $password_hash, $full_name, $phone);
-            } else {
-                mysqli_stmt_bind_param($stmt, "ssss", $email, $password_hash, $full_name, $phone);
-            }
+            // Build types string
+            $types = str_repeat('s', count($bind_params));
+            mysqli_stmt_bind_param($stmt, $types, ...$bind_params);
             
             if (!mysqli_stmt_execute($stmt)) {
                 throw new Exception("Error creating user: " . mysqli_stmt_error($stmt));
@@ -182,31 +194,66 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             mysqli_stmt_close($stmt);
             
             // 5. Insert into students table
-            $insert_student = "INSERT INTO students (
-                student_id, roll_no, user_id, program_id, section, 
-                batch_year, semester, status, enrollment_date, father_name, session
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+            // Check what columns exist in students table
+            $check_student_columns = "SHOW COLUMNS FROM students";
+            $student_cols_result = mysqli_query($conn, $check_student_columns);
+            $student_columns = [];
+            if ($student_cols_result) {
+                while ($col = mysqli_fetch_assoc($student_cols_result)) {
+                    $student_columns[] = $col['Field'];
+                }
+            }
+            
+            $student_fields = ['student_id', 'roll_no', 'user_id', 'program_id', 'batch_year', 'semester', 'status', 'father_name'];
+            $student_values = ['?', '?', '?', '?', '?', '?', '?', '?'];
+            $student_params = [$student_id, $roll_no, $user_id, $program_id, $batch_year, $semester, $status, $father_name];
+            
+            // Check if section exists
+            if (in_array('section', $student_columns)) {
+                $student_fields[] = 'section';
+                $student_values[] = '?';
+                $student_params[] = $section;
+            }
+            
+            // Check if session exists
+            if (in_array('session', $student_columns)) {
+                $student_fields[] = 'session';
+                $student_values[] = '?';
+                $student_params[] = $session;
+            }
+            
+            // Check if enrollment_date exists
+            if (in_array('enrollment_date', $student_columns)) {
+                $student_fields[] = 'enrollment_date';
+                $student_values[] = '?';
+                $student_params[] = $enrollment_date;
+            }
+            
+            // Check if created_at exists
+            if (in_array('created_at', $student_columns)) {
+                $student_fields[] = 'created_at';
+                $student_values[] = 'NOW()';
+            }
+            
+            $insert_student = "INSERT INTO students (" . implode(', ', $student_fields) . ") 
+                              VALUES (" . implode(', ', $student_values) . ")";
             
             $stmt = mysqli_prepare($conn, $insert_student);
             if ($stmt === false) {
                 throw new Exception("Error preparing student insert: " . mysqli_error($conn));
             }
             
-            mysqli_stmt_bind_param(
-                $stmt,
-                "ssiisississ",
-                $student_id,
-                $roll_no,
-                $user_id,
-                $program_id,
-                $section,
-                $batch_year,
-                $semester,
-                $status,
-                $enrollment_date,
-                $father_name,
-                $session
-            );
+            // Build types string for student
+            $student_types = '';
+            foreach ($student_params as $param) {
+                if (is_int($param)) {
+                    $student_types .= 'i';
+                } else {
+                    $student_types .= 's';
+                }
+            }
+            
+            mysqli_stmt_bind_param($stmt, $student_types, ...$student_params);
             
             if (!mysqli_stmt_execute($stmt)) {
                 throw new Exception("Error creating student: " . mysqli_stmt_error($stmt));
@@ -243,17 +290,7 @@ include __DIR__ . '/../includes/sidebar.php';
     .required-field::after { content: '*'; color: #e74c3c; margin-left: 4px; }
     .success-box { background: #d4edda; border: 1px solid #c3e6cb; border-radius: 8px; padding: 20px; color: #155724; margin-bottom: 20px; }
     .field-hint { font-size: 12px; color: #6c757d; margin-top: 4px; }
-    .sidebar { width: 250px; height: 100vh; background: linear-gradient(180deg, #1a1a2e 0%, #16213e 100%); color: white; position: fixed; left: 0; top: 0; overflow-y: auto; padding-bottom: 20px; z-index: 1000; }
-    .sidebar .brand { padding: 20px; text-align: center; border-bottom: 1px solid rgba(255,255,255,0.1); }
-    .sidebar .brand h4 { font-weight: 700; margin: 0; }
-    .sidebar .brand small { color: #a8a8b3; }
-    .sidebar .nav-link { color: #a8a8b3; padding: 12px 20px; border-radius: 0; transition: all 0.3s; }
-    .sidebar .nav-link:hover { color: white; background: rgba(255,255,255,0.05); }
-    .sidebar .nav-link.active { color: white; background: rgba(102, 126, 234, 0.3); border-left: 3px solid #667eea; }
-    .sidebar .nav-link i { width: 20px; margin-right: 10px; }
-    .topbar { background: white; padding: 15px 25px; border-radius: 15px; margin-bottom: 20px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); display: flex; justify-content: space-between; align-items: center; }
-    .topbar .avatar { width: 40px; height: 40px; border-radius: 50%; background: #667eea; color: white; display: flex; align-items: center; justify-content: center; font-weight: 700; }
-    @media (max-width: 768px) { .sidebar { width: 100%; height: auto; position: relative; } .main-content { margin-left: 0; } }
+    @media (max-width: 768px) { .main-content { margin-left: 0; } }
 </style>
 
 <div class="main-content">

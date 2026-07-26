@@ -1,7 +1,27 @@
 <?php
-require_once __DIR__ . '../config/db_connect.php';
-require_once __DIR__ . '/../includes/auth.php';
-requireLogin();
+// TImetable/add.php - Add Timetable Entry
+
+require_once __DIR__ . '/../config/db_connect.php';
+require_once __DIR__ . '/../modules/sso/includes/auth.php';
+
+// Check if logged in
+if (!function_exists('isLoggedIn')) {
+    die("isLoggedIn() function not found in auth.php");
+}
+
+if (!isLoggedIn()) {
+    header('Location: ../modules/sso/login.php');
+    exit;
+}
+
+$user = getCurrentUser();
+$role = $user['role_name'] ?? 'User';
+
+// Check if user has permission
+if (!in_array($role, ['sso', 'admin'])) {
+    header('Location: ../dashboard.php');
+    exit;
+}
 
 $conn = getConnection();
 $error = '';
@@ -37,33 +57,49 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     elseif (empty($section)) $error = "Please enter section";
 
     if (empty($error)) {
-        // Check for conflicts
+        // Check for room conflicts
         $check_sql = "SELECT id FROM timetable 
-                      WHERE day_of_week = ? AND start_time < ? AND end_time > ? AND room_no = ?";
+                      WHERE day_of_week = ? AND room_no = ? 
+                      AND ((start_time <= ? AND end_time > ?) OR (start_time < ? AND end_time >= ?))";
         $check_stmt = $conn->prepare($check_sql);
-        $check_stmt->bind_param("ssss", $day_of_week, $end_time, $start_time, $room_no);
+        $check_stmt->bind_param("ssssss", $day_of_week, $room_no, $start_time, $start_time, $end_time, $end_time);
         $check_stmt->execute();
         $check_result = $check_stmt->get_result();
 
         if ($check_result->num_rows > 0) {
             $error = "Room is already booked at this time slot!";
         } else {
-            // Insert timetable entry
-            $insert_sql = "INSERT INTO timetable 
-                          (course_id, teacher_id, semester_id, session_id, day_of_week, 
-                           start_time, end_time, room_no, section) 
-                          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
-            $insert_stmt = $conn->prepare($insert_sql);
-            $insert_stmt->bind_param("iiiisssss", $course_id, $teacher_id, $semester_id, $session_id, 
-                                    $day_of_week, $start_time, $end_time, $room_no, $section);
-            
-            if ($insert_stmt->execute()) {
-                header("Location: index.php?success=Class added successfully!");
-                exit;
+            // Check for teacher conflicts
+            $check_teacher_sql = "SELECT id FROM timetable 
+                                  WHERE day_of_week = ? AND teacher_id = ? 
+                                  AND ((start_time <= ? AND end_time > ?) OR (start_time < ? AND end_time >= ?))";
+            $check_teacher_stmt = $conn->prepare($check_teacher_sql);
+            $check_teacher_stmt->bind_param("sissss", $day_of_week, $teacher_id, $start_time, $start_time, $end_time, $end_time);
+            $check_teacher_stmt->execute();
+            $check_teacher_result = $check_teacher_stmt->get_result();
+
+            if ($check_teacher_result->num_rows > 0) {
+                $error = "Teacher is already assigned to another class at this time!";
             } else {
-                $error = "Error adding class: " . $conn->error;
+                // Insert timetable entry
+                $insert_sql = "INSERT INTO timetable 
+                              (course_id, teacher_id, semester_id, session_id, day_of_week, 
+                               start_time, end_time, room_no, section) 
+                              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
+                $insert_stmt = $conn->prepare($insert_sql);
+                $insert_stmt->bind_param("iiiisssss", $course_id, $teacher_id, $semester_id, $session_id, 
+                                        $day_of_week, $start_time, $end_time, $room_no, $section);
+                
+                if ($insert_stmt->execute()) {
+                    $insert_stmt->close();
+                    header("Location: index.php?success=Class added successfully!");
+                    exit;
+                } else {
+                    $error = "Error adding class: " . $conn->error;
+                }
+                $insert_stmt->close();
             }
-            $insert_stmt->close();
+            $check_teacher_stmt->close();
         }
         $check_stmt->close();
     }
@@ -78,7 +114,7 @@ include __DIR__ . '/../includes/sidebar.php';
 ?>
 
 <style>
-    .form-content {
+    .main-content {
         margin-left: 250px;
         padding: 20px;
         min-height: 100vh;
@@ -105,7 +141,7 @@ include __DIR__ . '/../includes/sidebar.php';
     }
     
     @media (max-width: 768px) {
-        .form-content {
+        .main-content {
             margin-left: 0;
             padding: 15px;
         }
@@ -116,7 +152,7 @@ include __DIR__ . '/../includes/sidebar.php';
     }
 </style>
 
-<div class="form-content">
+<div class="main-content">
     <div class="container-fluid">
         
         <div class="d-flex justify-content-between align-items-center mb-4">
@@ -130,6 +166,10 @@ include __DIR__ . '/../includes/sidebar.php';
             <div class="alert alert-danger"><?= htmlspecialchars($error) ?></div>
         <?php endif; ?>
 
+        <?php if (isset($_GET['success'])): ?>
+            <div class="alert alert-success"><?= htmlspecialchars($_GET['success']) ?></div>
+        <?php endif; ?>
+
         <div class="form-container">
             <form method="POST" action="">
                 <div class="row">
@@ -138,7 +178,8 @@ include __DIR__ . '/../includes/sidebar.php';
                         <select name="course_id" class="form-select" required>
                             <option value="">Select Course</option>
                             <?php while($row = $courses->fetch_assoc()): ?>
-                                <option value="<?= $row['course_id'] ?>">
+                                <option value="<?= $row['course_id'] ?>" 
+                                    <?= ($_POST['course_id'] ?? '') == $row['course_id'] ? 'selected' : '' ?>>
                                     <?= htmlspecialchars($row['course_code'] . ' - ' . $row['course_name']) ?>
                                 </option>
                             <?php endwhile; ?>
@@ -149,7 +190,8 @@ include __DIR__ . '/../includes/sidebar.php';
                         <select name="teacher_id" class="form-select" required>
                             <option value="">Select Teacher</option>
                             <?php while($row = $teachers->fetch_assoc()): ?>
-                                <option value="<?= $row['teacher_id'] ?>">
+                                <option value="<?= $row['teacher_id'] ?>" 
+                                    <?= ($_POST['teacher_id'] ?? '') == $row['teacher_id'] ? 'selected' : '' ?>>
                                     <?= htmlspecialchars($row['teacher_name']) ?>
                                 </option>
                             <?php endwhile; ?>
@@ -163,7 +205,8 @@ include __DIR__ . '/../includes/sidebar.php';
                         <select name="semester_id" class="form-select" required>
                             <option value="">Select Semester</option>
                             <?php while($row = $semesters->fetch_assoc()): ?>
-                                <option value="<?= $row['semester_id'] ?>">
+                                <option value="<?= $row['semester_id'] ?>" 
+                                    <?= ($_POST['semester_id'] ?? '') == $row['semester_id'] ? 'selected' : '' ?>>
                                     <?= htmlspecialchars($row['semester_name']) ?>
                                 </option>
                             <?php endwhile; ?>
@@ -174,7 +217,8 @@ include __DIR__ . '/../includes/sidebar.php';
                         <select name="session_id" class="form-select" required>
                             <option value="">Select Session</option>
                             <?php while($row = $sessions->fetch_assoc()): ?>
-                                <option value="<?= $row['session_id'] ?>">
+                                <option value="<?= $row['session_id'] ?>" 
+                                    <?= ($_POST['session_id'] ?? '') == $row['session_id'] ? 'selected' : '' ?>>
                                     <?= htmlspecialchars($row['session_name']) ?>
                                 </option>
                             <?php endwhile; ?>
@@ -187,33 +231,39 @@ include __DIR__ . '/../includes/sidebar.php';
                         <label class="form-label">Day <span class="required-star">*</span></label>
                         <select name="day_of_week" class="form-select" required>
                             <option value="">Select Day</option>
-                            <option value="Monday">Monday</option>
-                            <option value="Tuesday">Tuesday</option>
-                            <option value="Wednesday">Wednesday</option>
-                            <option value="Thursday">Thursday</option>
-                            <option value="Friday">Friday</option>
-                            <option value="Saturday">Saturday</option>
-                            <option value="Sunday">Sunday</option>
+                            <option value="Monday" <?= ($_POST['day_of_week'] ?? '') == 'Monday' ? 'selected' : '' ?>>Monday</option>
+                            <option value="Tuesday" <?= ($_POST['day_of_week'] ?? '') == 'Tuesday' ? 'selected' : '' ?>>Tuesday</option>
+                            <option value="Wednesday" <?= ($_POST['day_of_week'] ?? '') == 'Wednesday' ? 'selected' : '' ?>>Wednesday</option>
+                            <option value="Thursday" <?= ($_POST['day_of_week'] ?? '') == 'Thursday' ? 'selected' : '' ?>>Thursday</option>
+                            <option value="Friday" <?= ($_POST['day_of_week'] ?? '') == 'Friday' ? 'selected' : '' ?>>Friday</option>
+                            <option value="Saturday" <?= ($_POST['day_of_week'] ?? '') == 'Saturday' ? 'selected' : '' ?>>Saturday</option>
+                            <option value="Sunday" <?= ($_POST['day_of_week'] ?? '') == 'Sunday' ? 'selected' : '' ?>>Sunday</option>
                         </select>
                     </div>
                     <div class="col-md-4 mb-3">
                         <label class="form-label">Start Time <span class="required-star">*</span></label>
-                        <input type="time" name="start_time" class="form-control" required>
+                        <input type="time" name="start_time" class="form-control" 
+                               value="<?= htmlspecialchars($_POST['start_time'] ?? '') ?>" required>
                     </div>
                     <div class="col-md-4 mb-3">
                         <label class="form-label">End Time <span class="required-star">*</span></label>
-                        <input type="time" name="end_time" class="form-control" required>
+                        <input type="time" name="end_time" class="form-control" 
+                               value="<?= htmlspecialchars($_POST['end_time'] ?? '') ?>" required>
                     </div>
                 </div>
 
                 <div class="row">
                     <div class="col-md-6 mb-3">
                         <label class="form-label">Room No <span class="required-star">*</span></label>
-                        <input type="text" name="room_no" class="form-control" placeholder="e.g., Room 101" required>
+                        <input type="text" name="room_no" class="form-control" 
+                               placeholder="e.g., Room 101" 
+                               value="<?= htmlspecialchars($_POST['room_no'] ?? '') ?>" required>
                     </div>
                     <div class="col-md-6 mb-3">
                         <label class="form-label">Section <span class="required-star">*</span></label>
-                        <input type="text" name="section" class="form-control" placeholder="e.g., A, B, C" required>
+                        <input type="text" name="section" class="form-control" 
+                               placeholder="e.g., A, B, C" 
+                               value="<?= htmlspecialchars($_POST['section'] ?? '') ?>" required>
                     </div>
                 </div>
 

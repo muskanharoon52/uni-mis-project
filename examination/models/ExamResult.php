@@ -11,12 +11,14 @@ class ExamResult {
     // Get all results with student and course details
     public function getAll() {
         $sql = "SELECT er.*, 
-                       s.student_id, u.full_name as student_name,
-                       c.course_name, c.course_code,
-                       es.exam_type, es.date as exam_date
+                       s.student_id, 
+                       s.full_name as student_name,
+                       c.course_name, 
+                       c.course_code,
+                       es.exam_type, 
+                       es.date as exam_date
                 FROM exam_results er
                 JOIN students s ON er.student_id = s.student_id
-                JOIN users u ON s.user_id = u.user_id
                 JOIN exam_schedules es ON er.exam_id = es.exam_id
                 JOIN courses c ON es.course_id = c.course_id
                 ORDER BY er.result_id DESC";
@@ -27,12 +29,14 @@ class ExamResult {
     // Get result by ID
     public function getById($result_id) {
         $sql = "SELECT er.*, 
-                       s.student_id, u.full_name as student_name,
-                       c.course_name, c.course_code,
-                       es.exam_type, es.date as exam_date
+                       s.student_id, 
+                       s.full_name as student_name,
+                       c.course_name, 
+                       c.course_code,
+                       es.exam_type, 
+                       es.date as exam_date
                 FROM exam_results er
                 JOIN students s ON er.student_id = s.student_id
-                JOIN users u ON s.user_id = u.user_id
                 JOIN exam_schedules es ON er.exam_id = es.exam_id
                 JOIN courses c ON es.course_id = c.course_id
                 WHERE er.result_id = ?";
@@ -46,7 +50,7 @@ class ExamResult {
     public function add($data) {
         // Check if result already exists
         $check = $this->conn->prepare("SELECT result_id FROM exam_results WHERE student_id = ? AND exam_id = ?");
-        $check->bind_param("si", $data['student_id'], $data['exam_id']);
+        $check->bind_param("ii", $data['student_id'], $data['exam_id']);
         $check->execute();
         if ($check->get_result()->num_rows > 0) {
             return false;
@@ -55,7 +59,7 @@ class ExamResult {
         $sql = "INSERT INTO exam_results (student_id, exam_id, marks_obtained, total_marks, grade, status) 
                 VALUES (?, ?, ?, ?, ?, 'draft')";
         $stmt = $this->conn->prepare($sql);
-        $stmt->bind_param("sidds", 
+        $stmt->bind_param("iidds", 
             $data['student_id'], 
             $data['exam_id'], 
             $data['marks_obtained'], 
@@ -91,15 +95,19 @@ class ExamResult {
     // Get results by student
     public function getByStudent($student_id) {
         $sql = "SELECT er.*, 
-                       c.course_name, c.course_code,
-                       es.exam_type, es.date as exam_date
+                       s.full_name as student_name,
+                       c.course_name, 
+                       c.course_code,
+                       es.exam_type, 
+                       es.date as exam_date
                 FROM exam_results er
+                JOIN students s ON er.student_id = s.student_id
                 JOIN exam_schedules es ON er.exam_id = es.exam_id
                 JOIN courses c ON es.course_id = c.course_id
                 WHERE er.student_id = ?
                 ORDER BY es.date DESC";
         $stmt = $this->conn->prepare($sql);
-        $stmt->bind_param("s", $student_id);
+        $stmt->bind_param("i", $student_id);
         $stmt->execute();
         return $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
     }
@@ -107,12 +115,12 @@ class ExamResult {
     // Get results by exam
     public function getByExam($exam_id) {
         $sql = "SELECT er.*, 
-                       s.student_id, u.full_name as student_name
+                       s.student_id, 
+                       s.full_name as student_name
                 FROM exam_results er
                 JOIN students s ON er.student_id = s.student_id
-                JOIN users u ON s.user_id = u.user_id
                 WHERE er.exam_id = ?
-                ORDER BY u.full_name ASC";
+                ORDER BY s.full_name ASC";
         $stmt = $this->conn->prepare($sql);
         $stmt->bind_param("i", $exam_id);
         $stmt->execute();
@@ -122,11 +130,12 @@ class ExamResult {
     // Get results by grade
     public function getByGrade($grade) {
         $sql = "SELECT er.*, 
-                       s.student_id, u.full_name as student_name,
-                       c.course_name, c.course_code
+                       s.student_id, 
+                       s.full_name as student_name,
+                       c.course_name, 
+                       c.course_code
                 FROM exam_results er
                 JOIN students s ON er.student_id = s.student_id
-                JOIN users u ON s.user_id = u.user_id
                 JOIN exam_schedules es ON er.exam_id = es.exam_id
                 JOIN courses c ON es.course_id = c.course_id
                 WHERE er.grade = ?
@@ -164,10 +173,64 @@ class ExamResult {
                 WHERE er.student_id = ?
                 AND es.exam_type = 'final'";
         $stmt = $this->conn->prepare($sql);
-        $stmt->bind_param("s", $student_id);
+        $stmt->bind_param("i", $student_id);
         $stmt->execute();
         $result = $stmt->get_result()->fetch_assoc();
         return $result['gpa'] ? round($result['gpa'], 2) : 0;
+    }
+    
+    // Get students without results for a specific exam
+    public function getStudentsWithoutResults($exam_id) {
+        $sql = "SELECT s.student_id, s.full_name, s.roll_no
+                FROM students s
+                WHERE s.status = 'Active'
+                AND s.student_id NOT IN (
+                    SELECT student_id 
+                    FROM exam_results 
+                    WHERE exam_id = ?
+                )";
+        $stmt = $this->conn->prepare($sql);
+        $stmt->bind_param("i", $exam_id);
+        $stmt->execute();
+        return $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+    }
+    
+    // Publish results
+    public function publish($result_id) {
+        $sql = "UPDATE exam_results 
+                SET status = 'published', published_at = NOW() 
+                WHERE result_id = ?";
+        $stmt = $this->conn->prepare($sql);
+        $stmt->bind_param("i", $result_id);
+        return $stmt->execute();
+    }
+    
+    // Get statistics
+    public function getStats() {
+        $stats = [];
+        
+        // Total results
+        $result = $this->conn->query("SELECT COUNT(*) as total FROM exam_results");
+        $stats['total'] = $result->fetch_assoc()['total'];
+        
+        // Published results
+        $result = $this->conn->query("SELECT COUNT(*) as published FROM exam_results WHERE status = 'published'");
+        $stats['published'] = $result->fetch_assoc()['published'];
+        
+        // Draft results
+        $result = $this->conn->query("SELECT COUNT(*) as draft FROM exam_results WHERE status = 'draft'");
+        $stats['draft'] = $result->fetch_assoc()['draft'];
+        
+        // Grade distribution
+        $result = $this->conn->query("
+            SELECT grade, COUNT(*) as count 
+            FROM exam_results 
+            GROUP BY grade 
+            ORDER BY grade
+        ");
+        $stats['grades'] = $result->fetch_all(MYSQLI_ASSOC);
+        
+        return $stats;
     }
 }
 ?>

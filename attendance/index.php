@@ -1,9 +1,116 @@
 <?php
-require_once __DIR__ . '../config/db_connect.php';
-require_once __DIR__ . '/../includes/auth.php';
+require_once __DIR__ . '/../config/db_connect.php';
+require_once __DIR__ . '/../modules/sso/includes/auth.php';
 requireLogin();
 
 $conn = getConnection();
+
+// Helper function to check if column exists
+if (!function_exists('columnExists')) {
+    function columnExists($conn, $table, $column) {
+        try {
+            $query = "SHOW COLUMNS FROM $table LIKE '$column'";
+            $result = mysqli_query($conn, $query);
+            return ($result && mysqli_num_rows($result) > 0);
+        } catch (Exception $e) {
+            return false;
+        }
+    }
+}
+
+// Helper function to get table columns
+if (!function_exists('getTableColumns')) {
+    function getTableColumns($conn, $table) {
+        try {
+            $columns = [];
+            $query = "SHOW COLUMNS FROM $table";
+            $result = mysqli_query($conn, $query);
+            if ($result) {
+                while ($row = mysqli_fetch_assoc($result)) {
+                    $columns[] = $row['Field'];
+                }
+            }
+            return $columns;
+        } catch (Exception $e) {
+            return [];
+        }
+    }
+}
+
+// Check which columns exist in attendance table
+$attColumns = getTableColumns($conn, 'attendance');
+$hasDate = in_array('date', $attColumns) || in_array('attendance_date', $attColumns) || in_array('class_date', $attColumns);
+$hasStatus = in_array('status', $attColumns);
+$hasRemark = in_array('remark', $attColumns) || in_array('remarks', $attColumns);
+$hasStudentId = in_array('student_id', $attColumns);
+$hasCourseId = in_array('course_id', $attColumns);
+$hasFacultyId = in_array('faculty_id', $attColumns);
+
+// Determine the correct date column name
+$dateColumn = 'date';
+if (in_array('attendance_date', $attColumns)) {
+    $dateColumn = 'attendance_date';
+} elseif (in_array('class_date', $attColumns)) {
+    $dateColumn = 'class_date';
+} elseif (in_array('date', $attColumns)) {
+    $dateColumn = 'date';
+} else {
+    $dateColumn = 'date';
+}
+
+// Determine the correct remark column name
+$remarkColumn = 'remark';
+if (in_array('remarks', $attColumns)) {
+    $remarkColumn = 'remarks';
+} elseif (in_array('remark', $attColumns)) {
+    $remarkColumn = 'remark';
+} else {
+    $remarkColumn = 'remark';
+}
+
+// Check which columns exist in courses table
+$courseColumns = getTableColumns($conn, 'courses');
+$hasCourseCode = in_array('course_code', $courseColumns);
+$hasCourseName = in_array('course_name', $courseColumns);
+$hasCourseTitle = in_array('course_title', $courseColumns);
+$hasCourseIdCol = in_array('course_id', $courseColumns);
+
+// Determine the correct course name column
+$courseNameColumn = 'course_name';
+if (in_array('course_title', $courseColumns)) {
+    $courseNameColumn = 'course_title';
+} elseif (in_array('name', $courseColumns)) {
+    $courseNameColumn = 'name';
+} elseif (in_array('course_name', $courseColumns)) {
+    $courseNameColumn = 'course_name';
+} else {
+    $courseNameColumn = 'course_name';
+}
+
+// Check which columns exist in students table
+$studentColumns = getTableColumns($conn, 'students');
+$hasStudentRollNo = in_array('roll_no', $studentColumns);
+$hasStudentUserId = in_array('user_id', $studentColumns);
+
+// Check which columns exist in users table
+$userColumns = getTableColumns($conn, 'users');
+$hasUserFullName = in_array('full_name', $userColumns);
+
+// Check which columns exist in faculty table
+$facultyColumns = getTableColumns($conn, 'faculty');
+$hasFacultyUserId = in_array('user_id', $facultyColumns);
+$hasFacultyName = in_array('faculty_name', $facultyColumns) || in_array('name', $facultyColumns);
+$hasFacultyIdCol = in_array('faculty_id', $facultyColumns);
+
+// Determine the correct faculty name column
+$facultyNameColumn = 'faculty_name';
+if (in_array('name', $facultyColumns)) {
+    $facultyNameColumn = 'name';
+} elseif (in_array('faculty_name', $facultyColumns)) {
+    $facultyNameColumn = 'faculty_name';
+} else {
+    $facultyNameColumn = 'faculty_name';
+}
 
 // Get filter parameters
 $search = isset($_GET['search']) ? trim($_GET['search']) : '';
@@ -12,68 +119,195 @@ $status_filter = isset($_GET['status']) ? $_GET['status'] : '';
 $date_from = isset($_GET['date_from']) ? $_GET['date_from'] : '';
 $date_to = isset($_GET['date_to']) ? $_GET['date_to'] : '';
 
-// Fetch attendance records with correct column names
-$sql = "SELECT 
-            a.attendance_id,
-            a.date as attendance_date,
-            a.status,
-            a.remark,
-            s.student_id,
-            s.roll_no,
-            u.full_name as student_name,
-            c.course_id,
-            c.course_code,
-            c.course_name,
-            f.faculty_id,
-            u2.full_name as faculty_name
-        FROM attendance a
-        LEFT JOIN students s ON a.student_id = s.student_id
-        LEFT JOIN users u ON s.user_id = u.user_id
-        LEFT JOIN courses c ON a.course_id = c.course_id
-        LEFT JOIN faculty f ON a.faculty_id = f.faculty_id
-        LEFT JOIN users u2 ON f.user_id = u2.user_id
-        WHERE 1=1";
+// Build SELECT query based on available columns
+$selectFields = [
+    'a.attendance_id'
+];
+
+if ($hasDate) {
+    $selectFields[] = "a.$dateColumn as attendance_date";
+} else {
+    $selectFields[] = "NOW() as attendance_date";
+}
+
+if ($hasStatus) {
+    $selectFields[] = 'a.status';
+} else {
+    $selectFields[] = "'present' as status";
+}
+
+if ($hasRemark) {
+    $selectFields[] = "a.$remarkColumn as remark";
+} else {
+    $selectFields[] = "NULL as remark";
+}
+
+if ($hasStudentId) {
+    $selectFields[] = 'a.student_id';
+} else {
+    $selectFields[] = "NULL as student_id";
+}
+
+if ($hasCourseId) {
+    $selectFields[] = 'a.course_id';
+} else {
+    $selectFields[] = "NULL as course_id";
+}
+
+if ($hasFacultyId) {
+    $selectFields[] = 'a.faculty_id';
+} else {
+    $selectFields[] = "NULL as faculty_id";
+}
+
+// Add student fields
+if ($hasStudentRollNo) {
+    $selectFields[] = 's.roll_no';
+} else {
+    $selectFields[] = "'N/A' as roll_no";
+}
+
+if ($hasUserFullName && $hasStudentUserId) {
+    $selectFields[] = 'u.full_name as student_name';
+} else {
+    $selectFields[] = "'N/A' as student_name";
+}
+
+// Add course fields
+if ($hasCourseCode) {
+    $selectFields[] = 'c.course_code';
+} else {
+    $selectFields[] = "'N/A' as course_code";
+}
+
+if ($hasCourseName || $hasCourseTitle) {
+    $selectFields[] = "c.$courseNameColumn as course_name";
+} else {
+    $selectFields[] = "'N/A' as course_name";
+}
+
+// Add faculty fields - check what's available
+if ($hasFacultyName) {
+    $selectFields[] = "f.$facultyNameColumn as faculty_name";
+} elseif ($hasUserFullName && $hasFacultyUserId) {
+    $selectFields[] = "u2.full_name as faculty_name";
+} else {
+    $selectFields[] = "'N/A' as faculty_name";
+}
+
+// Build the SQL query
+$sql = "SELECT \n            " . implode(",\n            ", $selectFields);
+$sql .= "\n        FROM attendance a";
+
+// Join students - only if student_id exists
+if ($hasStudentId) {
+    $sql .= "\n        LEFT JOIN students s ON a.student_id = s.student_id";
+    if ($hasStudentUserId) {
+        $sql .= "\n        LEFT JOIN users u ON s.user_id = u.user_id";
+    } else {
+        $sql .= "\n        LEFT JOIN users u ON 1=0";
+    }
+} else {
+    $sql .= "\n        LEFT JOIN students s ON 1=0";
+    $sql .= "\n        LEFT JOIN users u ON 1=0";
+}
+
+// Join courses - only if course_id exists
+if ($hasCourseId) {
+    $sql .= "\n        LEFT JOIN courses c ON a.course_id = c.course_id";
+} else {
+    $sql .= "\n        LEFT JOIN courses c ON 1=0";
+}
+
+// Join faculty - only if faculty_id exists
+if ($hasFacultyId && $hasFacultyIdCol) {
+    $sql .= "\n        LEFT JOIN faculty f ON a.faculty_id = f.faculty_id";
+    // Only join users if faculty has user_id and users table has full_name
+    if ($hasFacultyUserId && $hasUserFullName) {
+        $sql .= "\n        LEFT JOIN users u2 ON f.user_id = u2.user_id";
+    } else {
+        $sql .= "\n        LEFT JOIN users u2 ON 1=0";
+    }
+} else {
+    $sql .= "\n        LEFT JOIN faculty f ON 1=0";
+    $sql .= "\n        LEFT JOIN users u2 ON 1=0";
+}
+
+$sql .= "\n        WHERE 1=1";
 
 $params = [];
 $types = "";
 
 // Add search filter
 if (!empty($search)) {
-    $sql .= " AND (u.full_name LIKE ? OR s.student_id LIKE ? OR c.course_code LIKE ?)";
+    $searchConditions = [];
+    
+    if ($hasUserFullName && $hasStudentUserId) {
+        $searchConditions[] = "u.full_name LIKE ?";
+    }
+    
+    if ($hasStudentId) {
+        $searchConditions[] = "s.student_id LIKE ?";
+    }
+    
+    if ($hasCourseCode) {
+        $searchConditions[] = "c.course_code LIKE ?";
+    }
+    
+    if ($hasCourseName || $hasCourseTitle) {
+        $searchConditions[] = "c.$courseNameColumn LIKE ?";
+    }
+    
+    if ($hasFacultyName) {
+        $searchConditions[] = "f.$facultyNameColumn LIKE ?";
+    }
+    
+    // If no search conditions available, search by attendance_id
+    if (empty($searchConditions)) {
+        $searchConditions[] = "a.attendance_id LIKE ?";
+    }
+    
+    $sql .= " AND (" . implode(" OR ", $searchConditions) . ")";
     $searchParam = "%$search%";
-    $params[] = $searchParam;
-    $params[] = $searchParam;
-    $params[] = $searchParam;
-    $types .= "sss";
+    
+    foreach ($searchConditions as $condition) {
+        $params[] = $searchParam;
+        $types .= "s";
+    }
 }
 
 // Add course filter
-if ($course_filter > 0) {
+if ($course_filter > 0 && $hasCourseId) {
     $sql .= " AND a.course_id = ?";
     $params[] = $course_filter;
     $types .= "i";
 }
 
 // Add status filter
-if (!empty($status_filter)) {
+if (!empty($status_filter) && $hasStatus) {
     $sql .= " AND a.status = ?";
     $params[] = $status_filter;
     $types .= "s";
 }
 
 // Add date range filter
-if (!empty($date_from)) {
-    $sql .= " AND a.date >= ?";
+if (!empty($date_from) && $hasDate) {
+    $sql .= " AND a.$dateColumn >= ?";
     $params[] = $date_from;
     $types .= "s";
 }
-if (!empty($date_to)) {
-    $sql .= " AND a.date <= ?";
+if (!empty($date_to) && $hasDate) {
+    $sql .= " AND a.$dateColumn <= ?";
     $params[] = $date_to;
     $types .= "s";
 }
 
-$sql .= " ORDER BY a.date DESC, a.attendance_id DESC";
+$sql .= " ORDER BY a.attendance_id DESC";
+
+// Debug: Uncomment to see the query
+// echo "<pre>$sql</pre>";
+// print_r($params);
+// exit;
 
 $stmt = $conn->prepare($sql);
 if ($stmt === false) {
@@ -89,19 +323,39 @@ $result = $stmt->get_result();
 $attendances = $result ? $result->fetch_all(MYSQLI_ASSOC) : [];
 $stmt->close();
 
-// Get stats with correct column names
-$total_query = "SELECT 
-                    COUNT(*) as total,
-                    SUM(CASE WHEN status = 'present' THEN 1 ELSE 0 END) as present,
+// Get stats - simplified query
+$stats_query = "SELECT 
+                    COUNT(*) as total";
+if ($hasStatus) {
+    $stats_query .= ",\n                    SUM(CASE WHEN status = 'present' THEN 1 ELSE 0 END) as present,
                     SUM(CASE WHEN status = 'absent' THEN 1 ELSE 0 END) as absent,
                     SUM(CASE WHEN status = 'late' THEN 1 ELSE 0 END) as late,
-                    SUM(CASE WHEN status = 'excused' THEN 1 ELSE 0 END) as excused
-                FROM attendance";
-$stats_result = $conn->query($total_query);
+                    SUM(CASE WHEN status = 'excused' THEN 1 ELSE 0 END) as excused";
+} else {
+    $stats_query .= ",\n                    0 as present,
+                    0 as absent,
+                    0 as late,
+                    0 as excused";
+}
+$stats_query .= "\n                FROM attendance";
+$stats_result = $conn->query($stats_query);
 $stats = $stats_result ? $stats_result->fetch_assoc() : ['total' => 0, 'present' => 0, 'absent' => 0, 'late' => 0, 'excused' => 0];
 
-// Fetch dropdown data
-$courses = $conn->query("SELECT course_id, course_code, course_name FROM courses ORDER BY course_code");
+// Fetch dropdown data - only if course_id and course_code exist
+$courses = [];
+if ($hasCourseId && $hasCourseCode) {
+    $courseQuery = "SELECT course_id, course_code";
+    if ($hasCourseName || $hasCourseTitle) {
+        $courseQuery .= ", $courseNameColumn as course_name";
+    }
+    $courseQuery .= " FROM courses ORDER BY course_code";
+    $courses_result = $conn->query($courseQuery);
+    if ($courses_result) {
+        while ($row = $courses_result->fetch_assoc()) {
+            $courses[] = $row;
+        }
+    }
+}
 
 // ============================================
 // HEADER INCLUDE
@@ -278,12 +532,12 @@ include __DIR__ . '/../includes/sidebar.php';
                 <div class="col-md-2">
                     <select name="course" class="form-select">
                         <option value="0">All Courses</option>
-                        <?php while($row = $courses->fetch_assoc()): ?>
-                            <option value="<?= $row['course_id'] ?>" 
-                                <?= $course_filter == $row['course_id'] ? 'selected' : '' ?>>
-                                <?= htmlspecialchars($row['course_code']) ?>
+                        <?php foreach($courses as $course): ?>
+                            <option value="<?= $course['course_id'] ?>" 
+                                <?= $course_filter == $course['course_id'] ? 'selected' : '' ?>>
+                                <?= htmlspecialchars($course['course_code'] ?? 'N/A') ?>
                             </option>
-                        <?php endwhile; ?>
+                        <?php endforeach; ?>
                     </select>
                 </div>
                 <div class="col-md-2">
@@ -345,20 +599,31 @@ include __DIR__ . '/../includes/sidebar.php';
                                 <?php foreach($attendances as $att): ?>
                                     <tr>
                                         <td><?= $count++ ?></td>
-                                        <td><?= date('d M Y', strtotime($att['attendance_date'])) ?></td>
+                                        <td>
+                                            <?php 
+                                            $date_value = $att['attendance_date'] ?? null;
+                                            if ($date_value && $date_value != '0000-00-00' && $date_value != 'NULL') {
+                                                echo date('d M Y', strtotime($date_value));
+                                            } else {
+                                                echo 'N/A';
+                                            }
+                                            ?>
+                                        </td>
                                         <td>
                                             <strong><?= htmlspecialchars($att['student_name'] ?? 'N/A') ?></strong>
                                             <br>
-                                            <small class="text-muted"><?= htmlspecialchars($att['student_id']) ?></small>
+                                            <small class="text-muted"><?= htmlspecialchars($att['student_id'] ?? 'N/A') ?></small>
                                         </td>
                                         <td>
-                                            <?= htmlspecialchars($att['course_code']) ?>
-                                            <br>
-                                            <small><?= htmlspecialchars($att['course_name']) ?></small>
+                                            <?= htmlspecialchars($att['course_code'] ?? 'N/A') ?>
+                                            <?php if (!empty($att['course_name']) && $att['course_name'] != 'N/A'): ?>
+                                                <br>
+                                                <small><?= htmlspecialchars($att['course_name']) ?></small>
+                                            <?php endif; ?>
                                         </td>
                                         <td>
-                                            <span class="status-badge <?= $att['status'] ?>">
-                                                <?= ucfirst($att['status']) ?>
+                                            <span class="status-badge <?= $att['status'] ?? 'present' ?>">
+                                                <?= ucfirst($att['status'] ?? 'Present') ?>
                                             </span>
                                         </td>
                                         <td><?= htmlspecialchars($att['remark'] ?? '-') ?></td>

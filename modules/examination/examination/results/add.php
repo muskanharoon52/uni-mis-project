@@ -1,4 +1,5 @@
 <?php
+session_start();
 require_once '../../../../config/db_connect.php';
 require_once '../models/ExamResult.php';
 require_once '../models/ExamSchedule.php';
@@ -32,24 +33,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-include '../../includes/header.php';
+// Include header and navbar - going up 4 levels to root includes
+include '../../../../includes/header.php';
 $hideSidebarToggle = true;
 $showDashboardBackButton = true;
-include '../../includes/navbar.php';
+include '../../../../includes/navbar.php';
 
 $conn = getConnection();
 $scheduleModel = new ExamSchedule();
 $schedules = $scheduleModel->getUpcoming();
 
-// Get students
+// Get students - FIXED: Removed join with users table
 $students = $conn->query("
-    SELECT s.student_id, u.full_name, p.program_name 
+    SELECT s.student_id, s.full_name, p.program_name 
     FROM students s
-    JOIN users u ON s.user_id = u.user_id
     JOIN programs p ON s.program_id = p.program_id
-    WHERE s.status = 'active'
-    ORDER BY u.full_name
+    WHERE s.status = 'Active'
+    ORDER BY s.full_name
 ");
+
+// Check if query failed
+if (!$students) {
+    $students = [];
+    $formError = 'Error loading students: ' . $conn->error;
+}
 ?>
 
 <div class="container-fluid mt-4">
@@ -68,11 +75,15 @@ $students = $conn->query("
                             <label for="student_id" class="form-label">Student</label>
                             <select class="form-select" id="student_id" name="student_id" required>
                                 <option value="">Select Student</option>
-                                <?php while($student = $students->fetch_assoc()): ?>
-                                    <option value="<?php echo $student['student_id']; ?>">
-                                        <?php echo $student['full_name'] . ' (' . $student['student_id'] . ') - ' . $student['program_name']; ?>
-                                    </option>
-                                <?php endwhile; ?>
+                                <?php if ($students && $students->num_rows > 0): ?>
+                                    <?php while($student = $students->fetch_assoc()): ?>
+                                        <option value="<?php echo $student['student_id']; ?>">
+                                            <?php echo htmlspecialchars($student['full_name'] . ' (ID: ' . $student['student_id'] . ') - ' . $student['program_name']); ?>
+                                        </option>
+                                    <?php endwhile; ?>
+                                <?php else: ?>
+                                    <option value="">No students available</option>
+                                <?php endif; ?>
                             </select>
                         </div>
                         
@@ -80,22 +91,26 @@ $students = $conn->query("
                             <label for="exam_id" class="form-label">Exam Schedule</label>
                             <select class="form-select" id="exam_id" name="exam_id" required>
                                 <option value="">Select Exam</option>
-                                <?php foreach($schedules as $schedule): ?>
-                                    <option value="<?php echo $schedule['exam_id']; ?>">
-                                        <?php echo $schedule['course_code'] . ' - ' . $schedule['exam_type'] . ' (' . date('M d', strtotime($schedule['date'])) . ')'; ?>
-                                    </option>
-                                <?php endforeach; ?>
+                                <?php if ($schedules && count($schedules) > 0): ?>
+                                    <?php foreach($schedules as $schedule): ?>
+                                        <option value="<?php echo $schedule['exam_id']; ?>">
+                                            <?php echo htmlspecialchars($schedule['course_code'] . ' - ' . $schedule['exam_type'] . ' (' . date('M d', strtotime($schedule['date'])) . ')'); ?>
+                                        </option>
+                                    <?php endforeach; ?>
+                                <?php else: ?>
+                                    <option value="">No exams available</option>
+                                <?php endif; ?>
                             </select>
                         </div>
                         
                         <div class="row">
                             <div class="col-md-6 mb-3">
                                 <label for="marks_obtained" class="form-label">Marks Obtained</label>
-                                <input type="number" step="0.01" class="form-control" id="marks_obtained" name="marks_obtained" required>
+                                <input type="number" step="0.01" class="form-control" id="marks_obtained" name="marks_obtained" required min="0">
                             </div>
                             <div class="col-md-6 mb-3">
                                 <label for="total_marks" class="form-label">Total Marks</label>
-                                <input type="number" class="form-control" id="total_marks" name="total_marks" required>
+                                <input type="number" step="0.01" class="form-control" id="total_marks" name="total_marks" required min="1">
                             </div>
                         </div>
                         
@@ -127,7 +142,7 @@ $students = $conn->query("
 document.getElementById('marks_obtained').addEventListener('change', function() {
     const marks = parseFloat(this.value);
     const total = parseFloat(document.getElementById('total_marks').value);
-    if (marks && total) {
+    if (marks && total && marks > 0 && total > 0) {
         const percentage = (marks / total) * 100;
         let grade = '';
         if (percentage >= 90) grade = 'A';
@@ -142,7 +157,38 @@ document.getElementById('marks_obtained').addEventListener('change', function() 
 document.getElementById('total_marks').addEventListener('change', function() {
     const marks = parseFloat(document.getElementById('marks_obtained').value);
     const total = parseFloat(this.value);
-    if (marks && total) {
+    if (marks && total && marks > 0 && total > 0) {
+        const percentage = (marks / total) * 100;
+        let grade = '';
+        if (percentage >= 90) grade = 'A';
+        else if (percentage >= 80) grade = 'B';
+        else if (percentage >= 70) grade = 'C';
+        else if (percentage >= 60) grade = 'D';
+        else grade = 'F';
+        document.getElementById('grade').value = grade;
+    }
+});
+
+// Auto-calculate when both fields have values
+document.getElementById('marks_obtained').addEventListener('input', function() {
+    const marks = parseFloat(this.value);
+    const total = parseFloat(document.getElementById('total_marks').value);
+    if (marks && total && marks > 0 && total > 0) {
+        const percentage = (marks / total) * 100;
+        let grade = '';
+        if (percentage >= 90) grade = 'A';
+        else if (percentage >= 80) grade = 'B';
+        else if (percentage >= 70) grade = 'C';
+        else if (percentage >= 60) grade = 'D';
+        else grade = 'F';
+        document.getElementById('grade').value = grade;
+    }
+});
+
+document.getElementById('total_marks').addEventListener('input', function() {
+    const marks = parseFloat(document.getElementById('marks_obtained').value);
+    const total = parseFloat(this.value);
+    if (marks && total && marks > 0 && total > 0) {
         const percentage = (marks / total) * 100;
         let grade = '';
         if (percentage >= 90) grade = 'A';
@@ -155,4 +201,4 @@ document.getElementById('total_marks').addEventListener('change', function() {
 });
 </script>
 
-<?php include '../../includes/footer.php'; ?>
+<?php include '../../../../includes/footer.php'; ?>

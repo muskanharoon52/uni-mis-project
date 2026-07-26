@@ -1,7 +1,16 @@
 <?php
-require_once __DIR__ . '../config/db_connect.php';
-require_once __DIR__ . '/../includes/auth.php';
-requireLogin();
+require_once __DIR__ . '/../config/db_connect.php';
+require_once __DIR__ . '/../modules/sso/includes/auth.php';
+
+// Check if logged in
+if (!function_exists('isLoggedIn')) {
+    die("isLoggedIn() function not found in auth.php");
+}
+
+if (!isLoggedIn()) {
+    header('Location: ../modules/sso/login.php');
+    exit;
+}
 
 $conn = getConnection();
 $error = '';
@@ -21,13 +30,12 @@ $sections_query = "SELECT s.*, p.program_name, sm.semester_name
 $sections_result = $conn->query($sections_query);
 $sections = $sections_result ? $sections_result->fetch_all(MYSQLI_ASSOC) : [];
 
-// Fetch students for dropdown
-$students_query = "SELECT s.student_id, s.roll_no, u.full_name, p.program_name 
+// Fetch students for dropdown - Fixed query without user_id join
+$students_query = "SELECT s.student_id, s.roll_no, s.full_name, p.program_name 
                    FROM students s
-                   LEFT JOIN users u ON s.user_id = u.user_id
                    LEFT JOIN programs p ON s.program_id = p.program_id
                    WHERE s.status = 'active'
-                   ORDER BY u.full_name";
+                   ORDER BY s.full_name";
 $students_result = $conn->query($students_query);
 $students = $students_result ? $students_result->fetch_all(MYSQLI_ASSOC) : [];
 
@@ -161,6 +169,10 @@ include __DIR__ . '/../includes/sidebar.php';
             <div class="alert alert-danger"><?= htmlspecialchars($error) ?></div>
         <?php endif; ?>
 
+        <?php if (isset($_GET['success'])): ?>
+            <div class="alert alert-success"><?= htmlspecialchars($_GET['success']) ?></div>
+        <?php endif; ?>
+
         <div class="form-container">
             <form method="POST" action="">
                 <div class="mb-3">
@@ -170,7 +182,7 @@ include __DIR__ . '/../includes/sidebar.php';
                         <?php foreach($students as $student): ?>
                             <option value="<?= $student['student_id'] ?>" 
                                 <?= $student_id == $student['student_id'] ? 'selected' : '' ?>>
-                                <?= htmlspecialchars($student['full_name']) ?> 
+                                <?= htmlspecialchars($student['full_name'] ?? 'Unknown') ?> 
                                 (<?= htmlspecialchars($student['student_id']) ?>)
                             </option>
                         <?php endforeach; ?>
@@ -185,8 +197,8 @@ include __DIR__ . '/../includes/sidebar.php';
                             <option value="<?= $section['section_id'] ?>" 
                                 <?= $section_id == $section['section_id'] ? 'selected' : '' ?>>
                                 <?= htmlspecialchars($section['section_name']) ?> - 
-                                <?= htmlspecialchars($section['program_name']) ?> 
-                                (<?= htmlspecialchars($section['semester_name']) ?>)
+                                <?= htmlspecialchars($section['program_name'] ?? 'N/A') ?> 
+                                (<?= htmlspecialchars($section['semester_name'] ?? 'N/A') ?>)
                                 [<?= $section['enrolled_count'] ?>/<?= $section['capacity'] ?>]
                             </option>
                         <?php endforeach; ?>
@@ -198,13 +210,18 @@ include __DIR__ . '/../includes/sidebar.php';
                     <select name="semester_id" class="form-select" required>
                         <option value="">Select Semester</option>
                         <?php 
-                        $semesters = $conn->query("SELECT semester_id, semester_name FROM semesters ORDER BY semester_name");
-                        while($row = $semesters->fetch_assoc()): 
+                        $semesters_query = "SELECT semester_id, semester_name FROM semesters ORDER BY semester_name";
+                        $semesters_result = $conn->query($semesters_query);
+                        if ($semesters_result) {
+                            while($row = $semesters_result->fetch_assoc()): 
                         ?>
                             <option value="<?= $row['semester_id'] ?>">
                                 <?= htmlspecialchars($row['semester_name']) ?>
                             </option>
-                        <?php endwhile; ?>
+                        <?php 
+                            endwhile;
+                        }
+                        ?>
                     </select>
                 </div>
 

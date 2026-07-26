@@ -1,12 +1,11 @@
 <?php
-// modules/sso/logout.php - Logout Handler
-
+// Start session
 session_start();
 
-// Clear all session variables
+// Destroy all session data
 $_SESSION = array();
 
-// If session cookie exists, delete it
+// If you want to delete the session cookie
 if (ini_get("session.use_cookies")) {
     $params = session_get_cookie_params();
     setcookie(session_name(), '', time() - 42000,
@@ -18,7 +17,7 @@ if (ini_get("session.use_cookies")) {
 // Destroy the session
 session_destroy();
 
-// Redirect to the root index.php
-header("Location: ../../index.php");
+// Redirect to index page
+header('Location: index.php?msg=You have been logged out successfully');
 exit();
 ?>

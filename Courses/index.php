@@ -1,21 +1,59 @@
 <?php
-require_once __DIR__ . '../config/db_connect.php';
-require_once __DIR__ . '/../includes/auth.php';
+require_once __DIR__ . '/../config/db_connect.php';
+require_once __DIR__ . '/../modules/sso/includes/auth.php';
 requireLogin();
 
 $conn = getConnection();
+
+// Helper function to check if table exists
+if (!function_exists('tableExists')) {
+    function tableExists($conn, $tableName) {
+        $check = mysqli_query($conn, "SHOW TABLES LIKE '$tableName'");
+        return ($check && mysqli_num_rows($check) > 0);
+    }
+}
+
+// Helper function to check if column exists
+if (!function_exists('columnExists')) {
+    function columnExists($conn, $table, $column) {
+        try {
+            $query = "SHOW COLUMNS FROM $table LIKE '$column'";
+            $result = mysqli_query($conn, $query);
+            return ($result && mysqli_num_rows($result) > 0);
+        } catch (Exception $e) {
+            return false;
+        }
+    }
+}
 
 // Get filter parameters
 $search = isset($_GET['search']) ? trim($_GET['search']) : '';
 $program = isset($_GET['program']) ? (int)$_GET['program'] : 0;
 $status = isset($_GET['status']) ? $_GET['status'] : '';
 
-// Build query with joins
-$query = "SELECT c.*, 
-          p.program_name
-          FROM courses c
-          LEFT JOIN programs p ON c.program_id = p.program_id
-          WHERE 1=1";
+// Check if columns exist in courses table
+$hasProgramId = columnExists($conn, 'courses', 'program_id');
+$hasDescription = columnExists($conn, 'courses', 'description');
+$hasStatus = columnExists($conn, 'courses', 'status');
+$hasCreditHours = columnExists($conn, 'courses', 'credit_hours');
+
+// Check if programs table exists
+$programsTableExists = tableExists($conn, 'programs');
+
+// Build query with joins - only if columns exist
+$query = "SELECT c.*";
+if ($programsTableExists && $hasProgramId) {
+    $query .= ", p.program_name";
+} else {
+    $query .= ", NULL as program_name";
+}
+$query .= " FROM courses c";
+
+if ($programsTableExists && $hasProgramId) {
+    $query .= " LEFT JOIN programs p ON c.program_id = p.program_id";
+}
+
+$query .= " WHERE 1=1";
 
 $params = [];
 $types = "";
@@ -28,7 +66,7 @@ if (!empty($search)) {
     $types .= "ss";
 }
 
-if ($program > 0) {
+if ($program > 0 && $programsTableExists && $hasProgramId) {
     $query .= " AND c.program_id = ?";
     $params[] = $program;
     $types .= "i";
@@ -52,13 +90,18 @@ $result = $stmt->get_result();
 $courses = $result->fetch_all(MYSQLI_ASSOC);
 $stmt->close();
 
-// Get programs for filter
-$program_query = "SELECT program_id as id, program_name as name FROM programs ORDER BY program_name";
-$program_result = $conn->query($program_query);
-$programs = $program_result ? $program_result->fetch_all(MYSQLI_ASSOC) : [];
+// Get programs for filter - only if table exists
+$programs = [];
+if ($programsTableExists) {
+    $program_query = "SELECT program_id as id, program_name as name FROM programs ORDER BY program_name";
+    $program_result = $conn->query($program_query);
+    if ($program_result) {
+        $programs = $program_result->fetch_all(MYSQLI_ASSOC);
+    }
+}
 
 // ============================================
-// AB HEADER.PHP INCLUDE KAREIN
+// HEADER INCLUDE
 // ============================================
 require_once __DIR__ . '/../includes/header.php';
 
@@ -119,6 +162,23 @@ include __DIR__ . '/../includes/sidebar.php';
         background: #f5f6fa;
     }
     
+    .status-badge {
+        padding: 4px 12px;
+        border-radius: 20px;
+        font-size: 12px;
+        font-weight: 500;
+    }
+    
+    .status-badge.Active {
+        background: #d4edda;
+        color: #155724;
+    }
+    
+    .status-badge.Inactive {
+        background: #f8d7da;
+        color: #721c24;
+    }
+    
     @media (max-width: 768px) {
         .courses-content {
             margin-left: 0;
@@ -159,7 +219,7 @@ include __DIR__ . '/../includes/sidebar.php';
         <!-- Filter Section -->
         <div class="filter-section">
             <form method="GET" class="row g-3">
-                <div class="col-md-6">
+                <div class="col-md-5">
                     <input type="text" name="search" class="form-control" 
                            placeholder="Search by course code or title..." 
                            value="<?php echo htmlspecialchars($search); ?>">
@@ -175,11 +235,11 @@ include __DIR__ . '/../includes/sidebar.php';
                         <?php endforeach; ?>
                     </select>
                 </div>
-                <div class="col-md-2">
-                    <button type="submit" class="btn btn-primary w-100">
+                <div class="col-md-3">
+                    <button type="submit" class="btn btn-primary">
                         <i class="fas fa-search"></i> Filter
                     </button>
-                    <a href="index.php" class="btn btn-secondary btn-sm w-100 mt-1">
+                    <a href="index.php" class="btn btn-secondary">
                         <i class="fas fa-times"></i> Reset
                     </a>
                 </div>
@@ -188,8 +248,11 @@ include __DIR__ . '/../includes/sidebar.php';
 
         <!-- Courses Table -->
         <div class="card">
-            <div class="card-header">
+            <div class="card-header d-flex justify-content-between align-items-center">
                 <h5>All Courses (<?php echo count($courses); ?>)</h5>
+                <?php if (count($courses) > 0): ?>
+                    <span class="badge bg-primary"><?php echo count($courses); ?> records</span>
+                <?php endif; ?>
             </div>
             <div class="card-body">
                 <?php if (!empty($courses)): ?>
@@ -213,15 +276,15 @@ include __DIR__ . '/../includes/sidebar.php';
                                         <td><?php echo $count++; ?></td>
                                         <td>
                                             <span class="course-code-badge">
-                                                <?php echo htmlspecialchars($course['course_code']); ?>
+                                                <?php echo htmlspecialchars($course['course_code'] ?? 'N/A'); ?>
                                             </span>
                                         </td>
                                         <td>
-                                            <div><?php echo htmlspecialchars($course['course_name']); ?></div>
+                                            <div><?php echo htmlspecialchars($course['course_name'] ?? 'N/A'); ?></div>
                                         </td>
                                         <td>
                                             <span class="credit-badge">
-                                                <?php echo htmlspecialchars($course['credit_hours']); ?> Credits
+                                                <?php echo htmlspecialchars($course['credit_hours'] ?? '0'); ?> Credits
                                             </span>
                                         </td>
                                         <td><?php echo htmlspecialchars($course['program_name'] ?? 'N/A'); ?></td>
@@ -242,10 +305,12 @@ include __DIR__ . '/../includes/sidebar.php';
                                                onclick="return confirm('Are you sure you want to delete this course?')">
                                                 <i class="fas fa-trash"></i>
                                             </a>
-                                            <a href="../semester_courses/index.php?program=<?php echo $course['program_id']; ?>" 
-                                               class="btn btn-success btn-sm" title="Add to Semester">
-                                                <i class="fas fa-plus-circle"></i>
-                                            </a>
+                                            <?php if ($hasProgramId && !empty($course['program_id'])): ?>
+                                                <a href="../semester_courses/index.php?program=<?php echo $course['program_id']; ?>" 
+                                                   class="btn btn-success btn-sm" title="Add to Semester">
+                                                    <i class="fas fa-plus-circle"></i>
+                                                </a>
+                                            <?php endif; ?>
                                         </td>
                                     </tr>
                                 <?php endforeach; ?>

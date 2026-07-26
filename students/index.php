@@ -1,7 +1,47 @@
 <?php
-require_once __DIR__ . '../config/db_connect.php';
-require_once __DIR__ . '/../includes/auth.php';
-requireSSO();
+require_once __DIR__ . '/../config/db_connect.php';
+require_once __DIR__ . '/../modules/sso/includes/auth.php';
+
+// Check if logged in
+if (!isLoggedIn()) {
+    header('Location: ' . BASE_URL . 'modules/sso/login.php');
+    exit;
+}
+
+$user = getCurrentUser();
+$role = $user['role_name'] ?? 'User';
+
+// Helper function to check if column exists
+if (!function_exists('columnExists')) {
+    function columnExists($conn, $table, $column) {
+        try {
+            $query = "SHOW COLUMNS FROM $table LIKE '$column'";
+            $result = mysqli_query($conn, $query);
+            return ($result && mysqli_num_rows($result) > 0);
+        } catch (Exception $e) {
+            return false;
+        }
+    }
+}
+
+// Helper function to get table columns
+if (!function_exists('getTableColumns')) {
+    function getTableColumns($conn, $table) {
+        try {
+            $columns = [];
+            $query = "SHOW COLUMNS FROM $table";
+            $result = mysqli_query($conn, $query);
+            if ($result) {
+                while ($row = mysqli_fetch_assoc($result)) {
+                    $columns[] = $row['Field'];
+                }
+            }
+            return $columns;
+        } catch (Exception $e) {
+            return [];
+        }
+    }
+}
 
 // Get filter parameters
 $search = isset($_GET['search']) ? trim($_GET['search']) : '';
@@ -11,38 +51,101 @@ $status = isset($_GET['status']) ? $_GET['status'] : '';
 // Use global $conn
 global $conn;
 
-// Build query with all joins
-$query = "SELECT s.*, 
-          p.program_name,
-          p.program_code,
-          u.full_name,
-          u.email,
-          u.phone
-          FROM students s
-          LEFT JOIN programs p ON s.program_id = p.program_id
-          LEFT JOIN users u ON s.user_id = u.user_id
-          WHERE 1=1";
+// Check which columns exist in users table
+$userColumns = getTableColumns($conn, 'users');
+$hasUserPhone = in_array('phone', $userColumns);
+$hasUserEmail = in_array('email', $userColumns);
+$hasUserFullName = in_array('full_name', $userColumns);
+
+// Check which columns exist in students table
+$studentColumns = getTableColumns($conn, 'students');
+$hasStudentRollNo = in_array('roll_no', $studentColumns);
+$hasStudentFatherName = in_array('father_name', $studentColumns);
+$hasStudentProgramId = in_array('program_id', $studentColumns);
+$hasStudentSemester = in_array('semester', $studentColumns);
+$hasStudentStatus = in_array('status', $studentColumns);
+$hasStudentUserId = in_array('user_id', $studentColumns);
+
+// Build query with all joins - only include columns that exist
+$query = "SELECT s.*";
+
+// Add program fields
+$query .= ", p.program_name, p.program_code";
+
+// Add user fields - only if they exist AND if students table has user_id column
+if ($hasStudentUserId) {
+    if ($hasUserFullName) {
+        $query .= ", u.full_name";
+    } else {
+        $query .= ", NULL as full_name";
+    }
+
+    if ($hasUserEmail) {
+        $query .= ", u.email";
+    } else {
+        $query .= ", NULL as email";
+    }
+
+    if ($hasUserPhone) {
+        $query .= ", u.phone";
+    } else {
+        $query .= ", NULL as phone";
+    }
+} else {
+    // If no user_id column, set user fields to NULL
+    $query .= ", NULL as full_name, NULL as email, NULL as phone";
+}
+
+$query .= " FROM students s
+          LEFT JOIN programs p ON s.program_id = p.program_id";
+
+// Only join users table if students table has user_id column
+if ($hasStudentUserId) {
+    $query .= " LEFT JOIN users u ON s.user_id = u.user_id";
+}
+
+$query .= " WHERE 1=1";
 
 $params = [];
 $types = "";
 
 if (!empty($search)) {
-    $query .= " AND (u.full_name LIKE ? OR s.roll_no LIKE ? OR u.email LIKE ? OR s.father_name LIKE ?)";
+    $searchConditions = [];
+    
+    if ($hasUserFullName && $hasStudentUserId) {
+        $searchConditions[] = "u.full_name LIKE ?";
+    }
+    if ($hasStudentRollNo) {
+        $searchConditions[] = "s.roll_no LIKE ?";
+    }
+    if ($hasUserEmail && $hasStudentUserId) {
+        $searchConditions[] = "u.email LIKE ?";
+    }
+    if ($hasStudentFatherName) {
+        $searchConditions[] = "s.father_name LIKE ?";
+    }
+    
+    // If no search conditions available, search by student_id
+    if (empty($searchConditions)) {
+        $searchConditions[] = "s.student_id LIKE ?";
+    }
+    
+    $query .= " AND (" . implode(" OR ", $searchConditions) . ")";
     $searchParam = "%$search%";
-    $params[] = $searchParam;
-    $params[] = $searchParam;
-    $params[] = $searchParam;
-    $params[] = $searchParam;
-    $types .= "ssss";
+    
+    foreach ($searchConditions as $condition) {
+        $params[] = $searchParam;
+        $types .= "s";
+    }
 }
 
-if ($program > 0) {
+if ($program > 0 && $hasStudentProgramId) {
     $query .= " AND s.program_id = ?";
     $params[] = $program;
     $types .= "i";
 }
 
-if (!empty($status)) {
+if (!empty($status) && $hasStudentStatus) {
     $query .= " AND s.status = ?";
     $params[] = $status;
     $types .= "s";
@@ -81,6 +184,13 @@ include __DIR__ . '/../includes/sidebar.php';
 ?>
 
 <style>
+    .main-content {
+        margin-left: 250px;
+        padding: 20px;
+        min-height: 100vh;
+        background: #f5f6fa;
+    }
+    
     .student-avatar {
         width: 40px;
         height: 40px;
@@ -218,6 +328,13 @@ include __DIR__ . '/../includes/sidebar.php';
         box-shadow: 0 5px 15px rgba(23, 162, 184, 0.3);
         color: white;
     }
+    
+    @media (max-width: 768px) {
+        .main-content {
+            margin-left: 0;
+            padding: 15px;
+        }
+    }
 </style>
 
 <div class="main-content">
@@ -313,7 +430,13 @@ include __DIR__ . '/../includes/sidebar.php';
                                                 </div>
                                                 <div>
                                                     <div><?php echo htmlspecialchars($student['full_name'] ?? 'N/A'); ?></div>
-                                                    <small class="text-muted"><?php echo htmlspecialchars($student['email'] ?? 'N/A'); ?></small>
+                                                    <?php if (!empty($student['email']) && $student['email'] != 'N/A'): ?>
+                                                        <small class="text-muted"><?php echo htmlspecialchars($student['email']); ?></small>
+                                                    <?php endif; ?>
+                                                    <?php if (!empty($student['phone']) && $student['phone'] != 'N/A'): ?>
+                                                        <br>
+                                                        <small class="text-muted"><i class="fas fa-phone"></i> <?php echo htmlspecialchars($student['phone']); ?></small>
+                                                    <?php endif; ?>
                                                 </div>
                                             </div>
                                         </td>

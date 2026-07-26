@@ -1,8 +1,8 @@
 <?php
-// includes/sidebar.php - Navigation Sidebar (UPDATED)
+// includes/sidebar.php - Navigation Sidebar (FIXED - Fee Management & Reports REMOVED)
 
 if (!defined('BASE_URL')) {
-    define('BASE_URL', 'http://localhost/university_mis/');
+    define('BASE_URL', 'http://localhost/uni-mis-project/');
 }
 ?>
 
@@ -41,10 +41,12 @@ if (!defined('BASE_URL')) {
             <i class="fas fa-book"></i> Courses
         </a>
 
-        <!-- ✅ NEW: Fee Management (Combined) -->
-        <a href="<?php echo BASE_URL; ?>fee_management/index.php" class="nav-link <?php echo basename(dirname($_SERVER['PHP_SELF'])) == 'fee_management' ? 'active' : ''; ?>">
+        <!-- FEE MANAGEMENT - REMOVED -->
+        <!-- 
+        <a href="<?php echo BASE_URL; ?>fee_management/index.php" class="nav-link">
             <i class="fas fa-money-bill-wave"></i> Fee Management
         </a>
+        -->
 
         <!-- Semester Courses -->
         <a href="<?php echo BASE_URL; ?>semester_courses/index.php" class="nav-link <?php echo basename(dirname($_SERVER['PHP_SELF'])) == 'semester_courses' ? 'active' : ''; ?>">
@@ -71,15 +73,17 @@ if (!defined('BASE_URL')) {
             <i class="fas fa-file-alt"></i> Applications
         </a>
 
-        <!-- Reports -->
-        <a href="<?php echo BASE_URL; ?>reports/index.php" class="nav-link <?php echo basename(dirname($_SERVER['PHP_SELF'])) == 'reports' ? 'active' : ''; ?>">
+        <!-- REPORTS - REMOVED -->
+        <!-- 
+        <a href="<?php echo BASE_URL; ?>reports/index.php" class="nav-link">
             <i class="fas fa-chart-bar"></i> Reports
         </a>
+        -->
 
         <hr style="border-color: rgba(255,255,255,0.1);">
 
         <!-- Logout -->
-        <a href="<?php echo BASE_URL; ?>logout.php" class="nav-link text-danger">
+        <a href="<?php echo BASE_URL; ?>modules/sso/logout.php" class="nav-link text-danger">
             <i class="fas fa-sign-out-alt"></i> Logout
         </a>
     </nav>
@@ -128,6 +132,8 @@ if (!defined('BASE_URL')) {
     transition: all 0.3s;
     font-size: 14px;
     border-left: 3px solid transparent;
+    text-decoration: none;
+    display: block;
 }
 
 .sidebar .nav-link:hover {
@@ -150,6 +156,11 @@ if (!defined('BASE_URL')) {
 
 .sidebar .nav-link.text-danger:hover {
     background: rgba(220, 53, 69, 0.15);
+}
+
+.sidebar hr {
+    border-color: rgba(255,255,255,0.1);
+    margin: 10px 20px;
 }
 
 /* Mobile Responsive */

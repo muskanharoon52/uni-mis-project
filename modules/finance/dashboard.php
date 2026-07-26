@@ -13,8 +13,8 @@ if ($_SESSION['role_id'] != 3 && $_SESSION['role_id'] != 1) {
     exit();
 }
 
-// Include database connection
-include __DIR__ . '../../config/db_connect.php';
+// Include database connection - FIXED: 2 levels up (not 3)
+include __DIR__ . '/../../config/db_connect.php';
 
 // Include header
 include __DIR__ . '/includes/header.php';

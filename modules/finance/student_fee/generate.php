@@ -1,19 +1,21 @@
 <?php
 session_start();
+
 if (!isset($_SESSION['user_id'])) {
-    header('Location: ../auth/login.php');
+    header('Location: ../../../auth/login.php');
     exit();
 }
+
 if ($_SESSION['role_id'] != 3 && $_SESSION['role_id'] != 1) {
-    header('Location: ../auth/login.php?error=Access denied. Finance Officer only.');
+    header('Location: ../../../auth/login.php?error=Access denied. Finance Officer only.');
     exit();
 }
 
-// Include database connection
-include __DIR__ . '../../../config/db_connect.php';
+// Include database connection - FIXED: Added slash
+include_once __DIR__ . '/../../../config/db_connect.php';
 
-// Include header
-include __DIR__ . '/../includes/header.php';
+// Include header - FIXED: Use include_once
+include_once __DIR__ . '/../includes/header.php';
 
 $error = '';
 $success = '';
@@ -194,211 +196,217 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['generate_fee'])) {
 }
 ?>
 
-<div class="d-flex justify-content-between align-items-center mb-3">
-    <h2><i class="fas fa-file-invoice text-success"></i> Generate Student Fee</h2>
-    <a href="index.php" class="btn btn-secondary"><i class="fas fa-arrow-left"></i> Back to List</a>
-</div>
-
-<?php if(!empty($error)): ?>
-    <div class="alert alert-danger"><?php echo $error; ?></div>
-<?php endif; ?>
-
-<?php if(!empty($success)): ?>
-    <div class="alert alert-success">
-        <h5><i class="fas fa-check-circle"></i> <?php echo $success; ?></h5>
-        <p>Student: <strong><?php echo htmlspecialchars($student_name); ?></strong></p>
-        <p>Total Amount: <strong>PKR <?php echo number_format($total_amount, 2); ?></strong></p>
-        <p>Amount Paid: <strong>PKR <?php echo number_format($amount_paid ?? 0, 2); ?></strong></p>
-        <p>Remaining: <strong>PKR <?php echo number_format($total_amount - ($amount_paid ?? 0), 2); ?></strong></p>
-        <hr>
-        <h6>Fee Breakdown:</h6>
-        <ul>
-            <?php foreach($fee_structure as $item): ?>
-                <li><?php echo htmlspecialchars($item['fee_head_name']); ?>: PKR <?php echo number_format($item['amount'], 2); ?></li>
-            <?php endforeach; ?>
-        </ul>
-        <a href="view.php?id=<?php echo $generated_fee_id; ?>" class="btn btn-primary">View Fee Details</a>
-        <a href="index.php" class="btn btn-secondary">View All Fees</a>
-        <a href="generate.php" class="btn btn-success">Generate Another Fee</a>
+<div class="container-fluid">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h2><i class="fas fa-file-invoice text-success"></i> Generate Student Fee</h2>
+        <a href="index.php" class="btn btn-secondary"><i class="fas fa-arrow-left"></i> Back to List</a>
     </div>
-<?php endif; ?>
 
-<?php if(empty($success)): ?>
+    <?php if(!empty($error)): ?>
+        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+            <i class="fas fa-exclamation-circle"></i> <?php echo htmlspecialchars($error); ?>
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    <?php endif; ?>
 
-<!-- SEARCH SECTION -->
-<div class="card mb-4 bg-light">
-    <div class="card-header bg-info text-white">
-        <i class="fas fa-search"></i> Search Student
-    </div>
-    <div class="card-body">
-        <form method="GET" action="">
-            <div class="input-group">
-                <input type="text" class="form-control" name="search" 
-                       placeholder="Search by Student Name, Roll No, or Student ID..." 
-                       value="<?php echo htmlspecialchars($search_term); ?>">
-                <button class="btn btn-primary" type="submit"><i class="fas fa-search"></i> Search</button>
-                <?php if(isset($_GET['search']) && !empty($_GET['search'])): ?>
-                    <a href="generate.php" class="btn btn-secondary">Clear</a>
+    <?php if(!empty($success)): ?>
+        <div class="alert alert-success alert-dismissible fade show" role="alert">
+            <h5><i class="fas fa-check-circle"></i> <?php echo htmlspecialchars($success); ?></h5>
+            <p>Student: <strong><?php echo htmlspecialchars($student_name); ?></strong></p>
+            <p>Total Amount: <strong>PKR <?php echo number_format($total_amount, 2); ?></strong></p>
+            <p>Amount Paid: <strong>PKR <?php echo number_format($amount_paid ?? 0, 2); ?></strong></p>
+            <p>Remaining: <strong>PKR <?php echo number_format($total_amount - ($amount_paid ?? 0), 2); ?></strong></p>
+            <hr>
+            <h6>Fee Breakdown:</h6>
+            <ul>
+                <?php foreach($fee_structure as $item): ?>
+                    <li><?php echo htmlspecialchars($item['fee_head_name']); ?>: PKR <?php echo number_format($item['amount'], 2); ?></li>
+                <?php endforeach; ?>
+            </ul>
+            <a href="view.php?id=<?php echo $generated_fee_id; ?>" class="btn btn-primary">View Fee Details</a>
+            <a href="index.php" class="btn btn-secondary">View All Fees</a>
+            <a href="generate.php" class="btn btn-success">Generate Another Fee</a>
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+        </div>
+    <?php endif; ?>
+
+    <?php if(empty($success)): ?>
+
+    <!-- SEARCH SECTION -->
+    <div class="card mb-4 bg-light">
+        <div class="card-header bg-info text-white">
+            <i class="fas fa-search"></i> Search Student
+        </div>
+        <div class="card-body">
+            <form method="GET" action="">
+                <div class="input-group">
+                    <input type="text" class="form-control" name="search" 
+                           placeholder="Search by Student Name, Roll No, or Student ID..." 
+                           value="<?php echo htmlspecialchars($search_term); ?>">
+                    <button class="btn btn-primary" type="submit"><i class="fas fa-search"></i> Search</button>
+                    <?php if(isset($_GET['search']) && !empty($_GET['search'])): ?>
+                        <a href="generate.php" class="btn btn-secondary">Clear</a>
+                    <?php endif; ?>
+                </div>
+            </form>
+
+            <?php if(isset($_GET['search']) && !empty($_GET['search'])): ?>
+                <?php if(mysqli_num_rows($search_results) > 0): ?>
+                    <div class="mt-3">
+                        <h6>Search Results (<?php echo mysqli_num_rows($search_results); ?> found)</h6>
+                        <table class="table table-sm table-hover">
+                            <thead class="table-light">
+                                <tr><th>Student ID</th><th>Name</th><th>Roll No</th><th>Action</th></tr>
+                            </thead>
+                            <tbody>
+                                <?php while($row = mysqli_fetch_assoc($search_results)): ?>
+                                <tr>
+                                    <td><?php echo $row['student_id']; ?></td>
+                                    <td><?php echo htmlspecialchars($row['full_name']); ?></td>
+                                    <td><?php echo htmlspecialchars($row['roll_no'] ?? 'N/A'); ?></td>
+                                    <td>
+                                        <a href="generate.php?student_id=<?php echo $row['student_id']; ?>" 
+                                           class="btn btn-sm btn-success">Select</a>
+                                    </td>
+                                </tr>
+                                <?php endwhile; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                <?php else: ?>
+                    <div class="alert alert-warning mt-3">
+                        No students found matching "<strong><?php echo htmlspecialchars($search_term); ?></strong>"
+                    </div>
                 <?php endif; ?>
-            </div>
-        </form>
-
-        <?php if(isset($_GET['search']) && !empty($_GET['search'])): ?>
-            <?php if(mysqli_num_rows($search_results) > 0): ?>
-                <div class="mt-3">
-                    <h6>Search Results (<?php echo mysqli_num_rows($search_results); ?> found)</h6>
-                    <table class="table table-sm table-hover">
-                        <thead class="table-light">
-                            <tr><th>Student ID</th><th>Name</th><th>Roll No</th><th>Action</th></tr>
-                        </thead>
-                        <tbody>
-                            <?php while($row = mysqli_fetch_assoc($search_results)): ?>
-                            <tr>
-                                <td><?php echo $row['student_id']; ?></td>
-                                <td><?php echo htmlspecialchars($row['full_name']); ?></td>
-                                <td><?php echo htmlspecialchars($row['roll_no'] ?? 'N/A'); ?></td>
-                                <td>
-                                    <a href="generate.php?student_id=<?php echo $row['student_id']; ?>" 
-                                       class="btn btn-sm btn-success">Select</a>
-                                </td>
-                            </tr>
-                            <?php endwhile; ?>
-                        </tbody>
-                    </table>
-                </div>
-            <?php else: ?>
-                <div class="alert alert-warning mt-3">
-                    No students found matching "<strong><?php echo htmlspecialchars($search_term); ?></strong>"
-                </div>
             <?php endif; ?>
-        <?php endif; ?>
+        </div>
     </div>
+
+    <!-- SELECTED STUDENT -->
+    <?php if($selected_student): ?>
+        <div class="alert alert-success">
+            <h5><i class="fas fa-user-check"></i> Selected Student</h5>
+            <p>
+                <strong>Name:</strong> <?php echo htmlspecialchars($selected_student['full_name']); ?><br>
+                <strong>Roll No:</strong> <?php echo htmlspecialchars($selected_student['roll_no'] ?? 'N/A'); ?><br>
+                <strong>Student ID:</strong> <?php echo $selected_student['student_id']; ?>
+            </p>
+            <a href="generate.php" class="btn btn-light btn-sm">Clear Selection</a>
+        </div>
+    <?php endif; ?>
+
+    <!-- FEE GENERATION FORM -->
+    <form method="POST" action="">
+        <div class="row">
+            <div class="col-md-6 mb-3">
+                <label class="form-label">Student <span class="text-danger">*</span></label>
+                <select class="form-select" name="student_id" required>
+                    <option value="">-- Select Student --</option>
+                    <?php
+                    $all_students = mysqli_query($conn, "SELECT student_id, full_name, roll_no FROM students WHERE status = 'Active' ORDER BY full_name");
+                    while($row = mysqli_fetch_assoc($all_students)):
+                        $selected = ($selected_student && $selected_student['student_id'] == $row['student_id']) ? 'selected' : '';
+                    ?>
+                        <option value="<?php echo $row['student_id']; ?>" <?php echo $selected; ?>>
+                            <?php echo htmlspecialchars($row['full_name'] . ' (' . ($row['roll_no'] ?? 'No Roll') . ')'); ?>
+                        </option>
+                    <?php endwhile; ?>
+                </select>
+            </div>
+            <div class="col-md-6 mb-3">
+                <label class="form-label">Semester <span class="text-danger">*</span></label>
+                <select class="form-select" name="semester_id" required>
+                    <option value="">Select Semester</option>
+                    <?php while($row = mysqli_fetch_assoc($semester_result)): ?>
+                        <option value="<?php echo $row['semester_id']; ?>">
+                            <?php echo htmlspecialchars($row['semester_name']); ?>
+                        </option>
+                    <?php endwhile; ?>
+                </select>
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-md-6 mb-3">
+                <label class="form-label">Session <span class="text-danger">*</span></label>
+                <select class="form-select" name="session_id" required>
+                    <option value="">Select Session</option>
+                    <?php while($row = mysqli_fetch_assoc($session_result)): ?>
+                        <option value="<?php echo $row['session_id']; ?>">
+                            <?php echo htmlspecialchars($row['session_name']); ?>
+                        </option>
+                    <?php endwhile; ?>
+                </select>
+            </div>
+            <div class="col-md-6 mb-3">
+                <label class="form-label">Select Fee Head <span class="text-danger">*</span></label>
+                <select class="form-select" name="fee_head_id" required>
+                    <option value="">-- Select Fee Head --</option>
+                    <?php while($row = mysqli_fetch_assoc($fee_heads_result)): ?>
+                        <option value="<?php echo $row['fee_head_id']; ?>">
+                            <?php echo htmlspecialchars($row['fee_head_name']); ?>
+                            <?php if($row['description']): ?>
+                                (<?php echo htmlspecialchars($row['description']); ?>)
+                            <?php endif; ?>
+                        </option>
+                    <?php endwhile; ?>
+                </select>
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-md-6 mb-3">
+                <label class="form-label">Payment Type <span class="text-danger">*</span></label>
+                <select class="form-select" name="payment_type" id="payment_type" required>
+                    <option value="full">Full Payment (One Time)</option>
+                    <option value="installments">Installments</option>
+                </select>
+            </div>
+            <div class="col-md-6 mb-3" id="installment_options" style="display: none;">
+                <label class="form-label">Number of Installments</label>
+                <select class="form-select" name="installment_count">
+                    <option value="2">2 Installments</option>
+                    <option value="3" selected>3 Installments</option>
+                </select>
+            </div>
+        </div>
+
+        <hr>
+        <h5><i class="fas fa-money-bill-wave text-success"></i> Payment Details</h5>
+        <div class="row">
+            <div class="col-md-4 mb-3">
+                <label class="form-label">Amount Paying Now</label>
+                <input type="number" class="form-control" name="amount_paid" placeholder="0.00" step="0.01" min="0" value="0">
+            </div>
+            <div class="col-md-4 mb-3">
+                <label class="form-label">Payment Method</label>
+                <select class="form-select" name="payment_method">
+                    <option value="Cash">Cash</option>
+                    <option value="Bank">Bank Transfer</option>
+                    <option value="Card">Card</option>
+                    <option value="Online">Online</option>
+                </select>
+            </div>
+            <div class="col-md-4 mb-3">
+                <label class="form-label">Transaction Reference</label>
+                <input type="text" class="form-control" name="transaction_ref" placeholder="e.g. Txn-12345">
+            </div>
+        </div>
+
+        <button type="submit" name="generate_fee" class="btn btn-success"><i class="fas fa-file-invoice"></i> Generate Fee</button>
+        <a href="index.php" class="btn btn-secondary"><i class="fas fa-times"></i> Cancel</a>
+    </form>
+
+    <script>
+    document.getElementById('payment_type').addEventListener('change', function() {
+        var options = document.getElementById('installment_options');
+        if (this.value === 'installments') {
+            options.style.display = 'block';
+        } else {
+            options.style.display = 'none';
+        }
+    });
+    </script>
+
+    <?php endif; ?>
 </div>
 
-<!-- SELECTED STUDENT -->
-<?php if($selected_student): ?>
-    <div class="alert alert-success">
-        <h5><i class="fas fa-user-check"></i> Selected Student</h5>
-        <p>
-            <strong>Name:</strong> <?php echo htmlspecialchars($selected_student['full_name']); ?><br>
-            <strong>Roll No:</strong> <?php echo htmlspecialchars($selected_student['roll_no'] ?? 'N/A'); ?><br>
-            <strong>Student ID:</strong> <?php echo $selected_student['student_id']; ?>
-        </p>
-        <a href="generate.php" class="btn btn-light btn-sm">Clear Selection</a>
-    </div>
-<?php endif; ?>
-
-<!-- FEE GENERATION FORM -->
-<form method="POST" action="">
-    <div class="row">
-        <div class="col-md-6 mb-3">
-            <label class="form-label">Student <span class="text-danger">*</span></label>
-            <select class="form-select" name="student_id" required>
-                <option value="">-- Select Student --</option>
-                <?php
-                $all_students = mysqli_query($conn, "SELECT student_id, full_name, roll_no FROM students WHERE status = 'Active' ORDER BY full_name");
-                while($row = mysqli_fetch_assoc($all_students)):
-                    $selected = ($selected_student && $selected_student['student_id'] == $row['student_id']) ? 'selected' : '';
-                ?>
-                    <option value="<?php echo $row['student_id']; ?>" <?php echo $selected; ?>>
-                        <?php echo htmlspecialchars($row['full_name'] . ' (' . ($row['roll_no'] ?? 'No Roll') . ')'); ?>
-                    </option>
-                <?php endwhile; ?>
-            </select>
-        </div>
-        <div class="col-md-6 mb-3">
-            <label class="form-label">Semester <span class="text-danger">*</span></label>
-            <select class="form-select" name="semester_id" required>
-                <option value="">Select Semester</option>
-                <?php while($row = mysqli_fetch_assoc($semester_result)): ?>
-                    <option value="<?php echo $row['semester_id']; ?>">
-                        <?php echo htmlspecialchars($row['semester_name']); ?>
-                    </option>
-                <?php endwhile; ?>
-            </select>
-        </div>
-    </div>
-    <div class="row">
-        <div class="col-md-6 mb-3">
-            <label class="form-label">Session <span class="text-danger">*</span></label>
-            <select class="form-select" name="session_id" required>
-                <option value="">Select Session</option>
-                <?php while($row = mysqli_fetch_assoc($session_result)): ?>
-                    <option value="<?php echo $row['session_id']; ?>">
-                        <?php echo htmlspecialchars($row['session_name']); ?>
-                    </option>
-                <?php endwhile; ?>
-            </select>
-        </div>
-        <div class="col-md-6 mb-3">
-            <label class="form-label">Select Fee Head <span class="text-danger">*</span></label>
-            <select class="form-select" name="fee_head_id" required>
-                <option value="">-- Select Fee Head --</option>
-                <?php while($row = mysqli_fetch_assoc($fee_heads_result)): ?>
-                    <option value="<?php echo $row['fee_head_id']; ?>">
-                        <?php echo htmlspecialchars($row['fee_head_name']); ?>
-                        <?php if($row['description']): ?>
-                            (<?php echo htmlspecialchars($row['description']); ?>)
-                        <?php endif; ?>
-                    </option>
-                <?php endwhile; ?>
-            </select>
-        </div>
-    </div>
-    <div class="row">
-        <div class="col-md-6 mb-3">
-            <label class="form-label">Payment Type <span class="text-danger">*</span></label>
-            <select class="form-select" name="payment_type" id="payment_type" required>
-                <option value="full">Full Payment (One Time)</option>
-                <option value="installments">Installments</option>
-            </select>
-        </div>
-        <div class="col-md-6 mb-3" id="installment_options" style="display: none;">
-            <label class="form-label">Number of Installments</label>
-            <select class="form-select" name="installment_count">
-                <option value="2">2 Installments</option>
-                <option value="3" selected>3 Installments</option>
-            </select>
-        </div>
-    </div>
-
-    <hr>
-    <h5><i class="fas fa-money-bill-wave text-success"></i> Payment Details</h5>
-    <div class="row">
-        <div class="col-md-4 mb-3">
-            <label class="form-label">Amount Paying Now</label>
-            <input type="number" class="form-control" name="amount_paid" placeholder="0.00" step="0.01" min="0" value="0">
-        </div>
-        <div class="col-md-4 mb-3">
-            <label class="form-label">Payment Method</label>
-            <select class="form-select" name="payment_method">
-                <option value="Cash">Cash</option>
-                <option value="Bank">Bank Transfer</option>
-                <option value="Card">Card</option>
-                <option value="Online">Online</option>
-            </select>
-        </div>
-        <div class="col-md-4 mb-3">
-            <label class="form-label">Transaction Reference</label>
-            <input type="text" class="form-control" name="transaction_ref" placeholder="e.g. Txn-12345">
-        </div>
-    </div>
-
-    <button type="submit" name="generate_fee" class="btn btn-success"><i class="fas fa-file-invoice"></i> Generate Fee</button>
-    <a href="index.php" class="btn btn-secondary"><i class="fas fa-times"></i> Cancel</a>
-</form>
-
-<script>
-document.getElementById('payment_type').addEventListener('change', function() {
-    var options = document.getElementById('installment_options');
-    if (this.value === 'installments') {
-        options.style.display = 'block';
-    } else {
-        options.style.display = 'none';
-    }
-});
-</script>
-
-<?php endif; ?>
-
-<?php include __DIR__ . '/../includes/footer.php'; ?>
+<?php include_once __DIR__ . '/../includes/footer.php'; ?>

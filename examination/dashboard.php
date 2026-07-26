@@ -1,3 +1,4 @@
+
 <?php
 session_start();
 
@@ -24,7 +25,7 @@ $stats = [
 ];
 
 // Total Students - using correct column name
-$result = $conn->query("SELECT COUNT(*) as count FROM students WHERE status = 'active'");
+$result = $conn->query("SELECT COUNT(*) as count FROM students WHERE status = 'Active'");
 if ($result) {
     $row = $result->fetch_assoc();
     $stats['students'] = $row ? $row['count'] : 0;
@@ -89,13 +90,16 @@ if (!$recent_schedules) {
     $recent_schedules->num_rows = 0;
 }
 
-// Recent Results
+// Recent Results - Using full_name from students table
 $recent_results = $conn->query("
-    SELECT er.*, s.student_id, u.full_name as student_name, 
-           c.course_name, c.course_code, es.exam_type
+    SELECT er.*, 
+           s.student_id,
+           s.full_name as student_name,
+           c.course_name, 
+           c.course_code, 
+           es.exam_type
     FROM exam_results er
     JOIN students s ON er.student_id = s.student_id
-    JOIN users u ON s.user_id = u.user_id
     JOIN exam_schedules es ON er.exam_id = es.exam_id
     JOIN courses c ON es.course_id = c.course_id
     ORDER BY er.result_id DESC
@@ -107,15 +111,15 @@ if (!$recent_results) {
     $recent_results->num_rows = 0;
 }
 
-// Top Performing Students
+// Top Performing Students - Using full_name
 $top_students = $conn->query("
-    SELECT s.student_id, u.full_name, 
+    SELECT s.student_id,
+           s.full_name,
            AVG(er.marks_obtained / er.total_marks * 100) as avg_percentage,
            COUNT(er.result_id) as exams_taken
     FROM exam_results er
     JOIN students s ON er.student_id = s.student_id
-    JOIN users u ON s.user_id = u.user_id
-    GROUP BY s.student_id, u.full_name
+    GROUP BY s.student_id, s.full_name
     HAVING exams_taken >= 2
     ORDER BY avg_percentage DESC
     LIMIT 5
@@ -374,7 +378,7 @@ $conn->close();
                                 <thead>
                                     <tr>
                                         <th>Rank</th>
-                                        <th>Student</th>
+                                        <th>Student Name</th>
                                         <th>Student ID</th>
                                         <th>Average Percentage</th>
                                         <th>Exams Taken</th>
