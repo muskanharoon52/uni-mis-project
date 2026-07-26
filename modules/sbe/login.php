@@ -30,6 +30,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $user = null;
     }
 
+    // Fallback: check shared users table by username
+    if (!$user) {
+        try {
+            $mappedRole = $role === 'teacher' ? 'Teacher' : 'Student';
+            $roleName = $role === 'teacher' ? 'Teacher' : 'Student';
+            $stmt = db()->prepare('SELECT u.*, r.role_name FROM users u LEFT JOIN roles r ON r.role_id = u.role_id WHERE u.username = :login_id LIMIT 1');
+            $stmt->execute([':login_id' => $loginId]);
+            $dbUser = $stmt->fetch();
+            if ($dbUser && password_verify($password, $dbUser['password_hash'])) {
+                $user = [
+                    'auth_id' => (int)$dbUser['user_id'],
+                    'role' => $mappedRole,
+                    'login_id' => $dbUser['username'],
+                    'display_name' => $dbUser['full_name'],
+                    'password_hash' => $dbUser['password_hash'],
+                    'status' => $dbUser['status'] === 'Active' ? 'Active' : 'Inactive',
+                ];
+            }
+        } catch (Throwable $exception) {
+            $user = null;
+        }
+    }
+
     $fallback = $config['demo_auth'][$role][$loginId] ?? null;
     $fallbackValid = $fallback && hash_equals((string) $fallback['password'], $password);
 
@@ -109,6 +132,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             <button class="btn btn-primary" type="submit" style="width: 100%; min-height: 44px; border-radius: 8px; font-size: 0.9rem; font-weight: 600; background: var(--accent); color: #fff; border: none; cursor: pointer; transition: all 0.2s;">Get Started</button>
         </form>
+
+        <div style="margin-top: 20px; padding: 12px; background: #f8f9fa; border-radius: 8px; font-size: 0.8rem; color: #666; line-height: 1.6;">
+            <strong>Demo:</strong> teacher / password123 &middot; student / password123<br>
+            <strong>Or use IDs:</strong> 5001 / teacher123 &middot; 9001 / student123
+        </div>
     </aside>
 </div>
 
