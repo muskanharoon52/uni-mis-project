@@ -1,7 +1,7 @@
 <?php
 // login.php
 
-require_once __DIR__ . '/config/db_connect.php';
+require_once __DIR__ . '/../../config/db_connect.php';
 require_once __DIR__ . '/includes/auth.php';
 
 $error = '';
@@ -11,7 +11,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $password = $_POST['password'] ?? '';
     
     if (loginUser($email, $password)) {
-        header('Location: dashboard.php');
+        header('Location: ../../dashboard.php');
         exit;
     } else {
         $error = 'Invalid email or password!';

@@ -3,18 +3,18 @@ session_start();
 
 // Check if user is logged in
 if (!isset($_SESSION['user_id'])) {
-    header('Location: ../auth/login.php?error=Please login first');
+    header('Location: ../sso/login.php?error=Please login first');
     exit();
 }
 
 // Check if user has finance role (role_id = 3) or admin (role_id = 1)
 if ($_SESSION['role_id'] != 3 && $_SESSION['role_id'] != 1) {
-    header('Location: ../auth/login.php?error=Access denied. Finance Officer only.');
+    header('Location: ../sso/login.php?error=Access denied. Finance Officer only.');
     exit();
 }
 
 // Include database connection
-include __DIR__ . '/../config/db_connect.php';
+include __DIR__ . '/../../config/db_connect.php';
 
 // Include header
 include __DIR__ . '/includes/header.php';

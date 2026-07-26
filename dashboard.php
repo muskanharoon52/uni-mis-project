@@ -3,11 +3,11 @@
 
 session_start();
 require_once __DIR__ . '/config/db_connect.php';
-require_once __DIR__ . '/includes/auth.php';
+require_once __DIR__ . '/modules/sso/includes/auth.php';
 
 // Check if logged in
 if (!isLoggedIn()) {
-    header('Location: login.php');
+    header('Location: modules/sso/login.php');
     exit;
 }
 

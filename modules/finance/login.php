@@ -9,7 +9,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $password = $_POST['password'] ?? '';
 
     if (loginUser($email, $password)) {
-        header('Location: examination/dashboard.php');
+        header('Location: dashboard.php');
         exit;
     } else {
         $error = 'Invalid email or password!';
@@ -21,7 +21,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Login - Examination Module</title>
+    <title>Login - Finance Module</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
@@ -40,9 +40,9 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 <body>
     <div class="login-card">
         <div class="text-center">
-            <i class="fas fa-graduation-cap logo-icon"></i>
-            <h2>Examination Module</h2>
-            <p class="subtitle">Login to access exam management</p>
+            <i class="fas fa-building-columns logo-icon"></i>
+            <h2>Finance Module</h2>
+            <p class="subtitle">Login to access finance management</p>
         </div>
         <?php if ($error): ?>
         <div class="alert alert-danger"><?php echo htmlspecialchars($error); ?></div>
@@ -52,7 +52,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 <label class="form-label fw-semibold">Email Address</label>
                 <div class="input-group">
                     <span class="input-group-text"><i class="fas fa-envelope"></i></span>
-                    <input type="email" name="email" class="form-control" placeholder="exam@university.edu" required>
+                    <input type="email" name="email" class="form-control" placeholder="finance@university.edu" required>
                 </div>
             </div>
             <div class="mb-3">
@@ -67,9 +67,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         <hr>
         <div class="credentials-box">
             <p class="mb-1"><strong>Demo Credentials:</strong></p>
-            <p class="mb-0">Exam Officer: <strong>exam_admin / password123</strong></p>
-            <p class="mb-0">Student: <strong>student_demo / password123</strong></p>
-            <p class="mb-0">Teacher: <strong>teacher_demo / password123</strong></p>
+            <p class="mb-0">Finance Officer: <strong>finance_admin / password123</strong></p>
+            <p class="mb-0">Staff: <strong>staff_demo / password123</strong></p>
         </div>
     </div>
 </body>

@@ -1,5 +1,11 @@
 <?php
-// Start session to check if user is logged in
+ini_set('display_errors', 1);
+ini_set('display_startup_errors', 1);
+error_reporting(E_ALL);
+session_start();
+// Clear stale session to prevent auto-login
+session_unset();
+session_destroy();
 session_start();
 ?>
 <!DOCTYPE html>
@@ -34,10 +40,7 @@ session_start();
         .badge { font-size: 0.7rem; padding: 2px 8px; border-radius: 99px; font-weight: 600; }
         .badge-active { background: #dcfce7; color: #16a34a; }
         .badge-placeholder { background: #fef3c7; color: #d97706; }
-        .section-title { font-size: 1.1rem; font-weight: 600; color: #374151; margin-bottom: 12px; margin-top: 8px; }
-        .already-logged { margin-top: 20px; padding: 10px; background: #e8f0fe; border-radius: 10px; color: #667eea; font-size: 0.9rem; }
-        .already-logged a { color: #667eea; font-weight: 600; text-decoration: none; }
-        .already-logged a:hover { text-decoration: underline; }
+        .badge-disabled { background: #fee2e2; color: #dc2626; cursor: not-allowed; }
     </style>
 </head>
 <body>
@@ -45,37 +48,31 @@ session_start();
         <a href="index.php" class="navbar-brand">University MIS</a>
         <ul class="navbar-nav">
             <li><a href="index.php">Home</a></li>
-            <li><a href="examination/index.php">Examination</a></li>
-            <li><a href="login.php">SSO Login</a></li>
-            <li><a href="finance/dashboard.php">Finance</a></li>
+            <li><a href="mis.php">MIS Portal</a></li>
+            <li><a href="modules/examination/login.php">Examination</a></li>
+            <li><a href="modules/sso/login.php">SSO Login</a></li>
+            <li><a href="modules/finance/login.php">Finance</a></li>
         </ul>
     </nav>
     <div class="container">
         <h1>University Management Information System</h1>
         <p class="subtitle">Select a module to continue</p>
-        <?php if (isset($_SESSION['user_id'])): ?>
-            <div class="already-logged">
-                <i class="fas fa-info-circle"></i> You are currently logged in as
-                <strong><?php echo htmlspecialchars($_SESSION['full_name'] ?? 'User'); ?></strong>
-                (<a href="logout.php">Logout</a>)
-            </div>
-        <?php endif; ?>
         <div class="module-grid">
             <div class="module-card">
                 <h2><span class="icon icon-lms">&#128218;</span> LMS (Learning Management)</h2>
                 <p style="color:#6b7280;font-size:0.9rem;margin-bottom:16px;">Course materials, assignments, grades, and student communications</p>
                 <ul class="sub-menu">
                     <li>
-                        <a href="#">SBE (Admin Portal)</a>
-                        <span class="badge badge-placeholder">placeholder</span>
+                        <span>SBE (Admin Portal)</span>
+                        <span class="badge badge-disabled">Coming Soon</span>
                     </li>
                     <li>
-                        <a href="#">Teacher</a>
-                        <span class="badge badge-placeholder">placeholder</span>
+                        <span>Teacher</span>
+                        <span class="badge badge-disabled">Coming Soon</span>
                     </li>
                     <li>
-                        <a href="#">Student</a>
-                        <span class="badge badge-placeholder">placeholder</span>
+                        <span>Student</span>
+                        <span class="badge badge-disabled">Coming Soon</span>
                     </li>
                 </ul>
             </div>
@@ -84,23 +81,23 @@ session_start();
                 <p style="color:#6b7280;font-size:0.9rem;margin-bottom:16px;">Finance, admission, authentication, and examination management</p>
                 <ul class="sub-menu">
                     <li>
-                        <a href="#">Finance</a>
-                        <span class="badge badge-placeholder">placeholder</span>
-                    </li>
-                    <li>
-                        <a href="#">Admission</a>
-                        <span class="badge badge-placeholder">placeholder</span>
-                    </li>
-                    <li>
-                        <a href="login.php">SSO</a>
+                        <a href="modules/finance/login.php">Finance</a>
                         <span class="badge badge-active">active</span>
                     </li>
                     <li>
-                        <a href="examination/index.php">Examination</a>
+                        <span>Admission</span>
+                        <span class="badge badge-disabled">Coming Soon</span>
+                    </li>
+                    <li>
+                        <a href="modules/sso/login.php">SSO</a>
                         <span class="badge badge-active">active</span>
                     </li>
                     <li>
-                        <a href="finance/dashboard.php">Finance</a>
+                        <a href="modules/examination/login.php">Examination</a>
+                        <span class="badge badge-active">active</span>
+                    </li>
+                    <li>
+                        <a href="mis.php">MIS Portal</a>
                         <span class="badge badge-active">active</span>
                     </li>
                 </ul>

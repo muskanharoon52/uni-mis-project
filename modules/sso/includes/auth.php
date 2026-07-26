@@ -19,7 +19,7 @@ function isSSO() {
 
 function requireLogin() {
     if (!isLoggedIn()) {
-        header('Location: ' . BASE_URL . 'login.php');
+        header('Location: ' . BASE_URL . 'modules/sso/login.php');
         exit;
     }
 }
@@ -75,7 +75,7 @@ function loginUser($email, $password) {
 
 function logoutUser() {
     session_destroy();
-    header('Location: ' . BASE_URL . 'login.php');
+    header('Location: ' . BASE_URL . 'modules/sso/login.php');
     exit;
 }
 ?>
