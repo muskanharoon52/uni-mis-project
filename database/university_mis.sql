@@ -1,852 +1,31 @@
--- =====================================================================
--- UNIVERSITY MIS - MAIN/CENTRAL DATABASE
--- Merges: Admission, Finance, SSO, Examination, SBE, Login modules
--- Engine : InnoDB | Charset: utf8mb4
--- Author : Prepared for Admission Office lead (main DB integrator)
--- =====================================================================
--- HOW THIS FILE IS ORGANIZED
---  0. Database creation
---  1. SHARED / CORE tables      (used by every module)
---  2. LOGIN / USERS module      (staff accounts - fills the gap in every
---                                 member's design, since all modules
---                                 mentioned "Login module" but nobody
---                                 actually built it)
---  3. ADMISSION module
---  4. SSO module
---  5. FINANCE module
---  6. EXAMINATION module
---  7. SBE (system based examination) module
---  8. CROSS-MODULE TRIGGERS / STORED PROCEDURES (business rules)
---  9. USEFUL VIEWS
--- =====================================================================
--- NAMING FIXES vs the drafts you were sent (so nothing collides in ONE db):
---  * SSO's student-request table       -> renamed sso_applications
---    (was "applications", clashed conceptually with admission form)
---  * Examination module's "exams"      -> renamed examinations
---    (was "exams", clashed with SBE's own "exams" table)
---  * SBE tables all prefixed sbe_      (matches how member 5 already
---    documented them, and keeps her "local, isolated" layer intact)
---  * "program" (admission wording) and "department" (SSO wording) are
---    the SAME real-world thing (BSCS/BSSE/BSIT/BSAI) -> unified into
---    one shared table: departments
--- =====================================================================
+-- phpMyAdmin SQL Dump
+-- version 5.2.1
+-- https://www.phpmyadmin.net/
+--
+-- Host: 127.0.0.1
+-- Generation Time: Jul 26, 2026 at 10:14 PM
+-- Server version: 10.4.32-MariaDB
+-- PHP Version: 8.2.12
 
-CREATE DATABASE IF NOT EXISTS university_mis
-    CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-USE university_mis;
+SET SQL_MODE = "NO_AUTO_VALUE_ON_ZERO";
+START TRANSACTION;
+SET time_zone = "+00:00";
 
-SET FOREIGN_KEY_CHECKS = 0;
 
--- =====================================================================
--- 1. SHARED / CORE TABLES
--- =====================================================================
+/*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
+/*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;
+/*!40101 SET @OLD_COLLATION_CONNECTION=@@COLLATION_CONNECTION */;
+/*!40101 SET NAMES utf8mb4 */;
 
--- Departments = Programs (BSCS, BSSE, BSIT, BSAI ...)
-CREATE TABLE departments (
-    department_id   INT AUTO_INCREMENT PRIMARY KEY,
-    department_name VARCHAR(100) NOT NULL,          -- e.g. BSCS
-    department_code VARCHAR(20)  NOT NULL UNIQUE,    -- e.g. CS
-    duration_years  TINYINT      NOT NULL DEFAULT 4,
-    total_semesters TINYINT      NOT NULL DEFAULT 8,
-    status          ENUM('Active','Inactive') NOT NULL DEFAULT 'Active',
-    created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-) ENGINE=InnoDB;
-
--- Sessions / Intake batches (Fall 2026, Spring 2027 ...)
-CREATE TABLE sessions (
-    session_id   INT AUTO_INCREMENT PRIMARY KEY,
-    session_name VARCHAR(50) NOT NULL UNIQUE,        -- e.g. Fall 2026
-    start_date   DATE NULL,
-    end_date     DATE NULL,
-    status       ENUM('Active','Inactive') NOT NULL DEFAULT 'Active',
-    created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-) ENGINE=InnoDB;
-
--- Semesters belong to a department, numbered so promotion logic works
-CREATE TABLE semesters (
-    semester_id     INT AUTO_INCREMENT PRIMARY KEY,
-    semester_name   VARCHAR(50) NOT NULL,             -- Semester 1
-    semester_number TINYINT     NOT NULL,             -- 1,2,3...8  (needed to detect "final semester")
-    department_id   INT NOT NULL,
-    CONSTRAINT fk_sem_dept FOREIGN KEY (department_id) REFERENCES departments(department_id),
-    UNIQUE KEY uq_dept_sem (department_id, semester_number)
-) ENGINE=InnoDB;
-
--- =====================================================================
--- 2. LOGIN / USERS MODULE (staff side - admission, finance, sso, exam, admin)
--- Every module referenced "Login module" but never defined it centrally.
--- =====================================================================
-CREATE TABLE roles (
-    role_id   INT AUTO_INCREMENT PRIMARY KEY,
-    role_name VARCHAR(50) NOT NULL UNIQUE   -- SuperAdmin, AdmissionOfficer, FinanceOfficer, SSOStaff, ExamOfficer, Teacher
-) ENGINE=InnoDB;
-
-CREATE TABLE users (
-    user_id       INT AUTO_INCREMENT PRIMARY KEY,
-    full_name     VARCHAR(150) NOT NULL,
-    username      VARCHAR(100) NOT NULL UNIQUE,
-    email         VARCHAR(150) NOT NULL UNIQUE,
-    password_hash VARCHAR(255) NOT NULL,
-    role_id       INT NOT NULL,
-    department_id INT NULL,                 -- for teachers / dept-scoped staff
-    login_id      VARCHAR(20) NULL UNIQUE,  -- LMS login ID (e.g. 5001, 9001)
-    profile_photo VARCHAR(255) NULL,        -- LMS profile photo path
-    status        ENUM('Active','Inactive') NOT NULL DEFAULT 'Active',
-    last_login_at DATETIME NULL,
-    created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    CONSTRAINT fk_users_role FOREIGN KEY (role_id) REFERENCES roles(role_id),
-    CONSTRAINT fk_users_dept FOREIGN KEY (department_id) REFERENCES departments(department_id)
-) ENGINE=InnoDB;
-
--- =====================================================================
--- 3. ADMISSION MODULE
--- Flow: form submitted -> temporary number -> (review) -> first payment
---       received -> student_id issued (first-come-first-served on PAYMENT,
---       not on submission time) -> batch/session/program/starting
---       semester fixed by admission -> courses allocated from SSO's
---       predefined course list -> fee structure (from SSO) applied,
---       admission can add a discount by adding/removing fee heads ->
---       first (admission) scholarship can be granted here.
--- =====================================================================
-
-CREATE TABLE admission_applications (
-    application_id      INT AUTO_INCREMENT PRIMARY KEY,
-    temp_application_no VARCHAR(30) NOT NULL UNIQUE,   -- e.g. TMP-2026-000123, given instantly on submission
-    full_name           VARCHAR(150) NOT NULL,
-    father_name         VARCHAR(150) NOT NULL,
-    cnic_or_bform       VARCHAR(20)  NULL,
-    dob                 DATE NULL,
-    gender              ENUM('Male','Female','Other') NULL,
-    contact_no          VARCHAR(20)  NULL,
-    email               VARCHAR(150) NULL,
-    address             VARCHAR(255) NULL,
-    program_id          INT NOT NULL,                  -- desired department/program
-    session_id          INT NOT NULL,                  -- intake session applied for
-    applied_semester_id INT NOT NULL,                  -- normally semester 1, fixed by admission
-    application_status  ENUM('Submitted','Under Review','Approved','Rejected','Admitted','Cancelled')
-                         NOT NULL DEFAULT 'Submitted',
-    submitted_at        DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    reviewed_by          INT NULL,
-    reviewed_at          DATETIME NULL,
-    rejection_reason     VARCHAR(255) NULL,
-    created_at           TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at           TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    CONSTRAINT fk_appl_program  FOREIGN KEY (program_id)  REFERENCES departments(department_id),
-    CONSTRAINT fk_appl_session  FOREIGN KEY (session_id)  REFERENCES sessions(session_id),
-    CONSTRAINT fk_appl_sem      FOREIGN KEY (applied_semester_id) REFERENCES semesters(semester_id),
-    CONSTRAINT fk_appl_reviewer FOREIGN KEY (reviewed_by) REFERENCES users(user_id)
-) ENGINE=InnoDB;
-
--- The permanent student record. Created ONLY once the first (admission)
--- fee payment clears -> guarantees "first payer gets the ID first"
--- because student_id is an AUTO_INCREMENT assigned at insert time, and
--- the insert only happens from sp_confirm_admission() below, which is
--- called from the payment flow, never from the application flow.
-CREATE TABLE students (
-    student_id        INT AUTO_INCREMENT PRIMARY KEY,
-    application_id    INT NOT NULL UNIQUE,
-    roll_no           VARCHAR(30) NULL UNIQUE,   -- filled in later by SSO's "Roll Number" sub-module
-    full_name         VARCHAR(150) NOT NULL,
-    father_name       VARCHAR(150) NOT NULL,
-    cnic_or_bform     VARCHAR(20)  NULL,
-    dob               DATE NULL,
-    gender            ENUM('Male','Female','Other') NULL,
-    contact_no        VARCHAR(20)  NULL,
-    email             VARCHAR(150) NULL,
-    address           VARCHAR(255) NULL,
-    program_id        INT NOT NULL,              -- = department, fixed at admission
-    admission_session_id INT NOT NULL,           -- starting session/year, FIXED, never changes
-    current_session_id   INT NOT NULL,           -- session the student is currently studying in
-    current_semester_id  INT NOT NULL,           -- set/advanced by Admission at first, later by Examination promotion
-    batch_year        SMALLINT NOT NULL,
-    admission_date    DATE NOT NULL,
-    status            ENUM('Active','Freeze','Graduated','Dropped','Suspended') NOT NULL DEFAULT 'Active',
-    created_at        TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at        TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    CONSTRAINT fk_stu_application FOREIGN KEY (application_id) REFERENCES admission_applications(application_id),
-    CONSTRAINT fk_stu_program     FOREIGN KEY (program_id) REFERENCES departments(department_id),
-    CONSTRAINT fk_stu_adm_session FOREIGN KEY (admission_session_id) REFERENCES sessions(session_id),
-    CONSTRAINT fk_stu_cur_session FOREIGN KEY (current_session_id) REFERENCES sessions(session_id),
-    CONSTRAINT fk_stu_cur_sem     FOREIGN KEY (current_semester_id) REFERENCES semesters(semester_id)
-) ENGINE=InnoDB;
-
--- Fee structure is DEFINED by SSO (per program/session/semester), but it
--- is APPLIED/ASSIGNED to a student by Admission. This is the bridge table
--- that resolves "fee structure already defined by SSO, admission office
--- will apply that to the student".
-CREATE TABLE fee_structures (
-    fee_structure_id INT AUTO_INCREMENT PRIMARY KEY,
-    program_id       INT NOT NULL,
-    session_id       INT NOT NULL,
-    semester_id      INT NOT NULL,
-    total_amount     DECIMAL(12,2) NOT NULL DEFAULT 0,
-    status           ENUM('Active','Inactive') NOT NULL DEFAULT 'Active',
-    created_by       INT NOT NULL,        -- SSO staff user_id
-    created_at       TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at       TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    CONSTRAINT fk_fs_program  FOREIGN KEY (program_id)  REFERENCES departments(department_id),
-    CONSTRAINT fk_fs_session  FOREIGN KEY (session_id)  REFERENCES sessions(session_id),
-    CONSTRAINT fk_fs_semester FOREIGN KEY (semester_id) REFERENCES semesters(semester_id),
-    CONSTRAINT fk_fs_creator  FOREIGN KEY (created_by)  REFERENCES users(user_id),
-    UNIQUE KEY uq_program_session_sem (program_id, session_id, semester_id)
-) ENGINE=InnoDB;
-
--- fee_structure_details is created after fee_heads (section 5) - see below.
-
--- Admission applies a fee structure to a specific student for a specific semester
-CREATE TABLE student_fee_assignment (
-    assignment_id    INT AUTO_INCREMENT PRIMARY KEY,
-    student_id       INT NOT NULL,
-    fee_structure_id INT NOT NULL,
-    semester_id      INT NOT NULL,
-    assigned_by      INT NOT NULL,      -- admission officer user_id
-    assigned_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT fk_sfa_student FOREIGN KEY (student_id) REFERENCES students(student_id),
-    CONSTRAINT fk_sfa_fs      FOREIGN KEY (fee_structure_id) REFERENCES fee_structures(fee_structure_id),
-    CONSTRAINT fk_sfa_sem     FOREIGN KEY (semester_id) REFERENCES semesters(semester_id),
-    CONSTRAINT fk_sfa_officer FOREIGN KEY (assigned_by) REFERENCES users(user_id),
-    UNIQUE KEY uq_student_semester_assignment (student_id, semester_id)
-) ENGINE=InnoDB;
-
--- Scholarships: FIRST one given by Admission at admission time, subsequent
--- semester-wise scholarships given by other departments/committees.
-CREATE TABLE scholarships (
-    scholarship_id    INT AUTO_INCREMENT PRIMARY KEY,
-    student_id        INT NOT NULL,
-    scholarship_type  ENUM('Admission','Semester-wise','Merit','Need-based','Other') NOT NULL,
-    awarding_body      VARCHAR(100) NOT NULL,   -- 'Admission Office', 'Academics Committee', etc.
-    semester_id        INT NULL,                -- NULL for the admission-time one
-    discount_kind       ENUM('Flat','Percentage') NOT NULL DEFAULT 'Percentage',
-    discount_value      DECIMAL(10,2) NOT NULL,
-    approved_by         INT NOT NULL,
-    approved_at         TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    status               ENUM('Active','Revoked') NOT NULL DEFAULT 'Active',
-    remarks              VARCHAR(255) NULL,
-    CONSTRAINT fk_sch_student   FOREIGN KEY (student_id) REFERENCES students(student_id),
-    CONSTRAINT fk_sch_semester  FOREIGN KEY (semester_id) REFERENCES semesters(semester_id),
-    CONSTRAINT fk_sch_approver  FOREIGN KEY (approved_by) REFERENCES users(user_id)
-) ENGINE=InnoDB;
-
--- Admission-granted discounts by adding/removing individual fee heads
--- (separate from scholarships, this is the "add/remove fee head" tool).
-CREATE TABLE student_fee_discounts (
-    discount_id    INT AUTO_INCREMENT PRIMARY KEY,
-    student_id     INT NOT NULL,
-    fee_head_id    INT NOT NULL,
-    semester_id    INT NOT NULL,
-    action_type    ENUM('Add','Remove','Reduce') NOT NULL,  -- Add a head, Remove a head entirely, or Reduce its amount
-    amount         DECIMAL(10,2) NOT NULL DEFAULT 0,        -- amount added/removed/reduced
-    reason         VARCHAR(255) NULL,
-    applied_by     INT NOT NULL,
-    applied_at     TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT fk_sfd_student FOREIGN KEY (student_id) REFERENCES students(student_id),
-    CONSTRAINT fk_sfd_semester FOREIGN KEY (semester_id) REFERENCES semesters(semester_id),
-    CONSTRAINT fk_sfd_officer FOREIGN KEY (applied_by) REFERENCES users(user_id)
-    -- fk_head added after fee_heads table is created (section 5)
-) ENGINE=InnoDB;
-
--- =====================================================================
--- 4. SSO MODULE (everything after admission: courses, teachers,
---    timetable, attendance, applications, roll numbers)
--- =====================================================================
-
-CREATE TABLE teachers (
-    teacher_id    INT AUTO_INCREMENT PRIMARY KEY,
-    user_id       INT NULL,                -- link to login account, if teacher has portal access
-    teacher_name  VARCHAR(150) NOT NULL,
-    designation   VARCHAR(100) NULL,
-    email         VARCHAR(150) NOT NULL UNIQUE,
-    phone         VARCHAR(20)  NULL,
-    department_id INT NOT NULL,
-    status        ENUM('Active','Inactive') NOT NULL DEFAULT 'Active',
-    created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT fk_teacher_user FOREIGN KEY (user_id) REFERENCES users(user_id),
-    CONSTRAINT fk_teacher_dept FOREIGN KEY (department_id) REFERENCES departments(department_id)
-) ENGINE=InnoDB;
-
-CREATE TABLE courses (
-    course_id      INT AUTO_INCREMENT PRIMARY KEY,
-    course_code    VARCHAR(20) NOT NULL UNIQUE,
-    course_title   VARCHAR(150) NOT NULL,
-    description    TEXT NULL,                        -- LMS course description
-    credit_hours   TINYINT NOT NULL DEFAULT 3,
-    department_id  INT NOT NULL,
-    semester_id    INT NOT NULL,
-    semester_name  VARCHAR(40) NULL,                 -- LMS semester string (e.g. 'Spring 2026')
-    teacher_id     INT NULL,                         -- LMS direct teacher link (FK to teachers)
-    status         ENUM('Active','Inactive') NOT NULL DEFAULT 'Active',
-    created_at     TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT fk_course_dept FOREIGN KEY (department_id) REFERENCES departments(department_id),
-    CONSTRAINT fk_course_sem  FOREIGN KEY (semester_id) REFERENCES semesters(semester_id),
-    CONSTRAINT fk_course_teacher FOREIGN KEY (teacher_id) REFERENCES teachers(teacher_id)
-) ENGINE=InnoDB;
-
-CREATE TABLE semester_courses (
-    id           INT AUTO_INCREMENT PRIMARY KEY,
-    semester_id  INT NOT NULL,
-    course_id    INT NOT NULL,
-    CONSTRAINT fk_semc_sem    FOREIGN KEY (semester_id) REFERENCES semesters(semester_id),
-    CONSTRAINT fk_semc_course FOREIGN KEY (course_id) REFERENCES courses(course_id),
-    UNIQUE KEY uq_sem_course (semester_id, course_id)
-) ENGINE=InnoDB;
-
-CREATE TABLE teacher_courses (
-    id           INT AUTO_INCREMENT PRIMARY KEY,
-    teacher_id   INT NOT NULL,
-    course_id    INT NOT NULL,
-    semester_id  INT NOT NULL,
-    session_id   INT NOT NULL,
-    section      VARCHAR(5) NOT NULL DEFAULT 'A',
-    CONSTRAINT fk_tc_teacher FOREIGN KEY (teacher_id) REFERENCES teachers(teacher_id),
-    CONSTRAINT fk_tc_course  FOREIGN KEY (course_id) REFERENCES courses(course_id),
-    CONSTRAINT fk_tc_sem     FOREIGN KEY (semester_id) REFERENCES semesters(semester_id),
-    CONSTRAINT fk_tc_session FOREIGN KEY (session_id) REFERENCES sessions(session_id),
-    UNIQUE KEY uq_course_sem_session_section (course_id, semester_id, session_id, section)
-) ENGINE=InnoDB;
-
-CREATE TABLE timetable (
-    id           INT AUTO_INCREMENT PRIMARY KEY,
-    course_id    INT NOT NULL,
-    teacher_id   INT NOT NULL,
-    day_of_week  ENUM('Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday') NOT NULL,
-    start_time   TIME NOT NULL,
-    end_time     TIME NOT NULL,
-    room_no      VARCHAR(30) NOT NULL,
-    semester_id  INT NOT NULL,
-    session_id   INT NOT NULL,
-    section      VARCHAR(5) NOT NULL DEFAULT 'A',
-    CONSTRAINT fk_tt_course  FOREIGN KEY (course_id) REFERENCES courses(course_id),
-    CONSTRAINT fk_tt_teacher FOREIGN KEY (teacher_id) REFERENCES teachers(teacher_id),
-    CONSTRAINT fk_tt_sem     FOREIGN KEY (semester_id) REFERENCES semesters(semester_id),
-    CONSTRAINT fk_tt_session FOREIGN KEY (session_id) REFERENCES sessions(session_id),
-    CONSTRAINT chk_tt_time CHECK (end_time > start_time),
-    -- prevents double-booking the same room, at the same time, same day
-    UNIQUE KEY uq_room_slot (room_no, day_of_week, start_time, session_id)
-) ENGINE=InnoDB;
-
-CREATE TABLE attendance (
-    attendance_id INT AUTO_INCREMENT PRIMARY KEY,
-    student_id    INT NOT NULL,
-    course_id     INT NOT NULL,
-    teacher_id    INT NULL,                 -- nullable for LMS usage
-    class_date    DATE NOT NULL,
-    status        ENUM('Present','Absent','Late','Leave') NOT NULL,
-    marked_at     TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT fk_att_student FOREIGN KEY (student_id) REFERENCES students(student_id),
-    CONSTRAINT fk_att_course  FOREIGN KEY (course_id) REFERENCES courses(course_id),
-    CONSTRAINT fk_att_teacher FOREIGN KEY (teacher_id) REFERENCES teachers(teacher_id),
-    UNIQUE KEY uq_student_course_date (student_id, course_id, class_date)
-) ENGINE=InnoDB;
-
--- Renamed from "applications" to sso_applications to avoid clashing
--- with admission_applications in the shared database.
-CREATE TABLE sso_applications (
-    application_id  INT AUTO_INCREMENT PRIMARY KEY,
-    student_id      INT NOT NULL,
-    application_type ENUM('Leave','Course Withdrawal','Semester Freeze','Transcript',
-                           'Bonafide Certificate','ID Card','Other') NOT NULL,
-    subject         VARCHAR(150) NOT NULL,
-    description     VARCHAR(500) NULL,
-    attachment_path VARCHAR(255) NULL,
-    status          ENUM('Pending','Approved','Rejected') NOT NULL DEFAULT 'Pending',
-    remarks         VARCHAR(255) NULL,
-    resolved_by     INT NULL,
-    resolved_at     DATETIME NULL,
-    created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT fk_ssoapp_student FOREIGN KEY (student_id) REFERENCES students(student_id),
-    CONSTRAINT fk_ssoapp_resolver FOREIGN KEY (resolved_by) REFERENCES users(user_id)
-) ENGINE=InnoDB;
-
--- =====================================================================
--- 5. FINANCE MODULE
--- =====================================================================
-
-CREATE TABLE fee_heads (
-    fee_head_id   INT AUTO_INCREMENT PRIMARY KEY,
-    fee_head_name VARCHAR(100) NOT NULL UNIQUE,   -- Admission Fee, Tuition Fee, Library Fee...
-    description   VARCHAR(255) NULL,
-    status        ENUM('Active','Inactive') NOT NULL DEFAULT 'Active',
-    deleted_at    TIMESTAMP NULL,                 -- soft delete / restore support
-    created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-) ENGINE=InnoDB;
-
--- Now that fee_heads exists, finish fee_structure_details & the discount FK
-CREATE TABLE fee_structure_details (
-    id               INT AUTO_INCREMENT PRIMARY KEY,
-    fee_structure_id INT NOT NULL,
-    fee_head_id      INT NOT NULL,
-    amount           DECIMAL(10,2) NOT NULL,
-    CONSTRAINT fk_fsd_structure FOREIGN KEY (fee_structure_id) REFERENCES fee_structures(fee_structure_id) ON DELETE CASCADE,
-    CONSTRAINT fk_fsd_head      FOREIGN KEY (fee_head_id) REFERENCES fee_heads(fee_head_id),
-    UNIQUE KEY uq_structure_head (fee_structure_id, fee_head_id)
-) ENGINE=InnoDB;
-
-ALTER TABLE student_fee_discounts
-    ADD CONSTRAINT fk_sfd_head FOREIGN KEY (fee_head_id) REFERENCES fee_heads(fee_head_id);
-
-CREATE TABLE student_fee (
-    student_fee_id   INT AUTO_INCREMENT PRIMARY KEY,
-    student_id       INT NOT NULL,
-    semester_id      INT NOT NULL,
-    session_id       INT NOT NULL,
-    fee_structure_id INT NOT NULL,
-    total_amount     DECIMAL(12,2) NOT NULL DEFAULT 0,
-    paid_amount      DECIMAL(12,2) NOT NULL DEFAULT 0,
-    remaining_amount DECIMAL(12,2) GENERATED ALWAYS AS (total_amount - paid_amount) STORED,
-    due_date         DATE NULL,
-    status           ENUM('Unpaid','Partially Paid','Paid','Overdue') NOT NULL DEFAULT 'Unpaid',
-    generated_by     INT NOT NULL,
-    generated_at     TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT fk_stf_student FOREIGN KEY (student_id) REFERENCES students(student_id),
-    CONSTRAINT fk_stf_sem     FOREIGN KEY (semester_id) REFERENCES semesters(semester_id),
-    CONSTRAINT fk_stf_session FOREIGN KEY (session_id) REFERENCES sessions(session_id),
-    CONSTRAINT fk_stf_fs      FOREIGN KEY (fee_structure_id) REFERENCES fee_structures(fee_structure_id),
-    CONSTRAINT fk_stf_generator FOREIGN KEY (generated_by) REFERENCES users(user_id),
-    UNIQUE KEY uq_student_semester_fee (student_id, semester_id)
-) ENGINE=InnoDB;
-
-CREATE TABLE student_fee_details (
-    id             INT AUTO_INCREMENT PRIMARY KEY,
-    student_fee_id INT NOT NULL,
-    fee_head_id    INT NOT NULL,
-    amount         DECIMAL(10,2) NOT NULL,
-    discount_amount DECIMAL(10,2) NOT NULL DEFAULT 0,
-    net_amount     DECIMAL(10,2) GENERATED ALWAYS AS (amount - discount_amount) STORED,
-    CONSTRAINT fk_sfdet_stf  FOREIGN KEY (student_fee_id) REFERENCES student_fee(student_fee_id) ON DELETE CASCADE,
-    CONSTRAINT fk_sfdet_head FOREIGN KEY (fee_head_id) REFERENCES fee_heads(fee_head_id),
-    UNIQUE KEY uq_stf_head (student_fee_id, fee_head_id)
-) ENGINE=InnoDB;
-
-CREATE TABLE payments (
-    payment_id      INT AUTO_INCREMENT PRIMARY KEY,
-    student_fee_id  INT NOT NULL,
-    student_id      INT NOT NULL,
-    amount_paid     DECIMAL(12,2) NOT NULL,
-    payment_method  ENUM('Cash','Bank','Card','Online') NOT NULL DEFAULT 'Cash',
-    transaction_ref VARCHAR(100) NULL,
-    payment_date    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    received_by     INT NOT NULL,
-    status          ENUM('Success','Reversed') NOT NULL DEFAULT 'Success',
-    CONSTRAINT fk_pay_stf     FOREIGN KEY (student_fee_id) REFERENCES student_fee(student_fee_id),
-    CONSTRAINT fk_pay_student FOREIGN KEY (student_id) REFERENCES students(student_id),
-    CONSTRAINT fk_pay_officer FOREIGN KEY (received_by) REFERENCES users(user_id),
-    CONSTRAINT chk_pay_positive CHECK (amount_paid > 0)
-) ENGINE=InnoDB;
-
-CREATE TABLE receipts (
-    receipt_id  INT AUTO_INCREMENT PRIMARY KEY,
-    payment_id  INT NOT NULL UNIQUE,
-    receipt_no  VARCHAR(30) NOT NULL UNIQUE,
-    issued_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    issued_by   INT NOT NULL,
-    CONSTRAINT fk_rcpt_payment FOREIGN KEY (payment_id) REFERENCES payments(payment_id),
-    CONSTRAINT fk_rcpt_issuer  FOREIGN KEY (issued_by) REFERENCES users(user_id)
-) ENGINE=InnoDB;
-
-CREATE TABLE installments (
-    installment_id  INT AUTO_INCREMENT PRIMARY KEY,
-    student_fee_id  INT NOT NULL,
-    installment_no  TINYINT NOT NULL,
-    amount          DECIMAL(10,2) NOT NULL,
-    due_date        DATE NOT NULL,
-    paid_amount     DECIMAL(10,2) NOT NULL DEFAULT 0,
-    status          ENUM('Pending','Paid','Overdue') NOT NULL DEFAULT 'Pending',
-    CONSTRAINT fk_inst_stf FOREIGN KEY (student_fee_id) REFERENCES student_fee(student_fee_id) ON DELETE CASCADE,
-    UNIQUE KEY uq_stf_installment_no (student_fee_id, installment_no)
-) ENGINE=InnoDB;
-
-CREATE TABLE payment_reversals (
-    reversal_id     INT AUTO_INCREMENT PRIMARY KEY,
-    payment_id      INT NOT NULL,
-    reversed_amount DECIMAL(12,2) NOT NULL,
-    reason          VARCHAR(255) NOT NULL,
-    reversed_by     INT NOT NULL,
-    reversed_at     TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT fk_rev_payment FOREIGN KEY (payment_id) REFERENCES payments(payment_id),
-    CONSTRAINT fk_rev_officer FOREIGN KEY (reversed_by) REFERENCES users(user_id)
-) ENGINE=InnoDB;
-
-CREATE TABLE activity_logs (
-    log_id          BIGINT AUTO_INCREMENT PRIMARY KEY,
-    module          VARCHAR(50) NOT NULL,     -- Admission, Finance, SSO, Examination, SBE
-    action          VARCHAR(100) NOT NULL,    -- 'Fee Generated', 'Payment Received', 'Soft Delete', etc.
-    reference_table VARCHAR(100) NULL,
-    reference_id    BIGINT NULL,
-    performed_by    INT NULL,
-    details         TEXT NULL,
-    created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT fk_log_user FOREIGN KEY (performed_by) REFERENCES users(user_id)
-) ENGINE=InnoDB;
-
--- =====================================================================
--- 6. EXAMINATION MODULE  (Publish Paper + Promote Student)
--- NOTE: original "exams" renamed to "examinations" to avoid a name clash
---       with the SBE module's own "exams" table in this shared database.
--- =====================================================================
-
-CREATE TABLE examinations (
-    exam_id     INT AUTO_INCREMENT PRIMARY KEY,
-    exam_type   ENUM('Mid','Final') NOT NULL,
-    session_id  INT NOT NULL,
-    semester_id INT NOT NULL,
-    created_by  INT NOT NULL,       -- teacher/admin user_id
-    created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT fk_exm_session FOREIGN KEY (session_id) REFERENCES sessions(session_id),
-    CONSTRAINT fk_exm_sem     FOREIGN KEY (semester_id) REFERENCES semesters(semester_id),
-    CONSTRAINT fk_exm_creator FOREIGN KEY (created_by) REFERENCES users(user_id)
-) ENGINE=InnoDB;
-
-CREATE TABLE question_papers (
-    paper_id     INT AUTO_INCREMENT PRIMARY KEY,
-    exam_id      INT NOT NULL,
-    course_id    INT NOT NULL,
-    teacher_id   INT NOT NULL,
-    paper_file   VARCHAR(255) NOT NULL,
-    status       ENUM('Pending','Published') NOT NULL DEFAULT 'Pending',
-    publish_date DATE NULL,
-    created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT fk_qp_exam    FOREIGN KEY (exam_id) REFERENCES examinations(exam_id),
-    CONSTRAINT fk_qp_course  FOREIGN KEY (course_id) REFERENCES courses(course_id),
-    CONSTRAINT fk_qp_teacher FOREIGN KEY (teacher_id) REFERENCES teachers(teacher_id),
-    -- reject invalid file formats at the app layer; DB enforces the extension allow-list here as a backstop
-    CONSTRAINT chk_qp_file_ext CHECK (paper_file LIKE '%.pdf' OR paper_file LIKE '%.docx')
-) ENGINE=InnoDB;
-
-CREATE TABLE student_promotions (
-    promotion_id    INT AUTO_INCREMENT PRIMARY KEY,
-    student_id      INT NOT NULL,
-    from_semester_id INT NOT NULL,
-    to_semester_id   INT NOT NULL,
-    from_session_id  INT NOT NULL,
-    to_session_id    INT NOT NULL,
-    promoted_by      INT NOT NULL,
-    promotion_date   DATE NOT NULL DEFAULT (CURRENT_DATE),
-    remarks          VARCHAR(255) NULL,
-    CONSTRAINT fk_promo_student FOREIGN KEY (student_id) REFERENCES students(student_id),
-    CONSTRAINT fk_promo_from_sem FOREIGN KEY (from_semester_id) REFERENCES semesters(semester_id),
-    CONSTRAINT fk_promo_to_sem   FOREIGN KEY (to_semester_id) REFERENCES semesters(semester_id),
-    CONSTRAINT fk_promo_from_ses FOREIGN KEY (from_session_id) REFERENCES sessions(session_id),
-    CONSTRAINT fk_promo_to_ses   FOREIGN KEY (to_session_id) REFERENCES sessions(session_id),
-    CONSTRAINT fk_promo_officer  FOREIGN KEY (promoted_by) REFERENCES users(user_id),
-    -- prevents duplicate promotion of the same student into the same target semester/session
-    UNIQUE KEY uq_student_target (student_id, to_semester_id, to_session_id)
-) ENGINE=InnoDB;
-
--- =====================================================================
--- 7. SBE MODULE (System Based Examination)
--- Kept as its own isolated layer as originally designed (auth_users is
--- local), but course/teacher/student IDs are now linked to the shared
--- tables so it plugs into the ONE main database instead of floating
--- disconnected data. sbe_ prefix keeps every object name unique.
--- =====================================================================
-
-CREATE TABLE sbe_auth_users (
-    auth_id       INT AUTO_INCREMENT PRIMARY KEY,
-    role          ENUM('Teacher','Student') NOT NULL,
-    login_id      VARCHAR(50) NOT NULL UNIQUE,
-    password_hash VARCHAR(255) NOT NULL,
-    display_name  VARCHAR(150) NOT NULL,
-    -- links back to the real person in the shared DB (nullable so the
-    -- module can still work standalone if ever needed)
-    teacher_id    INT NULL,
-    student_id    INT NULL,
-    status        ENUM('Active','Inactive') NOT NULL DEFAULT 'Active',
-    created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    CONSTRAINT fk_sbeauth_teacher FOREIGN KEY (teacher_id) REFERENCES teachers(teacher_id),
-    CONSTRAINT fk_sbeauth_student FOREIGN KEY (student_id) REFERENCES students(student_id),
-    CONSTRAINT chk_sbeauth_role CHECK (
-        (role = 'Teacher' AND teacher_id IS NOT NULL) OR
-        (role = 'Student' AND student_id IS NOT NULL)
-    )
-) ENGINE=InnoDB;
-
-CREATE TABLE sbe_question_bank (
-    question_id      INT AUTO_INCREMENT PRIMARY KEY,
-    course_id        INT NOT NULL,
-    teacher_id       INT NOT NULL,
-    topic            VARCHAR(150) NULL,
-    question_text    TEXT NOT NULL,
-    option_a         VARCHAR(255) NOT NULL,
-    option_b         VARCHAR(255) NOT NULL,
-    option_c         VARCHAR(255) NOT NULL,
-    option_d         VARCHAR(255) NOT NULL,
-    correct_option   ENUM('A','B','C','D') NOT NULL,
-    explanation      VARCHAR(500) NULL,
-    marks            DECIMAL(5,2) NOT NULL DEFAULT 1,
-    difficulty_level ENUM('Easy','Medium','Hard') NOT NULL DEFAULT 'Medium',
-    status           ENUM('Active','Inactive') NOT NULL DEFAULT 'Active',
-    created_at       TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at       TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    CONSTRAINT fk_qb_course  FOREIGN KEY (course_id) REFERENCES courses(course_id),
-    CONSTRAINT fk_qb_teacher FOREIGN KEY (teacher_id) REFERENCES teachers(teacher_id)
-) ENGINE=InnoDB;
-
-CREATE TABLE sbe_exams (
-    exam_id            INT AUTO_INCREMENT PRIMARY KEY,
-    exam_code          VARCHAR(30) NOT NULL UNIQUE,
-    course_id          INT NOT NULL,
-    teacher_id         INT NOT NULL,
-    title              VARCHAR(150) NOT NULL,
-    exam_type          ENUM('Quiz','Mid','Final','Practice','Assignment Test') NOT NULL,
-    instructions       TEXT NULL,
-    duration_minutes   SMALLINT NOT NULL,
-    total_questions    SMALLINT NOT NULL,
-    total_marks        DECIMAL(6,2) NOT NULL,
-    passing_marks      DECIMAL(6,2) NOT NULL,
-    selection_mode     ENUM('Manual','Random') NOT NULL DEFAULT 'Manual',
-    negative_marking   DECIMAL(4,2) NOT NULL DEFAULT 0,
-    shuffle_questions  TINYINT(1) NOT NULL DEFAULT 0,
-    shuffle_options    TINYINT(1) NOT NULL DEFAULT 0,
-    allow_review       TINYINT(1) NOT NULL DEFAULT 1,
-    status             ENUM('Draft','Published','Closed','Archived') NOT NULL DEFAULT 'Draft',
-    created_at         TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at         TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    CONSTRAINT fk_sbeexam_course  FOREIGN KEY (course_id) REFERENCES courses(course_id),
-    CONSTRAINT fk_sbeexam_teacher FOREIGN KEY (teacher_id) REFERENCES teachers(teacher_id),
-    CONSTRAINT chk_sbeexam_pass CHECK (passing_marks <= total_marks)
-) ENGINE=InnoDB;
-
-CREATE TABLE sbe_exam_schedule (
-    schedule_id                 INT AUTO_INCREMENT PRIMARY KEY,
-    exam_id                     INT NOT NULL,
-    section                     VARCHAR(5) NOT NULL,     -- class/section, e.g. BSCS-5A
-    semester_id                 INT NOT NULL,
-    exam_date                   DATE NOT NULL,
-    start_time                  TIME NOT NULL,
-    end_time                    TIME NOT NULL,
-    late_submission_grace_minutes SMALLINT NOT NULL DEFAULT 0,
-    location                    VARCHAR(100) NULL,
-    remarks                     VARCHAR(255) NULL,
-    status                      ENUM('Scheduled','Ongoing','Completed','Cancelled') NOT NULL DEFAULT 'Scheduled',
-    created_at                  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at                  TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    CONSTRAINT fk_sbesched_exam FOREIGN KEY (exam_id) REFERENCES sbe_exams(exam_id),
-    CONSTRAINT fk_sbesched_sem  FOREIGN KEY (semester_id) REFERENCES semesters(semester_id),
-    CONSTRAINT chk_sbesched_time CHECK (end_time > start_time)
-) ENGINE=InnoDB;
-
-CREATE TABLE sbe_exam_questions (
-    exam_question_id INT AUTO_INCREMENT PRIMARY KEY,
-    exam_id          INT NOT NULL,
-    question_id      INT NOT NULL,
-    question_order   SMALLINT NOT NULL,
-    created_at       TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT fk_sbeeq_exam FOREIGN KEY (exam_id) REFERENCES sbe_exams(exam_id),
-    CONSTRAINT fk_sbeeq_question FOREIGN KEY (question_id) REFERENCES sbe_question_bank(question_id),
-    UNIQUE KEY uq_exam_question (exam_id, question_id),        -- no duplicate question in the same exam
-    UNIQUE KEY uq_exam_order (exam_id, question_order)         -- no duplicate order position
-) ENGINE=InnoDB;
-
-CREATE TABLE sbe_student_exams (
-    student_exam_id    INT AUTO_INCREMENT PRIMARY KEY,
-    schedule_id        INT NOT NULL,
-    exam_id            INT NOT NULL,
-    student_id         INT NOT NULL,
-    attempt_no         TINYINT NOT NULL DEFAULT 1,
-    status             ENUM('In Progress','Submitted','Auto Submitted','Expired','Cancelled') NOT NULL DEFAULT 'In Progress',
-    started_at         DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    expires_at         DATETIME NOT NULL,
-    submitted_at       DATETIME NULL,
-    time_taken_seconds INT NULL,
-    obtained_marks     DECIMAL(6,2) NULL,
-    percentage         DECIMAL(5,2) NULL,
-    pass_fail_status   ENUM('Pass','Fail') NULL,
-    CONSTRAINT fk_sbese_schedule FOREIGN KEY (schedule_id) REFERENCES sbe_exam_schedule(schedule_id),
-    CONSTRAINT fk_sbese_exam     FOREIGN KEY (exam_id) REFERENCES sbe_exams(exam_id),
-    CONSTRAINT fk_sbese_student  FOREIGN KEY (student_id) REFERENCES students(student_id),
-    UNIQUE KEY uq_schedule_student_attempt (schedule_id, student_id, attempt_no)
-) ENGINE=InnoDB;
-
-CREATE TABLE sbe_student_answers (
-    student_answer_id  INT AUTO_INCREMENT PRIMARY KEY,
-    student_exam_id     INT NOT NULL,
-    question_id          INT NOT NULL,
-    question_order        SMALLINT NOT NULL,
-    question_snapshot     JSON NOT NULL,
-    selected_option       ENUM('A','B','C','D') NULL,
-    answered_at            DATETIME NULL,
-    is_correct             TINYINT(1) NULL,
-    marks_awarded          DECIMAL(5,2) NOT NULL DEFAULT 0,
-    CONSTRAINT fk_sbesa_studentexam FOREIGN KEY (student_exam_id) REFERENCES sbe_student_exams(student_exam_id),
-    CONSTRAINT fk_sbesa_question    FOREIGN KEY (question_id) REFERENCES sbe_question_bank(question_id),
-    UNIQUE KEY uq_studentexam_question (student_exam_id, question_id)
-) ENGINE=InnoDB;
-
-CREATE TABLE sbe_exam_results (
-    exam_result_id  INT AUTO_INCREMENT PRIMARY KEY,
-    student_exam_id INT NOT NULL,
-    exam_id         INT NOT NULL,
-    student_id      INT NOT NULL,
-    obtained_marks  DECIMAL(6,2) NOT NULL,
-    total_marks     DECIMAL(6,2) NOT NULL,
-    percentage      DECIMAL(5,2) NOT NULL,
-    pass_fail_status ENUM('Pass','Fail') NOT NULL,
-    rank_position   INT NULL,
-    remarks         VARCHAR(255) NULL,
-    status          ENUM('Draft','Published','Archived') NOT NULL DEFAULT 'Draft',
-    published_at    DATETIME NULL,
-    created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT fk_sberes_studentexam FOREIGN KEY (student_exam_id) REFERENCES sbe_student_exams(student_exam_id),
-    CONSTRAINT fk_sberes_exam        FOREIGN KEY (exam_id) REFERENCES sbe_exams(exam_id),
-    CONSTRAINT fk_sberes_student     FOREIGN KEY (student_id) REFERENCES students(student_id),
-    CONSTRAINT chk_sberes_marks CHECK (obtained_marks <= total_marks),
-    UNIQUE KEY uq_studentexam_result (student_exam_id)
-) ENGINE=InnoDB;
-
--- =====================================================================
--- LMS MODULE TABLES (Learning Management System)
--- =====================================================================
-
--- LMS: Student-course enrollment (links LMS users to courses)
-CREATE TABLE lms_enrollments (
-    enrollment_id INT AUTO_INCREMENT PRIMARY KEY,
-    student_user_id INT NOT NULL,
-    course_id    INT NOT NULL,
-    enrolled_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT fk_lms_enr_student FOREIGN KEY (student_user_id) REFERENCES users(user_id) ON DELETE CASCADE,
-    CONSTRAINT fk_lms_enr_course  FOREIGN KEY (course_id) REFERENCES courses(course_id) ON DELETE CASCADE,
-    UNIQUE KEY uq_lms_enrollment (student_user_id, course_id)
-) ENGINE=InnoDB;
-
--- LMS: Teacher-created assignments with file upload and due date
-CREATE TABLE lms_assignments (
-    assignment_id INT AUTO_INCREMENT PRIMARY KEY,
-    course_id    INT NOT NULL,
-    title        VARCHAR(160) NOT NULL,
-    description  TEXT NULL,
-    file_path    VARCHAR(255) NULL,
-    due_date     DATE NOT NULL,
-    created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT fk_lms_asn_course FOREIGN KEY (course_id) REFERENCES courses(course_id) ON DELETE CASCADE
-) ENGINE=InnoDB;
-
--- LMS: Course lecture materials with file upload
-CREATE TABLE lms_lectures (
-    lecture_id    INT AUTO_INCREMENT PRIMARY KEY,
-    course_id     INT NOT NULL,
-    title         VARCHAR(160) NOT NULL,
-    file_path     VARCHAR(255) NOT NULL,
-    lecture_date  DATE NULL,
-    created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT fk_lms_lec_course FOREIGN KEY (course_id) REFERENCES courses(course_id) ON DELETE CASCADE
-) ENGINE=InnoDB;
-
--- LMS: Student assignment submissions with grading and feedback
-CREATE TABLE lms_submissions (
-    submission_id   INT AUTO_INCREMENT PRIMARY KEY,
-    assignment_id   INT NOT NULL,
-    student_user_id INT NOT NULL,
-    content         TEXT NOT NULL,
-    submission_file VARCHAR(255) NULL,
-    submitted_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    grade           DECIMAL(5,2) NULL,
-    feedback        TEXT NULL,
-    CONSTRAINT fk_lms_sub_assignment FOREIGN KEY (assignment_id) REFERENCES lms_assignments(assignment_id) ON DELETE CASCADE,
-    CONSTRAINT fk_lms_sub_student    FOREIGN KEY (student_user_id) REFERENCES users(user_id) ON DELETE CASCADE,
-    UNIQUE KEY uq_lms_submission (assignment_id, student_user_id)
-) ENGINE=InnoDB;
-
--- LMS: Per-component internal marks (quiz, mid, assignment, etc.)
-CREATE TABLE lms_marks (
-    mark_id        INT AUTO_INCREMENT PRIMARY KEY,
-    course_id      INT NOT NULL,
-    student_user_id INT NOT NULL,
-    component      VARCHAR(100) NOT NULL,
-    marks_obtained DECIMAL(6,2) NOT NULL,
-    total_marks    DECIMAL(6,2) NOT NULL,
-    created_at     TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT fk_lms_mark_course FOREIGN KEY (course_id) REFERENCES courses(course_id) ON DELETE CASCADE,
-    CONSTRAINT fk_lms_mark_student FOREIGN KEY (student_user_id) REFERENCES users(user_id) ON DELETE CASCADE,
-    UNIQUE KEY uq_lms_mark (course_id, student_user_id, component)
-) ENGINE=InnoDB;
-
--- LMS: Locks/finalizes marks for a student-course pair
-CREATE TABLE lms_mark_finalizations (
-    finalization_id INT AUTO_INCREMENT PRIMARY KEY,
-    course_id       INT NOT NULL,
-    student_user_id INT NOT NULL,
-    is_finalized    TINYINT(1) NOT NULL DEFAULT 0,
-    finalized_at    TIMESTAMP NULL,
-    CONSTRAINT fk_lms_mf_course FOREIGN KEY (course_id) REFERENCES courses(course_id) ON DELETE CASCADE,
-    CONSTRAINT fk_lms_mf_student FOREIGN KEY (student_user_id) REFERENCES users(user_id) ON DELETE CASCADE,
-    UNIQUE KEY uq_lms_finalization (course_id, student_user_id)
-) ENGINE=InnoDB;
-
--- LMS: Student support/query tickets
-CREATE TABLE lms_queries (
-    query_id       INT AUTO_INCREMENT PRIMARY KEY,
-    user_id        INT NOT NULL,
-    subject        VARCHAR(160) NOT NULL,
-    message        TEXT NOT NULL,
-    status         ENUM('open','answered','closed') NOT NULL DEFAULT 'open',
-    reply          TEXT NULL,
-    created_at     TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT fk_lms_qry_user FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
-) ENGINE=InnoDB;
-
--- LMS: Student applications (leave, withdrawal, etc.)
-CREATE TABLE lms_applications (
-    application_id INT AUTO_INCREMENT PRIMARY KEY,
-    user_id        INT NOT NULL,
-    type           VARCHAR(100) NOT NULL,
-    details        TEXT NOT NULL,
-    status         ENUM('pending','approved','rejected') NOT NULL DEFAULT 'pending',
-    created_at     TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT fk_lms_app_user FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE
-) ENGINE=InnoDB;
-
--- LMS: In-app notifications with sender, recipient, category, read-status
-CREATE TABLE lms_notifications (
-    notification_id   INT AUTO_INCREMENT PRIMARY KEY,
-    recipient_user_id INT NOT NULL,
-    sender_user_id    INT NULL,
-    category          ENUM('notification','message','announcement') NOT NULL DEFAULT 'notification',
-    title             VARCHAR(160) NOT NULL,
-    body              TEXT NOT NULL,
-    link_url          VARCHAR(255) NULL,
-    is_read           TINYINT(1) NOT NULL DEFAULT 0,
-    created_at        TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT fk_lms_notif_recipient FOREIGN KEY (recipient_user_id) REFERENCES users(user_id) ON DELETE CASCADE,
-    CONSTRAINT fk_lms_notif_sender    FOREIGN KEY (sender_user_id) REFERENCES users(user_id) ON DELETE SET NULL
-) ENGINE=InnoDB;
-
--- LMS: Simplified fee records for LMS views
-CREATE TABLE lms_fee_records (
-    fee_record_id INT AUTO_INCREMENT PRIMARY KEY,
-    student_user_id INT NOT NULL,
-    semester     VARCHAR(40) NOT NULL,
-    description  VARCHAR(160) NOT NULL,
-    amount       DECIMAL(12,2) NOT NULL,
-    paid_amount  DECIMAL(12,2) NOT NULL DEFAULT 0,
-    due_date     DATE NOT NULL,
-    status       ENUM('paid','partial','unpaid') NOT NULL DEFAULT 'unpaid',
-    created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT fk_lms_fee_student FOREIGN KEY (student_user_id) REFERENCES users(user_id) ON DELETE CASCADE
-) ENGINE=InnoDB;
-
-SET FOREIGN_KEY_CHECKS = 1;
-
--- =====================================================================
--- 8. CROSS-MODULE BUSINESS-RULE LOGIC
--- =====================================================================
+--
+-- Database: `university_mis`
+--
 
 DELIMITER $$
-
--- 8.1 Confirm admission after the FIRST successful payment.
---     This is what guarantees "whoever pays first gets student_id first",
---     because the students row (and its AUTO_INCREMENT id) is only
---     created here, not at application time.
-CREATE PROCEDURE sp_confirm_admission(
-    IN p_application_id INT,
-    IN p_current_semester_id INT,
-    IN p_batch_year SMALLINT,
-    OUT p_student_id INT
-)
-BEGIN
+--
+-- Procedures
+--
+CREATE DEFINER=`root`@`localhost` PROCEDURE `sp_confirm_admission` (IN `p_application_id` INT, IN `p_current_semester_id` INT, IN `p_batch_year` SMALLINT, OUT `p_student_id` INT)   BEGIN
     DECLARE v_program_id INT;
     DECLARE v_session_id INT;
 
@@ -874,11 +53,759 @@ BEGIN
     WHERE application_id = p_application_id;
 END$$
 
--- 8.2 Keep student_fee.paid_amount / status in sync whenever a payment is recorded
-CREATE TRIGGER trg_after_payment_insert
-AFTER INSERT ON payments
-FOR EACH ROW
-BEGIN
+DELIMITER ;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `activity_logs`
+--
+
+CREATE TABLE `activity_logs` (
+  `log_id` bigint(20) NOT NULL,
+  `module` varchar(50) NOT NULL,
+  `action` varchar(100) NOT NULL,
+  `reference_table` varchar(100) DEFAULT NULL,
+  `reference_id` bigint(20) DEFAULT NULL,
+  `performed_by` int(11) DEFAULT NULL,
+  `details` text DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `admission_applications`
+--
+
+CREATE TABLE `admission_applications` (
+  `application_id` int(11) NOT NULL,
+  `temp_application_no` varchar(30) NOT NULL,
+  `full_name` varchar(150) NOT NULL,
+  `father_name` varchar(150) NOT NULL,
+  `cnic_or_bform` varchar(20) DEFAULT NULL,
+  `dob` date DEFAULT NULL,
+  `gender` enum('Male','Female','Other') DEFAULT NULL,
+  `contact_no` varchar(20) DEFAULT NULL,
+  `email` varchar(150) DEFAULT NULL,
+  `address` varchar(255) DEFAULT NULL,
+  `program_id` int(11) NOT NULL,
+  `session_id` int(11) NOT NULL,
+  `applied_semester_id` int(11) NOT NULL,
+  `application_status` enum('Submitted','Under Review','Approved','Rejected','Admitted','Cancelled') NOT NULL DEFAULT 'Submitted',
+  `submitted_at` datetime NOT NULL DEFAULT current_timestamp(),
+  `reviewed_by` int(11) DEFAULT NULL,
+  `reviewed_at` datetime DEFAULT NULL,
+  `rejection_reason` varchar(255) DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--
+-- Dumping data for table `admission_applications`
+--
+
+INSERT INTO `admission_applications` (`application_id`, `temp_application_no`, `full_name`, `father_name`, `cnic_or_bform`, `dob`, `gender`, `contact_no`, `email`, `address`, `program_id`, `session_id`, `applied_semester_id`, `application_status`, `submitted_at`, `reviewed_by`, `reviewed_at`, `rejection_reason`, `created_at`, `updated_at`) VALUES
+(13, '', 'Muhammad Ali', 'Ahmed Ali', '42101-1234567-1', '2000-01-15', 'Male', '0310-1111111', 'ali@email.com', 'House #12, Street 5, Lahore', 1, 1, 1, 'Approved', '2026-07-26 12:10:32', NULL, NULL, NULL, '2026-07-26 07:10:32', '2026-07-26 07:10:32');
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `admission_students`
+--
+
+CREATE TABLE `admission_students` (
+  `id` int(11) NOT NULL,
+  `student_id` varchar(30) DEFAULT NULL,
+  `full_name` varchar(150) NOT NULL,
+  `student_name` varchar(150) DEFAULT NULL,
+  `father_name` varchar(150) DEFAULT NULL,
+  `cnic_or_bform` varchar(20) DEFAULT NULL,
+  `dob` date DEFAULT NULL,
+  `gender` enum('Male','Female','Other') DEFAULT NULL,
+  `contact_no` varchar(20) DEFAULT NULL,
+  `email` varchar(150) DEFAULT NULL,
+  `address` varchar(255) DEFAULT NULL,
+  `program_id` int(11) DEFAULT NULL,
+  `department_id` int(11) DEFAULT NULL,
+  `status` enum('active','inactive','graduated','suspended') DEFAULT 'active',
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `applications`
+--
+
+CREATE TABLE `applications` (
+  `application_id` int(11) NOT NULL,
+  `student_id` varchar(50) NOT NULL,
+  `application_type` varchar(100) NOT NULL,
+  `subject` varchar(255) DEFAULT NULL,
+  `description` text DEFAULT NULL,
+  `attachment` varchar(255) DEFAULT NULL,
+  `status` enum('Pending','Approved','Rejected') DEFAULT 'Pending',
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `review_date` datetime DEFAULT NULL,
+  `reviewed_by` int(11) DEFAULT NULL,
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
+  `remarks` text DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `attendance`
+--
+
+CREATE TABLE `attendance` (
+  `attendance_id` int(11) NOT NULL,
+  `date` date DEFAULT NULL,
+  `student_id` int(11) NOT NULL,
+  `course_id` int(11) NOT NULL,
+  `faculty_id` int(11) DEFAULT NULL,
+  `teacher_id` int(11) NOT NULL,
+  `class_date` date NOT NULL,
+  `status` enum('Present','Absent','Leave') NOT NULL,
+  `remark` text DEFAULT NULL,
+  `marked_at` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `courses`
+--
+
+CREATE TABLE `courses` (
+  `course_id` int(11) NOT NULL,
+  `course_code` varchar(20) NOT NULL,
+  `course_name` varchar(100) DEFAULT NULL,
+  `course_title` varchar(150) NOT NULL,
+  `program_id` int(11) DEFAULT NULL,
+  `credit_hours` tinyint(4) NOT NULL DEFAULT 3,
+  `description` text DEFAULT NULL,
+  `department_id` int(11) DEFAULT NULL,
+  `semester_id` int(11) NOT NULL,
+  `status` enum('Active','Inactive') NOT NULL DEFAULT 'Active',
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `semester_name` varchar(40) DEFAULT NULL,
+  `teacher_id` int(11) DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `departments`
+--
+
+CREATE TABLE `departments` (
+  `department_id` int(11) NOT NULL,
+  `department_name` varchar(100) NOT NULL,
+  `department_code` varchar(20) NOT NULL,
+  `duration_years` tinyint(4) NOT NULL DEFAULT 4,
+  `total_semesters` tinyint(4) NOT NULL DEFAULT 8,
+  `status` enum('Active','Inactive') NOT NULL DEFAULT 'Active',
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--
+-- Dumping data for table `departments`
+--
+
+INSERT INTO `departments` (`department_id`, `department_name`, `department_code`, `duration_years`, `total_semesters`, `status`, `created_at`, `updated_at`) VALUES
+(1, 'Default Department', '', 4, 8, 'Active', '2026-07-26 06:47:52', '2026-07-26 06:47:52'),
+(2, 'Computer Science', 'CS', 4, 8, 'Active', '2026-07-26 07:03:24', '2026-07-26 07:03:24'),
+(3, 'Information Technology', 'IT', 4, 8, 'Active', '2026-07-26 07:07:25', '2026-07-26 07:07:25'),
+(4, 'Software Engineering', 'SE', 4, 8, 'Active', '2026-07-26 07:07:25', '2026-07-26 07:07:25'),
+(5, 'Artificial Intelligence', 'AI', 4, 8, 'Active', '2026-07-26 07:07:25', '2026-07-26 07:07:25'),
+(6, 'Data Science', 'DS', 4, 8, 'Active', '2026-07-26 07:07:25', '2026-07-26 07:07:25');
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `examinations`
+--
+
+CREATE TABLE `examinations` (
+  `exam_id` int(11) NOT NULL,
+  `exam_type` enum('Mid','Final') NOT NULL,
+  `session_id` int(11) NOT NULL,
+  `semester_id` int(11) NOT NULL,
+  `created_by` int(11) NOT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `exam_attendance`
+--
+
+CREATE TABLE `exam_attendance` (
+  `attendance_id` int(11) NOT NULL,
+  `student_id` int(11) NOT NULL,
+  `exam_id` int(11) NOT NULL,
+  `present` tinyint(1) DEFAULT 0,
+  `absent_reason` text DEFAULT NULL,
+  `marked_by` int(11) DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `exam_results`
+--
+
+CREATE TABLE `exam_results` (
+  `result_id` int(11) NOT NULL,
+  `student_id` int(11) NOT NULL,
+  `exam_id` int(11) NOT NULL,
+  `marks_obtained` decimal(5,2) NOT NULL,
+  `total_marks` decimal(5,2) NOT NULL,
+  `grade` varchar(2) DEFAULT NULL,
+  `percentage` decimal(5,2) DEFAULT NULL,
+  `status` enum('draft','published','archived') DEFAULT 'draft',
+  `remarks` text DEFAULT NULL,
+  `entered_by` int(11) DEFAULT NULL,
+  `published_by` int(11) DEFAULT NULL,
+  `published_at` datetime DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `exam_schedules`
+--
+
+CREATE TABLE `exam_schedules` (
+  `exam_id` int(11) NOT NULL,
+  `course_id` int(11) NOT NULL,
+  `exam_type` varchar(30) NOT NULL,
+  `date` date NOT NULL,
+  `start_time` time NOT NULL,
+  `end_time` time NOT NULL,
+  `room` varchar(30) NOT NULL,
+  `status` enum('Scheduled','Ongoing','Completed','Cancelled') NOT NULL DEFAULT 'Scheduled',
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--
+-- Dumping data for table `exam_schedules`
+--
+
+INSERT INTO `exam_schedules` (`exam_id`, `course_id`, `exam_type`, `date`, `start_time`, `end_time`, `room`, `status`, `created_at`) VALUES
+(2, 0, 'quiz', '2026-02-01', '10:00:00', '11:00:00', 'A1', 'Scheduled', '2026-07-26 06:14:47');
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `faculty`
+--
+
+CREATE TABLE `faculty` (
+  `faculty_id` int(11) NOT NULL,
+  `user_id` int(11) DEFAULT NULL,
+  `name` varchar(100) DEFAULT NULL,
+  `teacher_id` int(11) DEFAULT NULL,
+  `faculty_name` varchar(150) NOT NULL,
+  `designation` varchar(100) DEFAULT NULL,
+  `email` varchar(150) NOT NULL,
+  `phone` varchar(20) DEFAULT NULL,
+  `department_id` int(11) NOT NULL,
+  `status` enum('Active','Inactive') NOT NULL DEFAULT 'Active',
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `fee_heads`
+--
+
+CREATE TABLE `fee_heads` (
+  `fee_head_id` int(11) NOT NULL,
+  `fee_head_name` varchar(100) NOT NULL,
+  `description` varchar(255) DEFAULT NULL,
+  `status` enum('Active','Inactive') NOT NULL DEFAULT 'Active',
+  `deleted_at` timestamp NULL DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--
+-- Triggers `fee_heads`
+--
+DELIMITER $$
+CREATE TRIGGER `trg_after_feehead_update` AFTER UPDATE ON `fee_heads` FOR EACH ROW BEGIN
+    IF OLD.deleted_at IS NULL AND NEW.deleted_at IS NOT NULL THEN
+        INSERT INTO activity_logs (module, action, reference_table, reference_id, details)
+        VALUES ('Finance', 'Soft Delete Fee Head', 'fee_heads', NEW.fee_head_id, NEW.fee_head_name);
+    ELSEIF OLD.deleted_at IS NOT NULL AND NEW.deleted_at IS NULL THEN
+        INSERT INTO activity_logs (module, action, reference_table, reference_id, details)
+        VALUES ('Finance', 'Restore Fee Head', 'fee_heads', NEW.fee_head_id, NEW.fee_head_name);
+    END IF;
+END
+$$
+DELIMITER ;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `fee_payments`
+--
+
+CREATE TABLE `fee_payments` (
+  `id` int(11) NOT NULL,
+  `student_id` int(11) DEFAULT NULL,
+  `fee_type` varchar(50) NOT NULL,
+  `amount` decimal(10,2) NOT NULL,
+  `payment_date` date NOT NULL,
+  `payment_method` varchar(20) DEFAULT 'cash',
+  `status` varchar(20) DEFAULT 'pending'
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `fee_records`
+--
+
+CREATE TABLE `fee_records` (
+  `fee_id` int(11) NOT NULL,
+  `student_id` varchar(50) NOT NULL,
+  `total_fee` decimal(10,2) DEFAULT 0.00,
+  `paid_amount` decimal(10,2) DEFAULT 0.00,
+  `remaining_amount` decimal(10,2) DEFAULT 0.00,
+  `payment_date` date DEFAULT NULL,
+  `payment_method` varchar(50) DEFAULT NULL,
+  `transaction_id` varchar(100) DEFAULT NULL,
+  `status` enum('Paid','Partial','Unpaid') DEFAULT 'Unpaid',
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `fee_structures`
+--
+
+CREATE TABLE `fee_structures` (
+  `fee_structure_id` int(11) NOT NULL,
+  `program_id` int(11) NOT NULL,
+  `session_id` int(11) NOT NULL,
+  `semester_id` int(11) NOT NULL,
+  `total_amount` decimal(12,2) NOT NULL DEFAULT 0.00,
+  `status` enum('Active','Inactive') NOT NULL DEFAULT 'Active',
+  `created_by` int(11) NOT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `fee_structure_details`
+--
+
+CREATE TABLE `fee_structure_details` (
+  `id` int(11) NOT NULL,
+  `fee_structure_id` int(11) NOT NULL,
+  `fee_head_id` int(11) NOT NULL,
+  `amount` decimal(10,2) NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `installments`
+--
+
+CREATE TABLE `installments` (
+  `installment_id` int(11) NOT NULL,
+  `student_fee_id` int(11) NOT NULL,
+  `installment_no` tinyint(4) NOT NULL,
+  `amount` decimal(10,2) NOT NULL,
+  `due_date` date NOT NULL,
+  `paid_amount` decimal(10,2) NOT NULL DEFAULT 0.00,
+  `status` enum('Pending','Paid','Overdue') NOT NULL DEFAULT 'Pending'
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `lms_academic_calendar`
+--
+
+CREATE TABLE `lms_academic_calendar` (
+  `event_id` int(11) NOT NULL,
+  `title` varchar(255) NOT NULL,
+  `event_date` date DEFAULT NULL,
+  `event_type` varchar(50) DEFAULT NULL,
+  `description` text DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `lms_announcements`
+--
+
+CREATE TABLE `lms_announcements` (
+  `announcement_id` int(11) NOT NULL,
+  `course_id` int(11) DEFAULT NULL,
+  `title` varchar(255) NOT NULL,
+  `body` text DEFAULT NULL,
+  `author_user_id` int(11) DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `lms_applications`
+--
+
+CREATE TABLE `lms_applications` (
+  `application_id` int(11) NOT NULL,
+  `user_id` int(11) NOT NULL,
+  `type` varchar(50) NOT NULL,
+  `details` text DEFAULT NULL,
+  `status` enum('pending','approved','rejected') DEFAULT 'pending',
+  `created_at` datetime DEFAULT current_timestamp(),
+  `updated_at` datetime DEFAULT current_timestamp() ON UPDATE current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `lms_assignments`
+--
+
+CREATE TABLE `lms_assignments` (
+  `assignment_id` int(11) NOT NULL,
+  `course_id` int(11) NOT NULL,
+  `title` varchar(255) NOT NULL,
+  `description` text DEFAULT NULL,
+  `due_date` datetime DEFAULT NULL,
+  `max_marks` decimal(5,2) DEFAULT 100.00,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `lms_course_materials`
+--
+
+CREATE TABLE `lms_course_materials` (
+  `material_id` int(11) NOT NULL,
+  `course_id` int(11) NOT NULL,
+  `title` varchar(255) DEFAULT NULL,
+  `file_path` varchar(255) DEFAULT NULL,
+  `uploaded_by` int(11) DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `lms_datesheets`
+--
+
+CREATE TABLE `lms_datesheets` (
+  `datesheet_id` int(11) NOT NULL,
+  `course_id` int(11) NOT NULL,
+  `exam_type` varchar(50) DEFAULT NULL,
+  `exam_date` date DEFAULT NULL,
+  `start_time` time DEFAULT NULL,
+  `end_time` time DEFAULT NULL,
+  `room` varchar(50) DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `lms_enrollments`
+--
+
+CREATE TABLE `lms_enrollments` (
+  `enrollment_id` int(11) NOT NULL,
+  `course_id` int(11) NOT NULL,
+  `student_user_id` int(11) NOT NULL,
+  `enrolled_at` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `lms_exams`
+--
+
+CREATE TABLE `lms_exams` (
+  `exam_id` int(11) NOT NULL,
+  `course_id` int(11) NOT NULL,
+  `title` varchar(255) DEFAULT NULL,
+  `total_marks` decimal(5,2) DEFAULT 0.00,
+  `exam_date` date DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `lms_fees`
+--
+
+CREATE TABLE `lms_fees` (
+  `fee_id` int(11) NOT NULL,
+  `student_user_id` int(11) NOT NULL,
+  `course_id` int(11) DEFAULT NULL,
+  `amount` decimal(10,2) DEFAULT 0.00,
+  `status` enum('paid','unpaid','partial') DEFAULT 'unpaid',
+  `due_date` date DEFAULT NULL,
+  `paid_at` timestamp NULL DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `lms_lectures`
+--
+
+CREATE TABLE `lms_lectures` (
+  `lecture_id` int(11) NOT NULL,
+  `course_id` int(11) NOT NULL,
+  `title` varchar(255) DEFAULT NULL,
+  `lecture_date` date DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `lms_marks`
+--
+
+CREATE TABLE `lms_marks` (
+  `id` int(11) NOT NULL,
+  `course_id` int(11) NOT NULL,
+  `student_user_id` int(11) NOT NULL,
+  `component` varchar(50) NOT NULL,
+  `marks_obtained` decimal(5,2) DEFAULT 0.00
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `lms_mark_finalizations`
+--
+
+CREATE TABLE `lms_mark_finalizations` (
+  `id` int(11) NOT NULL,
+  `course_id` int(11) NOT NULL,
+  `student_user_id` int(11) NOT NULL,
+  `is_finalized` tinyint(1) DEFAULT 0,
+  `finalized_at` timestamp NULL DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `lms_messages`
+--
+
+CREATE TABLE `lms_messages` (
+  `message_id` int(11) NOT NULL,
+  `sender_user_id` int(11) NOT NULL,
+  `recipient_user_id` int(11) NOT NULL,
+  `subject` varchar(255) DEFAULT NULL,
+  `body` text DEFAULT NULL,
+  `is_read` tinyint(1) DEFAULT 0,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `lms_notifications`
+--
+
+CREATE TABLE `lms_notifications` (
+  `notification_id` int(11) NOT NULL,
+  `recipient_user_id` int(11) NOT NULL,
+  `sender_user_id` int(11) DEFAULT NULL,
+  `category` varchar(50) DEFAULT 'notification',
+  `title` varchar(255) DEFAULT NULL,
+  `body` text DEFAULT NULL,
+  `link_url` varchar(255) DEFAULT NULL,
+  `is_read` tinyint(1) DEFAULT 0,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `lms_queries`
+--
+
+CREATE TABLE `lms_queries` (
+  `query_id` int(11) NOT NULL,
+  `student_user_id` int(11) NOT NULL,
+  `course_id` int(11) DEFAULT NULL,
+  `subject` varchar(255) DEFAULT NULL,
+  `message` text DEFAULT NULL,
+  `reply` text DEFAULT NULL,
+  `status` enum('open','replied','closed') DEFAULT 'open',
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `lms_quizzes`
+--
+
+CREATE TABLE `lms_quizzes` (
+  `quiz_id` int(11) NOT NULL,
+  `course_id` int(11) NOT NULL,
+  `title` varchar(255) NOT NULL,
+  `total_marks` decimal(5,2) DEFAULT 0.00,
+  `duration_minutes` int(11) DEFAULT 30,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `lms_quiz_results`
+--
+
+CREATE TABLE `lms_quiz_results` (
+  `result_id` int(11) NOT NULL,
+  `quiz_id` int(11) NOT NULL,
+  `student_user_id` int(11) NOT NULL,
+  `marks_obtained` decimal(5,2) DEFAULT 0.00,
+  `submitted_at` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `lms_reports`
+--
+
+CREATE TABLE `lms_reports` (
+  `report_id` int(11) NOT NULL,
+  `course_id` int(11) DEFAULT NULL,
+  `report_type` varchar(50) DEFAULT NULL,
+  `data` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin DEFAULT NULL CHECK (json_valid(`data`)),
+  `generated_by` int(11) DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `lms_settings`
+--
+
+CREATE TABLE `lms_settings` (
+  `setting_id` int(11) NOT NULL,
+  `user_id` int(11) NOT NULL,
+  `setting_key` varchar(100) DEFAULT NULL,
+  `setting_value` text DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `lms_student_answers`
+--
+
+CREATE TABLE `lms_student_answers` (
+  `answer_id` int(11) NOT NULL,
+  `quiz_id` int(11) NOT NULL,
+  `student_user_id` int(11) NOT NULL,
+  `question_text` text DEFAULT NULL,
+  `answer_text` text DEFAULT NULL,
+  `marks` decimal(5,2) DEFAULT 0.00
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `lms_submissions`
+--
+
+CREATE TABLE `lms_submissions` (
+  `submission_id` int(11) NOT NULL,
+  `assignment_id` int(11) NOT NULL,
+  `student_user_id` int(11) NOT NULL,
+  `file_path` varchar(255) DEFAULT NULL,
+  `submitted_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `marks` decimal(5,2) DEFAULT NULL,
+  `feedback` text DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `lms_timetable`
+--
+
+CREATE TABLE `lms_timetable` (
+  `timetable_id` int(11) NOT NULL,
+  `course_id` int(11) NOT NULL,
+  `day_of_week` varchar(20) DEFAULT NULL,
+  `start_time` time DEFAULT NULL,
+  `end_time` time DEFAULT NULL,
+  `room` varchar(50) DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `lms_transcripts`
+--
+
+CREATE TABLE `lms_transcripts` (
+  `transcript_id` int(11) NOT NULL,
+  `student_user_id` int(11) NOT NULL,
+  `course_id` int(11) NOT NULL,
+  `grade` varchar(5) DEFAULT NULL,
+  `gpa` decimal(3,2) DEFAULT NULL,
+  `semester` varchar(40) DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `payments`
+--
+
+CREATE TABLE `payments` (
+  `payment_id` int(11) NOT NULL,
+  `student_fee_id` int(11) NOT NULL,
+  `student_id` int(11) NOT NULL,
+  `amount_paid` decimal(12,2) NOT NULL,
+  `payment_method` enum('Cash','Bank','Card','Online') NOT NULL DEFAULT 'Cash',
+  `transaction_ref` varchar(100) DEFAULT NULL,
+  `payment_date` datetime NOT NULL DEFAULT current_timestamp(),
+  `received_by` int(11) NOT NULL,
+  `status` enum('Success','Reversed') NOT NULL DEFAULT 'Success'
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Triggers `payments`
+--
+DELIMITER $$
+CREATE TRIGGER `trg_after_payment_insert` AFTER INSERT ON `payments` FOR EACH ROW BEGIN
     IF NEW.status = 'Success' THEN
         UPDATE student_fee
         SET paid_amount = paid_amount + NEW.amount_paid
@@ -896,13 +823,30 @@ BEGIN
         VALUES ('Finance', 'Payment Received', 'payments', NEW.payment_id, NEW.received_by,
                 CONCAT('Amount: ', NEW.amount_paid));
     END IF;
-END$$
+END
+$$
+DELIMITER ;
 
--- 8.3 Reverse a payment: adjust student_fee back down and log it
-CREATE TRIGGER trg_after_reversal_insert
-AFTER INSERT ON payment_reversals
-FOR EACH ROW
-BEGIN
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `payment_reversals`
+--
+
+CREATE TABLE `payment_reversals` (
+  `reversal_id` int(11) NOT NULL,
+  `payment_id` int(11) NOT NULL,
+  `reversed_amount` decimal(12,2) NOT NULL,
+  `reason` varchar(255) NOT NULL,
+  `reversed_by` int(11) NOT NULL,
+  `reversed_at` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--
+-- Triggers `payment_reversals`
+--
+DELIMITER $$
+CREATE TRIGGER `trg_after_reversal_insert` AFTER INSERT ON `payment_reversals` FOR EACH ROW BEGIN
     DECLARE v_student_fee_id INT;
 
     SELECT student_fee_id INTO v_student_fee_id FROM payments WHERE payment_id = NEW.payment_id;
@@ -923,544 +867,9 @@ BEGIN
 
     INSERT INTO activity_logs (module, action, reference_table, reference_id, performed_by, details)
     VALUES ('Finance', 'Payment Reversed', 'payment_reversals', NEW.reversal_id, NEW.reversed_by, NEW.reason);
-END$$
-
--- 8.4 Prevent promoting a student who is already in the final semester of their program
-CREATE TRIGGER trg_before_promotion_insert
-BEFORE INSERT ON student_promotions
-FOR EACH ROW
-BEGIN
-    DECLARE v_from_num TINYINT;
-    DECLARE v_total_sem TINYINT;
-    DECLARE v_program_id INT;
-
-    SELECT s.semester_number, d.total_semesters, d.department_id
-    INTO v_from_num, v_total_sem, v_program_id
-    FROM semesters s
-    JOIN departments d ON d.department_id = s.department_id
-    WHERE s.semester_id = NEW.from_semester_id;
-
-    IF v_from_num >= v_total_sem THEN
-        SIGNAL SQLSTATE '45000'
-        SET MESSAGE_TEXT = 'Cannot promote: student is already in the final semester.';
-    END IF;
-END$$
-
--- 8.5 Log soft delete / restore of fee heads
-CREATE TRIGGER trg_after_feehead_update
-AFTER UPDATE ON fee_heads
-FOR EACH ROW
-BEGIN
-    IF OLD.deleted_at IS NULL AND NEW.deleted_at IS NOT NULL THEN
-        INSERT INTO activity_logs (module, action, reference_table, reference_id, details)
-        VALUES ('Finance', 'Soft Delete Fee Head', 'fee_heads', NEW.fee_head_id, NEW.fee_head_name);
-    ELSEIF OLD.deleted_at IS NOT NULL AND NEW.deleted_at IS NULL THEN
-        INSERT INTO activity_logs (module, action, reference_table, reference_id, details)
-        VALUES ('Finance', 'Restore Fee Head', 'fee_heads', NEW.fee_head_id, NEW.fee_head_name);
-    END IF;
-END$$
-
+END
+$$
 DELIMITER ;
-
--- =====================================================================
--- 9. USEFUL VIEWS
--- =====================================================================
-
--- One-stop student profile combining Admission + SSO + current fee status
-CREATE OR REPLACE VIEW vw_student_profile AS
-SELECT
-    st.student_id, st.roll_no, st.full_name, st.father_name,
-    d.department_name AS program, se.session_name AS current_session,
-    sm.semester_name AS current_semester, st.batch_year, st.status,
-    sf.total_amount, sf.paid_amount, sf.remaining_amount, sf.status AS fee_status
-FROM students st
-JOIN departments d ON d.department_id = st.program_id
-JOIN sessions se ON se.session_id = st.current_session_id
-JOIN semesters sm ON sm.semester_id = st.current_semester_id
-LEFT JOIN student_fee sf ON sf.student_id = st.student_id AND sf.semester_id = st.current_semester_id;
-
--- Pending admission queue ordered by submission time (for review), separate
--- from the payment-driven student_id assignment
-CREATE OR REPLACE VIEW vw_pending_admissions AS
-SELECT application_id, temp_application_no, full_name, program_id, session_id, submitted_at
-FROM admission_applications
-WHERE application_status IN ('Submitted','Under Review')
-ORDER BY submitted_at ASC;
-
--- =====================================================================
--- 10. LMS MODULE SEED DATA
--- =====================================================================
-
--- Roles: add Student role for LMS
-INSERT INTO roles (role_name) VALUES ('Student') ON DUPLICATE KEY UPDATE role_name = role_name;
-
--- LMS Users: 5 teachers (5001-5005) + 20 students (9001-9020)
--- Password for all: teacher123 / student123 (bcrypt)
-SET @teacher_role = (SELECT role_id FROM roles WHERE role_name = 'Teacher');
-SET @student_role = (SELECT role_id FROM roles WHERE role_name = 'Student');
-SET @cs_dept = (SELECT department_id FROM departments WHERE department_code = 'CS' LIMIT 1);
-SET @sem_1 = (SELECT semester_id FROM semesters WHERE semester_number = 1 LIMIT 1);
-
--- Department fallback: if CS doesn't exist, use first department
-SET @dept_fallback = COALESCE(@cs_dept, (SELECT department_id FROM departments LIMIT 1));
-SET @sem_fallback  = COALESCE(@sem_1, (SELECT semester_id FROM semesters LIMIT 1));
-
-INSERT INTO users (full_name, username, email, password_hash, role_id, department_id, login_id, profile_photo, status) VALUES
-    ('Dr. Sara Khan',    'teacher_sara',    'sara.khan@university.edu',    '$2y$10$k8/5TEYHKt4qecH5vqVeoOG3SZEPKCr/0jvffQIh/YQjteBHpjarq', @teacher_role, @dept_fallback, '5001', NULL, 'Active'),
-    ('Dr. Ahmed Ali',    'teacher_ahmed',   'ahmed.ali@university.edu',    '$2y$10$k8/5TEYHKt4qecH5vqVeoOG3SZEPKCr/0jvffQIh/YQjteBHpjarq', @teacher_role, @dept_fallback, '5002', NULL, 'Active'),
-    ('Dr. Fatima Noor',  'teacher_fatima',  'fatima.noor@university.edu',  '$2y$10$k8/5TEYHKt4qecH5vqVeoOG3SZEPKCr/0jvffQIh/YQjteBHpjarq', @teacher_role, @dept_fallback, '5003', NULL, 'Active'),
-    ('Prof. Hassan Raza','teacher_hassan',   'hassan.raza@university.edu',  '$2y$10$k8/5TEYHKt4qecH5vqVeoOG3SZEPKCr/0jvffQIh/YQjteBHpjarq', @teacher_role, @dept_fallback, '5004', NULL, 'Active'),
-    ('Ms. Ayesha Siddiq','teacher_ayesha',  'ayesha.siddiq@university.edu','$2y$10$k8/5TEYHKt4qecH5vqVeoOG3SZEPKCr/0jvffQIh/YQjteBHpjarq', @teacher_role, @dept_fallback, '5005', NULL, 'Active');
-
-INSERT INTO users (full_name, username, email, password_hash, role_id, department_id, login_id, profile_photo, status) VALUES
-    ('Ali Raza',         'stu_ali',         'ali.raza@student.edu',         '$2y$10$k8/5TEYHKt4qecH5vqVeoOG3SZEPKCr/0jvffQIh/YQjteBHpjarq', @student_role, @dept_fallback, '9001', NULL, 'Active'),
-    ('Amina Noor',       'stu_amina',       'amina.noor@student.edu',       '$2y$10$k8/5TEYHKt4qecH5vqVeoOG3SZEPKCr/0jvffQIh/YQjteBHpjarq', @student_role, @dept_fallback, '9002', NULL, 'Active'),
-    ('Bilal Ahmed',      'stu_bilal',       'bilal.ahmed@student.edu',      '$2y$10$k8/5TEYHKt4qecH5vqVeoOG3SZEPKCr/0jvffQIh/YQjteBHpjarq', @student_role, @dept_fallback, '9003', NULL, 'Active'),
-    ('Hira Khan',        'stu_hira',        'hira.khan@student.edu',        '$2y$10$k8/5TEYHKt4qecH5vqVeoOG3SZEPKCr/0jvffQIh/YQjteBHpjarq', @student_role, @dept_fallback, '9004', NULL, 'Active'),
-    ('Hassan Ali',       'stu_hassan_s',    'hassan.ali@student.edu',       '$2y$10$k8/5TEYHKt4qecH5vqVeoOG3SZEPKCr/0jvffQIh/YQjteBHpjarq', @student_role, @dept_fallback, '9005', NULL, 'Active'),
-    ('Maryam Iqbal',     'stu_maryam',      'maryam.iqbal@student.edu',     '$2y$10$k8/5TEYHKt4qecH5vqVeoOG3SZEPKCr/0jvffQIh/YQjteBHpjarq', @student_role, @dept_fallback, '9006', NULL, 'Active'),
-    ('Usman Tariq',      'stu_usman',       'usman.tariq@student.edu',      '$2y$10$k8/5TEYHKt4qecH5vqVeoOG3SZEPKCr/0jvffQIh/YQjteBHpjarq', @student_role, @dept_fallback, '9007', NULL, 'Active'),
-    ('Sana Raza',        'stu_sana',        'sana.raza@student.edu',        '$2y$10$k8/5TEYHKt4qecH5vqVeoOG3SZEPKCr/0jvffQIh/YQjteBHpjarq', @student_role, @dept_fallback, '9008', NULL, 'Active'),
-    ('Zain Malik',       'stu_zain',        'zain.malik@student.edu',       '$2y$10$k8/5TEYHKt4qecH5vqVeoOG3SZEPKCr/0jvffQIh/YQjteBHpjarq', @student_role, @dept_fallback, '9009', NULL, 'Active'),
-    ('Iqra Javed',       'stu_iqra',        'iqra.javed@student.edu',       '$2y$10$k8/5TEYHKt4qecH5vqVeoOG3SZEPKCr/0jvffQIh/YQjteBHpjarq', @student_role, @dept_fallback, '9010', NULL, 'Active'),
-    ('Kamran Shah',      'stu_kamran',      'kamran.shah@student.edu',      '$2y$10$k8/5TEYHKt4qecH5vqVeoOG3SZEPKCr/0jvffQIh/YQjteBHpjarq', @student_role, @dept_fallback, '9011', NULL, 'Active'),
-    ('Nadia Bibi',       'stu_nadia',       'nadia.bibi@student.edu',       '$2y$10$k8/5TEYHKt4qecH5vqVeoOG3SZEPKCr/0jvffQIh/YQjteBHpjarq', @student_role, @dept_fallback, '9012', NULL, 'Active'),
-    ('Omar Farooq',      'stu_omar',        'omar.farooq@student.edu',      '$2y$10$k8/5TEYHKt4qecH5vqVeoOG3SZEPKCr/0jvffQIh/YQjteBHpjarq', @student_role, @dept_fallback, '9013', NULL, 'Active'),
-    ('巴基斯坦', 'stu_pakistan', 'pakistan@student.edu', '$2y$10$k8/5TEYHKt4qecH5vqVeoOG3SZEPKCr/0jvffQIh/YQjteBHpjarq', @student_role, @dept_fallback, '9014', NULL, 'Active'),
-    ('Qasim Nawaz',      'stu_qasim',       'qasim.nawaz@student.edu',      '$2y$10$k8/5TEYHKt4qecH5vqVeoOG3SZEPKCr/0jvffQIh/YQjteBHpjarq', @student_role, @dept_fallback, '9015', NULL, 'Active'),
-    ('Rabia Malik',      'stu_rabia',       'rabia.malik@student.edu',      '$2y$10$k8/5TEYHKt4qecH5vqVeoOG3SZEPKCr/0jvffQIh/YQjteBHpjarq', @student_role, @dept_fallback, '9016', NULL, 'Active'),
-    ('Saad Tariq',       'stu_saad',        'saad.tariq@student.edu',       '$2y$10$k8/5TEYHKt4qecH5vqVeoOG3SZEPKCr/0jvffQIh/YQjteBHpjarq', @student_role, @dept_fallback, '9017', NULL, 'Active'),
-    ('Tania Iqbal',      'stu_tania',       'tania.iqbal@student.edu',      '$2y$10$k8/5TEYHKt4qecH5vqVeoOG3SZEPKCr/0jvffQIh/YQjteBHpjarq', @student_role, @dept_fallback, '9018', NULL, 'Active'),
-    ('Umar Hayat',       'stu_umar',        'umar.hayat@student.edu',       '$2y$10$k8/5TEYHKt4qecH5vqVeoOG3SZEPKCr/0jvffQIh/YQjteBHpjarq', @student_role, @dept_fallback, '9019', NULL, 'Active'),
-    ('Zara Hussain',     'stu_zara',        'zara.hussain@student.edu',     '$2y$10$k8/5TEYHKt4qecH5vqVeoOG3SZEPKCr/0jvffQIh/YQjteBHpjarq', @student_role, @dept_fallback, '9020', NULL, 'Active');
-
--- LMS Courses (assigned to first teacher)
-SET @t1 = (SELECT user_id FROM users WHERE login_id = '5001' LIMIT 1);
-
-INSERT INTO courses (course_code, course_title, description, credit_hours, department_id, semester_id, semester_name, teacher_id, status) VALUES
-    ('CS101',  'Introduction to Programming',    'Fundamentals of programming using clear logic and problem solving.', 3, @dept_fallback, @sem_fallback, 'Spring 2026', @t1, 'Active'),
-    ('CS102',  'Object Oriented Programming',     'OOP concepts: classes, inheritance, polymorphism, and design patterns.', 3, @dept_fallback, @sem_fallback, 'Spring 2026', @t1, 'Active'),
-    ('SE201',  'Software Engineering',            'Software development lifecycle, agile methodologies, and project management.', 3, @dept_fallback, @sem_fallback, 'Spring 2026', @t1, 'Active'),
-    ('SE204',  'Database Systems',                'Design and manage relational databases and SQL-based applications.', 3, @dept_fallback, @sem_fallback, 'Spring 2026', @t1, 'Active'),
-    ('CS301',  'Data Structures and Algorithms',  'Arrays, linked lists, trees, graphs, sorting and searching algorithms.', 3, @dept_fallback, @sem_fallback, 'Spring 2026', @t1, 'Active'),
-    ('CS302',  'Operating Systems',               'Process management, memory management, file systems, and concurrency.', 3, @dept_fallback, @sem_fallback, 'Spring 2026', @t1, 'Active'),
-    ('SE301',  'Web Engineering',                 'Modern web development: HTML, CSS, JavaScript, PHP, and frameworks.', 3, @dept_fallback, @sem_fallback, 'Spring 2026', @t1, 'Active'),
-    ('SE302',  'Information Security',            'Cryptography, network security, access control, and security auditing.', 3, @dept_fallback, @sem_fallback, 'Spring 2026', @t1, 'Active');
-
--- LMS Enrollments: all 20 students in all 8 courses
-INSERT INTO lms_enrollments (student_user_id, course_id)
-SELECT u.user_id, c.course_id
-FROM users u
-CROSS JOIN courses c
-WHERE u.role_id = @student_role AND c.semester_name = 'Spring 2026';
-
--- LMS Assignments
-INSERT INTO lms_assignments (course_id, title, description, file_path, due_date) VALUES
-    ((SELECT course_id FROM courses WHERE course_code = 'CS101'),  'Loops Practice',         'Submit five solved loop problems.',                   NULL, '2026-07-20'),
-    ((SELECT course_id FROM courses WHERE course_code = 'CS101'),  'Functions Assignment',    'Write functions for common mathematical operations.',  NULL, '2026-07-25'),
-    ((SELECT course_id FROM courses WHERE course_code = 'CS102'),  'Class Design',            'Design a class hierarchy for a banking system.',       NULL, '2026-07-22'),
-    ((SELECT course_id FROM courses WHERE course_code = 'CS102'),  'Inheritance Lab',         'Implement inheritance and polymorphism examples.',     NULL, '2026-07-28'),
-    ((SELECT course_id FROM courses WHERE course_code = 'SE201'),  'SDLC Report',             'Write a report on SDLC phases for a real project.',    NULL, '2026-07-23'),
-    ((SELECT course_id FROM courses WHERE course_code = 'SE204'),  'ERD Design',              'Create an ERD for a library management system.',        NULL, '2026-07-25'),
-    ((SELECT course_id FROM courses WHERE course_code = 'SE204'),  'SQL Queries',             'Write 10 complex SQL queries with joins.',             NULL, '2026-07-30'),
-    ((SELECT course_id FROM courses WHERE course_code = 'CS301'),  'Binary Tree Implementation', 'Implement a BST with insert, delete, search.',     NULL, '2026-07-24'),
-    ((SELECT course_id FROM courses WHERE course_code = 'CS302'),  'Process Scheduling',      'Simulate FCFS, SJF, and Round Robin algorithms.',      NULL, '2026-07-26'),
-    ((SELECT course_id FROM courses WHERE course_code = 'SE301'),  'Web Page Design',         'Build a responsive landing page using HTML/CSS.',       NULL, '2026-07-27'),
-    ((SELECT course_id FROM courses WHERE course_code = 'SE302'),  'Security Audit Report',   'Perform a basic security audit on a sample system.',    NULL, '2026-07-29');
-
--- LMS Submissions: some students submitted assignments
-INSERT INTO lms_submissions (assignment_id, student_user_id, content, submission_file, submitted_at, grade, feedback) VALUES
-    (1,  (SELECT user_id FROM users WHERE login_id = '9001'), 'Loops practice submitted for review.', NULL, NOW(), NULL, NULL),
-    (1,  (SELECT user_id FROM users WHERE login_id = '9002'), 'Practice file uploaded.',              NULL, NOW(), NULL, NULL),
-    (6,  (SELECT user_id FROM users WHERE login_id = '9003'), 'ERD draft uploaded.',                  NULL, NOW(), NULL, NULL),
-    (2,  (SELECT user_id FROM users WHERE login_id = '9004'), 'Functions assignment submitted.',       NULL, NOW(), 8.00, 'Good work.'),
-    (7,  (SELECT user_id FROM users WHERE login_id = '9005'), 'SQL queries submitted.',               NULL, NOW(), NULL, NULL),
-    (3,  (SELECT user_id FROM users WHERE login_id = '9006'), 'Class design document uploaded.',       NULL, NOW(), NULL, NULL),
-    (8,  (SELECT user_id FROM users WHERE login_id = '9007'), 'BST implementation submitted.',         NULL, NOW(), 7.50, 'Needs more test cases.'),
-    (1,  (SELECT user_id FROM users WHERE login_id = '9008'), 'Loops solved.',                        NULL, NOW(), NULL, NULL);
-
--- LMS Attendance
-SET @cs101 = (SELECT course_id FROM courses WHERE course_code = 'CS101' LIMIT 1);
-SET @cs102 = (SELECT course_id FROM courses WHERE course_code = 'CS102' LIMIT 1);
-SET @se204 = (SELECT course_id FROM courses WHERE course_code = 'SE204' LIMIT 1);
-SET @cs301 = (SELECT course_id FROM courses WHERE course_code = 'CS301' LIMIT 1);
-
-INSERT INTO lms_enrollments (student_user_id, course_id)
-SELECT u.user_id, c.course_id
-FROM users u
-CROSS JOIN courses c
-WHERE u.role_id = @student_role AND c.semester_name = 'Spring 2026'
-ON DUPLICATE KEY UPDATE enrolled_at = enrolled_at;
-
--- Note: LMS attendance uses lms_enrollments for student-course links.
--- The main attendance table uses students(student_id). For LMS, attendance
--- is tracked in lms_enrollments with class_date and status added as needed by the app.
--- Since the LMS PHP code references `attendance` directly, we keep using the main
--- attendance table but with LMS user IDs mapped.
-
--- LMS Internal Marks: comprehensive marks for all students
-INSERT INTO lms_marks (course_id, student_user_id, component, marks_obtained, total_marks)
-SELECT
-    c.course_id,
-    u.user_id,
-    m.component,
-    m.marks_obtained,
-    m.total_marks
-FROM users u
-CROSS JOIN courses c
-CROSS JOIN (
-    SELECT 'assignment_1' AS component, 3 AS marks_obtained, 10 AS total_marks UNION ALL
-    SELECT 'assignment_2', 5, 10 UNION ALL
-    SELECT 'assignment_3', 2, 10 UNION ALL
-    SELECT 'test_1', 7, 10 UNION ALL
-    SELECT 'test_2', 4, 10 UNION ALL
-    SELECT 'test_3', 6, 10 UNION ALL
-    SELECT 'presentation', 8, 10 UNION ALL
-    SELECT 'major_assignment', 9, 10 UNION ALL
-    SELECT 'mid_term', 20, 25
-) m
-WHERE u.role_id = @student_role
-  AND c.semester_name = 'Spring 2026'
-  AND u.login_id IN ('9001','9002','9003','9004','9005','9006','9007','9008','9009','9010')
-ON DUPLICATE KEY UPDATE marks_obtained = m.marks_obtained;
-
--- LMS Queries
-INSERT INTO lms_queries (user_id, subject, message, status, reply, created_at) VALUES
-    ((SELECT user_id FROM users WHERE login_id = '9001'), 'Attendance correction', 'Please check my attendance for CS101.', 'open', NULL, NOW()),
-    ((SELECT user_id FROM users WHERE login_id = '9002'), 'Assignment deadline',   'Can the assignment deadline be extended?', 'open', NULL, NOW()),
-    ((SELECT user_id FROM users WHERE login_id = '9003'), 'Marks review',          'Please review my recent mid term marks.', 'open', NULL, NOW()),
-    ((SELECT user_id FROM users WHERE login_id = '9004'), 'Course material',       'Where can I find the slides for OOP?', 'answered', 'Check the lectures section.', NOW()),
-    ((SELECT user_id FROM users WHERE login_id = '9005'), 'Lab access',            'I cannot access the database lab.', 'open', NULL, NOW());
-
--- LMS Applications
-INSERT INTO lms_applications (user_id, type, details, status, created_at) VALUES
-    ((SELECT user_id FROM users WHERE login_id = '9001'), 'Leave Request',          'Medical leave for one day.',                    'pending',  NOW()),
-    ((SELECT user_id FROM users WHERE login_id = '9002'), 'Leave Request',          'Family event on Monday.',                       'pending',  NOW()),
-    ((SELECT user_id FROM users WHERE login_id = '9003'), 'Course Withdrawal',      'I want to drop SE302 this semester.',           'pending',  NOW()),
-    ((SELECT user_id FROM users WHERE login_id = '9004'), 'Transcript Request',     'Need official transcript for job application.', 'approved', NOW()),
-    ((SELECT user_id FROM users WHERE login_id = '9005'), 'Semester Freeze',        'Medical emergency, need to freeze this semester.','pending', NOW());
-
--- LMS Notifications
-INSERT INTO lms_notifications (recipient_user_id, sender_user_id, category, title, body, link_url, is_read, created_at)
-SELECT u.user_id, @t1, 'notification', 'New assignment posted', CONCAT('An assignment has been uploaded for ', c.course_code, '.'), 'student/submissions.php', 0, NOW()
-FROM users u
-CROSS JOIN courses c
-WHERE u.role_id = @student_role
-  AND c.semester_name = 'Spring 2026'
-  AND u.login_id IN ('9001','9002','9003','9004','9005')
-LIMIT 50;
-
-INSERT INTO lms_notifications (recipient_user_id, sender_user_id, category, title, body, link_url, is_read, created_at)
-SELECT u.user_id, @t1, 'message', 'Welcome to University LMS', 'Check your courses and keep an eye on assignments in the dashboard.', 'student/dashboard.php', 0, NOW()
-FROM users u
-WHERE u.role_id = @student_role
-  AND u.login_id IN ('9006','9007','9008','9009','9010');
-
-INSERT INTO lms_notifications (recipient_user_id, sender_user_id, category, title, body, link_url, is_read, created_at)
-SELECT u.user_id, @t1, 'announcement', 'Semester update', 'Spring 2026 notices will appear here.', 'student/dashboard.php', 0, NOW()
-FROM users u
-WHERE u.role_id = @student_role
-  AND u.login_id IN ('9011','9012','9013','9014','9015');
-
--- LMS Fee Records
-INSERT INTO lms_fee_records (student_user_id, semester, description, amount, paid_amount, due_date, status)
-SELECT u.user_id, 'Spring 2026', 'Semester Tuition Fee', 85000.00,
-    CASE
-        WHEN u.login_id IN ('9001','9004','9006','9008','9010','9012','9014','9016','9018','9020') THEN 85000.00
-        WHEN u.login_id IN ('9002','9007','9011','9015','9019') THEN 42500.00
-        ELSE 0.00
-    END,
-    '2026-07-15',
-    CASE
-        WHEN u.login_id IN ('9001','9004','9006','9008','9010','9012','9014','9016','9018','9020') THEN 'paid'
-        WHEN u.login_id IN ('9002','9007','9011','9015','9019') THEN 'partial'
-        ELSE 'unpaid'
-    END
-FROM users u
-WHERE u.role_id = @student_role;
-
-INSERT INTO lms_fee_records (student_user_id, semester, description, amount, paid_amount, due_date, status)
-SELECT u.user_id, 'Spring 2026', 'Library and Lab Charges', 7500.00, 7500.00, '2026-07-15', 'paid'
-FROM users u
-WHERE u.role_id = @student_role AND u.login_id IN ('9001','9002','9003','9004','9005');
-
--- phpMyAdmin SQL Dump
--- version 5.2.1
--- https://www.phpmyadmin.net/
---
--- Host: 127.0.0.1
--- Generation Time: Jun 27, 2026 at 05:47 PM
--- Server version: 10.4.32-MariaDB
--- PHP Version: 8.2.12
-
-SET SQL_MODE = "NO_AUTO_VALUE_ON_ZERO";
-START TRANSACTION;
-SET time_zone = "+00:00";
-
-
-/*!40101 SET @OLD_CHARACTER_SET_CLIENT=@@CHARACTER_SET_CLIENT */;
-/*!40101 SET @OLD_CHARACTER_SET_RESULTS=@@CHARACTER_SET_RESULTS */;
-/*!40101 SET @OLD_COLLATION_CONNECTION=@@COLLATION_CONNECTION */;
-/*!40101 SET NAMES utf8mb4 */;
-
---
--- Database: `university_mis`
---
-
-DELIMITER $$
---
--- Procedures
---
-CREATE DEFINER=`root`@`localhost` PROCEDURE `generate_student_id` (IN `program_code` VARCHAR(10), IN `batch_year` INT, OUT `new_id` VARCHAR(20))   BEGIN
-    DECLARE last_number INT;
-
-    SELECT COUNT(*) + 1 INTO last_number
-    FROM students
-    WHERE student_id LIKE CONCAT(program_code, '-', batch_year, '-%');
-
-    SET new_id = CONCAT(program_code, '-', batch_year, '-', LPAD(last_number, 3, '0'));
-END$$
-
-DELIMITER ;
-
--- --------------------------------------------------------
-
---
--- Table structure for table `admission_applications`
---
-
-CREATE TABLE `admission_applications` (
-  `application_id` varchar(20) NOT NULL,
-  `name` varchar(100) NOT NULL,
-  `father_name` varchar(100) DEFAULT NULL,
-  `email` varchar(100) NOT NULL,
-  `phone` varchar(20) DEFAULT NULL,
-  `cnic` varchar(15) DEFAULT NULL,
-  `program_applied` int(11) DEFAULT NULL,
-  `documents_path` varchar(255) DEFAULT NULL,
-  `status` enum('pending','approved','rejected','waiting_test') DEFAULT 'pending',
-  `test_score` decimal(5,2) DEFAULT NULL,
-  `applied_date` datetime DEFAULT current_timestamp(),
-  `reviewed_by` int(11) DEFAULT NULL,
-  `review_date` datetime DEFAULT NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
---
--- Dumping data for table `admission_applications`
---
-
-INSERT INTO `admission_applications` (`application_id`, `name`, `father_name`, `email`, `phone`, `cnic`, `program_applied`, `documents_path`, `status`, `test_score`, `applied_date`, `reviewed_by`, `review_date`) VALUES
-('APP-2026-001', 'Muhammad Ali', 'Ahmed Ali', 'ali@email.com', '0310-1111111', '42101-1234567-1', 1, NULL, 'approved', 85.50, '2026-06-27 18:33:55', NULL, NULL),
-('APP-2026-002', 'Fatima Khan', 'Rashid Khan', 'fatima@email.com', '0310-2222222', '42101-7654321-2', 2, NULL, 'pending', NULL, '2026-06-27 18:33:55', NULL, NULL),
-('APP-2026-003', 'Usman Ahmed', 'Zafar Ahmed', 'usman@email.com', '0310-3333333', '42101-9876543-3', 1, NULL, 'approved', 78.00, '2026-06-27 18:33:55', NULL, NULL),
-('APP-2026-004', 'Ayesha Malik', 'Tariq Malik', 'ayesha@email.com', '0310-4444444', '42101-4567890-4', 3, NULL, 'waiting_test', NULL, '2026-06-27 18:33:55', NULL, NULL);
-
--- --------------------------------------------------------
-
---
--- Table structure for table `assignments`
---
-
-CREATE TABLE `assignments` (
-  `assignment_id` int(11) NOT NULL,
-  `course_id` int(11) DEFAULT NULL,
-  `faculty_id` int(11) DEFAULT NULL,
-  `title` varchar(200) NOT NULL,
-  `description` text DEFAULT NULL,
-  `total_marks` int(11) DEFAULT NULL,
-  `deadline` datetime DEFAULT NULL,
-  `created_at` datetime DEFAULT current_timestamp()
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
---
--- Dumping data for table `assignments`
---
-
-INSERT INTO `assignments` (`assignment_id`, `course_id`, `faculty_id`, `title`, `description`, `total_marks`, `deadline`, `created_at`) VALUES
-(1, 1, 1, 'SQL Queries Assignment', 'Write 10 complex SQL queries', 50, '2026-07-20 23:59:59', '2026-06-27 18:33:55'),
-(2, 1, 1, 'Database Design Project', 'Design a complete database for a library', 100, '2026-08-15 23:59:59', '2026-06-27 18:33:55');
-
--- --------------------------------------------------------
-
---
--- Table structure for table `attendance`
---
-
-CREATE TABLE `attendance` (
-  `attendance_id` int(11) NOT NULL,
-  `student_id` varchar(20) DEFAULT NULL,
-  `course_id` int(11) DEFAULT NULL,
-  `date` date DEFAULT NULL,
-  `status` enum('present','absent','late','excused') DEFAULT 'absent',
-  `faculty_id` int(11) DEFAULT NULL,
-  `remark` varchar(255) DEFAULT NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
--- --------------------------------------------------------
-
---
--- Table structure for table `courses`
---
-
-CREATE TABLE `courses` (
-  `course_id` int(11) NOT NULL,
-  `course_code` varchar(20) NOT NULL,
-  `course_name` varchar(100) NOT NULL,
-  `credit_hours` int(11) NOT NULL,
-  `program_id` int(11) DEFAULT NULL,
-  `semester` int(11) DEFAULT NULL,
-  `description` text DEFAULT NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
---
--- Dumping data for table `courses`
---
-
-INSERT INTO `courses` (`course_id`, `course_code`, `course_name`, `credit_hours`, `program_id`, `semester`, `description`) VALUES
-(1, 'CS-301', 'Database Systems', 3, 1, 3, NULL),
-(2, 'CS-302', 'Operating Systems', 3, 1, 3, NULL),
-(3, 'CS-303', 'Computer Networks', 3, 1, 3, NULL),
-(4, 'CS-304', 'Software Engineering', 3, 1, 4, NULL),
-(5, 'CS-305', 'Data Structures', 3, 1, 2, NULL),
-(6, 'IT-301', 'Web Development', 3, 2, 3, NULL),
-(7, 'IT-302', 'Network Security', 3, 2, 4, NULL);
-
--- --------------------------------------------------------
-
---
--- Table structure for table `departments`
---
-
-CREATE TABLE `departments` (
-  `dept_id` int(11) NOT NULL,
-  `dept_code` varchar(10) NOT NULL,
-  `dept_name` varchar(100) NOT NULL,
-  `created_at` datetime DEFAULT current_timestamp()
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
---
--- Dumping data for table `departments`
---
-
-INSERT INTO `departments` (`dept_id`, `dept_code`, `dept_name`, `created_at`) VALUES
-(1, 'CS', 'Computer Science', '2026-06-27 18:33:55'),
-(2, 'IT', 'Information Technology', '2026-06-27 18:33:55'),
-(3, 'SE', 'Software Engineering', '2026-06-27 18:33:55'),
-(4, 'AI', 'Artificial Intelligence', '2026-06-27 18:33:55'),
-(5, 'DS', 'Data Science', '2026-06-27 18:33:55');
-
--- --------------------------------------------------------
-
---
--- Table structure for table `exam_results`
---
-
-CREATE TABLE `exam_results` (
-  `result_id` int(11) NOT NULL,
-  `student_id` varchar(20) DEFAULT NULL,
-  `exam_id` int(11) DEFAULT NULL,
-  `marks_obtained` decimal(5,2) DEFAULT NULL,
-  `total_marks` int(11) DEFAULT NULL,
-  `grade` varchar(2) DEFAULT NULL,
-  `status` enum('draft','published') NOT NULL DEFAULT 'draft'
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
--- --------------------------------------------------------
-
---
--- Table structure for table `exam_schedules`
---
-
-CREATE TABLE `exam_schedules` (
-  `exam_id` int(11) NOT NULL,
-  `course_id` int(11) DEFAULT NULL,
-  `exam_type` enum('mid','final','quiz','lab') DEFAULT 'final',
-  `date` date DEFAULT NULL,
-  `start_time` time DEFAULT NULL,
-  `end_time` time DEFAULT NULL,
-  `room` varchar(50) DEFAULT NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
---
--- Dumping data for table `exam_schedules`
---
-
-INSERT INTO `exam_schedules` (`exam_id`, `course_id`, `exam_type`, `date`, `start_time`, `end_time`, `room`) VALUES
-(1, 1, 'mid', '2026-07-25', '09:00:00', '11:00:00', 'Lab 1'),
-(2, 1, 'final', '2026-08-30', '09:00:00', '12:00:00', 'Hall A');
-
--- --------------------------------------------------------
-
---
--- Table structure for table `faculty`
---
-
-CREATE TABLE `faculty` (
-  `faculty_id` int(11) NOT NULL,
-  `user_id` int(11) DEFAULT NULL,
-  `employee_id` varchar(20) DEFAULT NULL,
-  `designation` varchar(50) DEFAULT NULL,
-  `department_id` int(11) DEFAULT NULL,
-  `hire_date` date DEFAULT NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
---
--- Dumping data for table `faculty`
---
-
-INSERT INTO `faculty` (`faculty_id`, `user_id`, `employee_id`, `designation`, `department_id`, `hire_date`) VALUES
-(1, 4, 'FAC-001', 'Professor', 1, '2020-08-01');
-
--- --------------------------------------------------------
-
---
--- Table structure for table `faculty_courses`
---
-
-CREATE TABLE `faculty_courses` (
-  `assignment_id` int(11) NOT NULL,
-  `faculty_id` int(11) DEFAULT NULL,
-  `course_id` int(11) DEFAULT NULL,
-  `semester` int(11) DEFAULT NULL,
-  `year` int(11) DEFAULT NULL,
-  `section` varchar(5) DEFAULT NULL,
-  `is_active` tinyint(1) DEFAULT 1
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
---
--- Dumping data for table `faculty_courses`
---
-
-INSERT INTO `faculty_courses` (`assignment_id`, `faculty_id`, `course_id`, `semester`, `year`, `section`, `is_active`) VALUES
-(1, 1, 1, 3, 2026, 'A', 1),
-(2, 1, 2, 3, 2026, 'A', 1);
-
--- --------------------------------------------------------
-
---
--- Table structure for table `fee_records`
---
-
-CREATE TABLE `fee_records` (
-  `fee_id` int(11) NOT NULL,
-  `student_id` varchar(20) DEFAULT NULL,
-  `semester` int(11) DEFAULT NULL,
-  `total_fee` decimal(10,2) DEFAULT NULL,
-  `paid_amount` decimal(10,2) DEFAULT 0.00,
-  `due_date` date DEFAULT NULL,
-  `status` enum('pending','partial','paid','overdue') DEFAULT 'pending',
-  `payment_date` date DEFAULT NULL,
-  `transaction_id` varchar(50) DEFAULT NULL,
-  `verified_by` int(11) DEFAULT NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
---
--- Dumping data for table `fee_records`
---
-
-INSERT INTO `fee_records` (`fee_id`, `student_id`, `semester`, `total_fee`, `paid_amount`, `due_date`, `status`, `payment_date`, `transaction_id`, `verified_by`) VALUES
-(1, 'CS-26-001', 3, 45000.00, 45000.00, '2026-03-15', 'paid', NULL, NULL, NULL),
-(2, 'CS-26-002', 3, 45000.00, 20000.00, '2026-03-15', 'partial', NULL, NULL, NULL);
 
 -- --------------------------------------------------------
 
@@ -1470,22 +879,80 @@ INSERT INTO `fee_records` (`fee_id`, `student_id`, `semester`, `total_fee`, `pai
 
 CREATE TABLE `programs` (
   `program_id` int(11) NOT NULL,
-  `program_code` varchar(20) NOT NULL,
   `program_name` varchar(100) NOT NULL,
-  `dept_id` int(11) DEFAULT NULL,
-  `duration_years` int(11) DEFAULT 4
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+  `program_code` varchar(20) NOT NULL,
+  `department_id` int(11) DEFAULT NULL,
+  `duration_years` tinyint(4) NOT NULL DEFAULT 4,
+  `total_semesters` tinyint(4) NOT NULL DEFAULT 8,
+  `status` enum('Active','Inactive') NOT NULL DEFAULT 'Active',
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
 -- Dumping data for table `programs`
 --
 
-INSERT INTO `programs` (`program_id`, `program_code`, `program_name`, `dept_id`, `duration_years`) VALUES
-(1, 'BSCS', 'BS Computer Science', 1, 4),
-(2, 'BSIT', 'BS Information Technology', 2, 4),
-(3, 'BSSE', 'BS Software Engineering', 3, 4),
-(4, 'BSAI', 'BS Artificial Intelligence', 4, 4),
-(5, 'BSDS', 'BS Data Science', 5, 4);
+INSERT INTO `programs` (`program_id`, `program_name`, `program_code`, `department_id`, `duration_years`, `total_semesters`, `status`, `created_at`) VALUES
+(1, 'Default Program', '', 1, 4, 8, 'Active', '2026-07-26 06:47:52'),
+(2, 'BS Computer Science', 'BSCS', 1, 4, 8, 'Active', '2026-07-26 07:10:32'),
+(3, 'BS Information Technology', 'BSIT', 2, 4, 8, 'Active', '2026-07-26 07:10:32'),
+(4, 'BS Software Engineering', 'BSSE', 3, 4, 8, 'Active', '2026-07-26 07:10:32'),
+(5, 'BS Artificial Intelligence', 'BSAI', 4, 4, 8, 'Active', '2026-07-26 07:10:32'),
+(6, 'BS Data Science', 'BSDS', 5, 4, 8, 'Active', '2026-07-26 07:10:32');
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `question_bank`
+--
+
+CREATE TABLE `question_bank` (
+  `question_id` int(11) NOT NULL,
+  `exam_id` int(11) DEFAULT NULL,
+  `course_id` int(11) NOT NULL,
+  `teacher_id` int(11) DEFAULT NULL,
+  `question_text` text NOT NULL,
+  `option_a` varchar(255) NOT NULL,
+  `option_b` varchar(255) NOT NULL,
+  `option_c` varchar(255) NOT NULL,
+  `option_d` varchar(255) NOT NULL,
+  `correct_option` enum('A','B','C','D') NOT NULL,
+  `marks` decimal(5,2) NOT NULL DEFAULT 1.00,
+  `difficulty_level` enum('Easy','Medium','Hard') NOT NULL DEFAULT 'Medium',
+  `status` enum('Active','Inactive') NOT NULL DEFAULT 'Active',
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `question_papers`
+--
+
+CREATE TABLE `question_papers` (
+  `paper_id` int(11) NOT NULL,
+  `exam_id` int(11) NOT NULL,
+  `course_id` int(11) NOT NULL,
+  `teacher_id` int(11) NOT NULL,
+  `paper_file` varchar(255) NOT NULL,
+  `status` enum('Pending','Published') NOT NULL DEFAULT 'Pending',
+  `publish_date` date DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `receipts`
+--
+
+CREATE TABLE `receipts` (
+  `receipt_id` int(11) NOT NULL,
+  `payment_id` int(11) NOT NULL,
+  `receipt_no` varchar(30) NOT NULL,
+  `issued_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `issued_by` int(11) NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- --------------------------------------------------------
 
@@ -1495,40 +962,370 @@ INSERT INTO `programs` (`program_id`, `program_code`, `program_name`, `dept_id`,
 
 CREATE TABLE `roles` (
   `role_id` int(11) NOT NULL,
-  `role_name` varchar(50) NOT NULL,
-  `description` varchar(255) DEFAULT NULL,
-  `created_at` datetime DEFAULT current_timestamp()
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+  `role_name` varchar(50) NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
 -- Dumping data for table `roles`
 --
 
-INSERT INTO `roles` (`role_id`, `role_name`, `description`, `created_at`) VALUES
-(1, 'admin', 'System Administrator - Full access', '2026-06-27 18:33:55'),
-(2, 'sso', 'Student Services Officer - Manages students', '2026-06-27 18:33:55'),
-(3, 'faculty', 'Faculty Member - Teaches courses', '2026-06-27 18:33:55'),
-(4, 'student', 'Student - Enrolled in programs', '2026-06-27 18:33:55'),
-(5, 'exam_officer', 'Examination Officer - Manages exams', '2026-06-27 18:33:55'),
-(6, 'account', 'Account Office - Handles fees', '2026-06-27 18:33:55');
+INSERT INTO `roles` (`role_id`, `role_name`) VALUES
+(1, 'Admin'),
+(6, 'Examiner'),
+(3, 'Finance Officer'),
+(4, 'Student'),
+(2, 'Teacher');
 
 -- --------------------------------------------------------
 
 --
--- Table structure for table `section_change_requests`
+-- Table structure for table `sbe_auth_users`
 --
 
-CREATE TABLE `section_change_requests` (
-  `request_id` int(11) NOT NULL,
-  `student_id` varchar(20) DEFAULT NULL,
-  `current_section` varchar(5) DEFAULT NULL,
-  `requested_section` varchar(5) DEFAULT NULL,
-  `reason` text DEFAULT NULL,
-  `status` enum('pending','approved','rejected') DEFAULT 'pending',
-  `requested_at` datetime DEFAULT current_timestamp(),
-  `reviewed_by` int(11) DEFAULT NULL,
-  `review_date` datetime DEFAULT NULL
+CREATE TABLE `sbe_auth_users` (
+  `auth_id` int(11) NOT NULL,
+  `role` enum('Teacher','Student') NOT NULL,
+  `login_id` varchar(50) NOT NULL,
+  `password_hash` varchar(255) NOT NULL,
+  `display_name` varchar(150) NOT NULL,
+  `teacher_id` int(11) DEFAULT NULL,
+  `student_id` int(11) DEFAULT NULL,
+  `status` enum('Active','Inactive') NOT NULL DEFAULT 'Active',
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `sbe_auth_users`
+--
+
+INSERT INTO `sbe_auth_users` (`auth_id`, `role`, `login_id`, `password_hash`, `display_name`, `teacher_id`, `student_id`, `status`, `created_at`, `updated_at`) VALUES
+(1, 'Teacher', '5001', '$2y$10$Dbil/GL2koHeVKRp7tXy7uR.coHqiJZh9Wz8dIIj/zdjMxXGAdxwC', 'Dr. Sara Khan', NULL, NULL, 'Active', '2026-07-26 18:28:03', '2026-07-26 18:28:03'),
+(2, 'Teacher', '5002', '$2y$10$Dbil/GL2koHeVKRp7tXy7uR.coHqiJZh9Wz8dIIj/zdjMxXGAdxwC', 'Teacher Demo', NULL, NULL, 'Active', '2026-07-26 18:28:03', '2026-07-26 18:28:03'),
+(3, 'Student', '9001', '$2y$10$NVy5mVCpcgfv94f5DK2QnORaQ1lG8J8CgXieLEDk.VsINn1jumOg2', 'Ali Raza', NULL, NULL, 'Active', '2026-07-26 18:28:03', '2026-07-26 18:28:03'),
+(4, 'Student', '9002', '$2y$10$NVy5mVCpcgfv94f5DK2QnORaQ1lG8J8CgXieLEDk.VsINn1jumOg2', 'Student Demo', NULL, NULL, 'Active', '2026-07-26 18:28:03', '2026-07-26 18:28:03');
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `sbe_exams`
+--
+
+CREATE TABLE `sbe_exams` (
+  `exam_id` int(11) NOT NULL,
+  `exam_code` varchar(30) NOT NULL,
+  `course_id` int(11) NOT NULL,
+  `teacher_id` int(11) NOT NULL,
+  `title` varchar(150) NOT NULL,
+  `exam_type` enum('Quiz','Mid','Final','Practice','Assignment Test') NOT NULL,
+  `instructions` text DEFAULT NULL,
+  `duration_minutes` smallint(6) NOT NULL,
+  `total_questions` smallint(6) NOT NULL,
+  `total_marks` decimal(6,2) NOT NULL,
+  `passing_marks` decimal(6,2) NOT NULL,
+  `selection_mode` enum('Manual','Random') NOT NULL DEFAULT 'Manual',
+  `negative_marking` decimal(4,2) NOT NULL DEFAULT 0.00,
+  `shuffle_questions` tinyint(1) NOT NULL DEFAULT 0,
+  `shuffle_options` tinyint(1) NOT NULL DEFAULT 0,
+  `allow_review` tinyint(1) NOT NULL DEFAULT 1,
+  `status` enum('Draft','Published','Closed','Archived') NOT NULL DEFAULT 'Draft',
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `sbe_exam_questions`
+--
+
+CREATE TABLE `sbe_exam_questions` (
+  `exam_question_id` int(11) NOT NULL,
+  `exam_id` int(11) NOT NULL,
+  `question_id` int(11) NOT NULL,
+  `question_order` smallint(6) NOT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `sbe_exam_results`
+--
+
+CREATE TABLE `sbe_exam_results` (
+  `exam_result_id` int(11) NOT NULL,
+  `student_exam_id` int(11) NOT NULL,
+  `exam_id` int(11) NOT NULL,
+  `student_id` int(11) NOT NULL,
+  `obtained_marks` decimal(6,2) NOT NULL,
+  `total_marks` decimal(6,2) NOT NULL,
+  `percentage` decimal(5,2) NOT NULL,
+  `pass_fail_status` enum('Pass','Fail') NOT NULL,
+  `rank_position` int(11) DEFAULT NULL,
+  `remarks` varchar(255) DEFAULT NULL,
+  `status` enum('Draft','Published','Archived') NOT NULL DEFAULT 'Draft',
+  `published_at` datetime DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `sbe_exam_schedule`
+--
+
+CREATE TABLE `sbe_exam_schedule` (
+  `schedule_id` int(11) NOT NULL,
+  `exam_id` int(11) NOT NULL,
+  `section` varchar(5) NOT NULL,
+  `semester_id` int(11) NOT NULL,
+  `exam_date` date NOT NULL,
+  `start_time` time NOT NULL,
+  `end_time` time NOT NULL,
+  `late_submission_grace_minutes` smallint(6) NOT NULL DEFAULT 0,
+  `location` varchar(100) DEFAULT NULL,
+  `remarks` varchar(255) DEFAULT NULL,
+  `status` enum('Scheduled','Ongoing','Completed','Cancelled') NOT NULL DEFAULT 'Scheduled',
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `sbe_question_bank`
+--
+
+CREATE TABLE `sbe_question_bank` (
+  `question_id` int(11) NOT NULL,
+  `course_id` int(11) NOT NULL,
+  `teacher_id` int(11) NOT NULL,
+  `topic` varchar(150) DEFAULT NULL,
+  `question_text` text NOT NULL,
+  `option_a` varchar(255) NOT NULL,
+  `option_b` varchar(255) NOT NULL,
+  `option_c` varchar(255) NOT NULL,
+  `option_d` varchar(255) NOT NULL,
+  `correct_option` enum('A','B','C','D') NOT NULL,
+  `explanation` varchar(500) DEFAULT NULL,
+  `marks` decimal(5,2) NOT NULL DEFAULT 1.00,
+  `difficulty_level` enum('Easy','Medium','Hard') NOT NULL DEFAULT 'Medium',
+  `status` enum('Active','Inactive') NOT NULL DEFAULT 'Active',
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `sbe_student_answers`
+--
+
+CREATE TABLE `sbe_student_answers` (
+  `student_answer_id` int(11) NOT NULL,
+  `student_exam_id` int(11) NOT NULL,
+  `question_id` int(11) NOT NULL,
+  `question_order` smallint(6) NOT NULL,
+  `question_snapshot` longtext CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NOT NULL CHECK (json_valid(`question_snapshot`)),
+  `selected_option` enum('A','B','C','D') DEFAULT NULL,
+  `answered_at` datetime DEFAULT NULL,
+  `is_correct` tinyint(1) DEFAULT NULL,
+  `marks_awarded` decimal(5,2) NOT NULL DEFAULT 0.00
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `sbe_student_exams`
+--
+
+CREATE TABLE `sbe_student_exams` (
+  `student_exam_id` int(11) NOT NULL,
+  `schedule_id` int(11) NOT NULL,
+  `exam_id` int(11) NOT NULL,
+  `student_id` int(11) NOT NULL,
+  `attempt_no` tinyint(4) NOT NULL DEFAULT 1,
+  `status` enum('In Progress','Submitted','Auto Submitted','Expired','Cancelled') NOT NULL DEFAULT 'In Progress',
+  `started_at` datetime NOT NULL DEFAULT current_timestamp(),
+  `expires_at` datetime NOT NULL,
+  `submitted_at` datetime DEFAULT NULL,
+  `time_taken_seconds` int(11) DEFAULT NULL,
+  `obtained_marks` decimal(6,2) DEFAULT NULL,
+  `percentage` decimal(5,2) DEFAULT NULL,
+  `pass_fail_status` enum('Pass','Fail') DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `scholarships`
+--
+
+CREATE TABLE `scholarships` (
+  `scholarship_id` int(11) NOT NULL,
+  `student_id` int(11) NOT NULL,
+  `scholarship_type` enum('Admission','Semester-wise','Merit','Need-based','Other') NOT NULL,
+  `awarding_body` varchar(100) NOT NULL,
+  `semester_id` int(11) DEFAULT NULL,
+  `discount_kind` enum('Flat','Percentage') NOT NULL DEFAULT 'Percentage',
+  `discount_value` decimal(10,2) NOT NULL,
+  `approved_by` int(11) NOT NULL,
+  `approved_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `status` enum('Active','Revoked') NOT NULL DEFAULT 'Active',
+  `remarks` varchar(255) DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `sections`
+--
+
+CREATE TABLE `sections` (
+  `section_id` int(11) NOT NULL,
+  `section_name` varchar(50) NOT NULL,
+  `program_id` int(11) DEFAULT NULL,
+  `semester_id` int(11) DEFAULT NULL,
+  `session_id` int(11) DEFAULT NULL,
+  `course_id` int(11) DEFAULT NULL,
+  `teacher_id` varchar(50) DEFAULT NULL,
+  `capacity` int(11) DEFAULT 30,
+  `enrolled_count` int(11) DEFAULT 0,
+  `enrolled` int(11) DEFAULT 0,
+  `academic_year` varchar(20) DEFAULT NULL,
+  `status` enum('Active','Inactive') DEFAULT 'Active',
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `section_courses`
+--
+
+CREATE TABLE `section_courses` (
+  `id` int(11) NOT NULL,
+  `section_id` int(11) NOT NULL,
+  `course_id` int(11) NOT NULL,
+  `teacher_id` varchar(50) DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `semesters`
+--
+
+CREATE TABLE `semesters` (
+  `semester_id` int(11) NOT NULL,
+  `semester_name` varchar(50) NOT NULL,
+  `semester_number` tinyint(4) NOT NULL,
+  `department_id` int(11) NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--
+-- Dumping data for table `semesters`
+--
+
+INSERT INTO `semesters` (`semester_id`, `semester_name`, `semester_number`, `department_id`) VALUES
+(1, 'Semester 1', 1, 1),
+(2, 'Semester 2', 2, 1),
+(3, 'Semester 3', 3, 1),
+(4, 'Semester 4', 4, 1),
+(5, 'Semester 5', 5, 1),
+(6, 'Semester 6', 6, 1),
+(7, 'Semester 7', 7, 1),
+(8, 'Semester 8', 8, 1),
+(9, 'Semester 1', 1, 2),
+(10, 'Semester 2', 2, 2),
+(11, 'Semester 3', 3, 2),
+(12, 'Semester 4', 4, 2),
+(13, 'Semester 5', 5, 2),
+(14, 'Semester 6', 6, 2),
+(15, 'Semester 7', 7, 2),
+(16, 'Semester 8', 8, 2),
+(17, 'Semester 1', 1, 3),
+(18, 'Semester 2', 2, 3),
+(19, 'Semester 3', 3, 3),
+(20, 'Semester 4', 4, 3),
+(21, 'Semester 5', 5, 3),
+(22, 'Semester 6', 6, 3),
+(23, 'Semester 7', 7, 3),
+(24, 'Semester 8', 8, 3),
+(25, 'Semester 1', 1, 4),
+(26, 'Semester 2', 2, 4),
+(27, 'Semester 3', 3, 4),
+(28, 'Semester 4', 4, 4),
+(29, 'Semester 5', 5, 4),
+(30, 'Semester 6', 6, 4),
+(31, 'Semester 7', 7, 4),
+(32, 'Semester 8', 8, 4),
+(33, 'Semester 1', 1, 5),
+(34, 'Semester 2', 2, 5),
+(35, 'Semester 3', 3, 5),
+(36, 'Semester 4', 4, 5),
+(37, 'Semester 5', 5, 5),
+(38, 'Semester 6', 6, 5),
+(39, 'Semester 7', 7, 5),
+(40, 'Semester 8', 8, 5);
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `semester_courses`
+--
+
+CREATE TABLE `semester_courses` (
+  `id` int(11) NOT NULL,
+  `semester_id` int(11) NOT NULL,
+  `course_id` int(11) NOT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `sessions`
+--
+
+CREATE TABLE `sessions` (
+  `session_id` int(11) NOT NULL,
+  `session_name` varchar(50) NOT NULL,
+  `start_date` date DEFAULT NULL,
+  `end_date` date DEFAULT NULL,
+  `status` enum('Active','Inactive') NOT NULL DEFAULT 'Active',
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--
+-- Dumping data for table `sessions`
+--
+
+INSERT INTO `sessions` (`session_id`, `session_name`, `start_date`, `end_date`, `status`, `created_at`) VALUES
+(1, 'Spring 2026', '2026-01-01', '2026-06-30', 'Active', '2026-07-26 07:00:50'),
+(5, 'Fall 2026', '2026-07-01', '2026-12-31', 'Active', '2026-07-26 07:10:32'),
+(6, 'Spring 2027', '2027-01-01', '2027-06-30', 'Active', '2026-07-26 07:10:32');
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `sso_applications`
+--
+
+CREATE TABLE `sso_applications` (
+  `application_id` int(11) NOT NULL,
+  `student_id` int(11) NOT NULL,
+  `application_type` enum('Leave','Course Withdrawal','Semester Freeze','Transcript','Bonafide Certificate','ID Card','Other') NOT NULL,
+  `subject` varchar(150) NOT NULL,
+  `description` varchar(500) DEFAULT NULL,
+  `attachment_path` varchar(255) DEFAULT NULL,
+  `status` enum('Pending','Approved','Rejected') NOT NULL DEFAULT 'Pending',
+  `remarks` varchar(255) DEFAULT NULL,
+  `resolved_by` int(11) DEFAULT NULL,
+  `resolved_at` datetime DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- --------------------------------------------------------
 
@@ -1537,24 +1334,27 @@ CREATE TABLE `section_change_requests` (
 --
 
 CREATE TABLE `students` (
-  `student_id` varchar(20) NOT NULL,
-  `user_id` int(11) DEFAULT NULL,
-  `application_id` varchar(20) DEFAULT NULL,
-  `program_id` int(11) DEFAULT NULL,
-  `section` varchar(5) DEFAULT NULL,
-  `batch_year` int(11) DEFAULT NULL,
-  `semester` int(11) DEFAULT 1,
-  `status` enum('pending','confirmed','active','inactive','graduated') DEFAULT 'pending',
-  `enrollment_date` date DEFAULT NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
---
--- Dumping data for table `students`
---
-
-INSERT INTO `students` (`student_id`, `user_id`, `application_id`, `program_id`, `section`, `batch_year`, `semester`, `status`, `enrollment_date`) VALUES
-('CS-26-001', 5, 'APP-2026-001', 1, 'A', 2026, 2, 'active', '2026-01-15'),
-('CS-26-002', 6, 'APP-2026-003', 1, 'A', 2026, 2, 'confirmed', '2026-01-15');
+  `student_id` int(11) NOT NULL,
+  `application_id` int(11) NOT NULL,
+  `roll_no` varchar(30) DEFAULT NULL,
+  `full_name` varchar(150) NOT NULL,
+  `father_name` varchar(150) NOT NULL,
+  `cnic_or_bform` varchar(20) DEFAULT NULL,
+  `dob` date DEFAULT NULL,
+  `gender` enum('Male','Female','Other') DEFAULT NULL,
+  `contact_no` varchar(20) DEFAULT NULL,
+  `email` varchar(150) DEFAULT NULL,
+  `address` varchar(255) DEFAULT NULL,
+  `program_id` int(11) NOT NULL,
+  `admission_session_id` int(11) NOT NULL,
+  `current_session_id` int(11) NOT NULL,
+  `current_semester_id` int(11) NOT NULL,
+  `batch_year` smallint(6) NOT NULL,
+  `admission_date` date NOT NULL,
+  `status` enum('Active','Freeze','Graduated','Dropped','Suspended') NOT NULL DEFAULT 'Active',
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- --------------------------------------------------------
 
@@ -1563,40 +1363,200 @@ INSERT INTO `students` (`student_id`, `user_id`, `application_id`, `program_id`,
 --
 
 CREATE TABLE `student_courses` (
-  `enrollment_id` int(11) NOT NULL,
-  `student_id` varchar(20) DEFAULT NULL,
-  `course_id` int(11) DEFAULT NULL,
-  `semester` int(11) DEFAULT NULL,
-  `year` int(11) DEFAULT NULL,
-  `grade` varchar(2) DEFAULT NULL,
-  `gpa` decimal(3,2) DEFAULT NULL,
-  `status` enum('enrolled','completed','dropped','failed') DEFAULT 'enrolled',
-  `enrollment_date` date DEFAULT NULL
+  `id` int(11) NOT NULL,
+  `student_id` varchar(50) NOT NULL,
+  `course_id` int(11) NOT NULL,
+  `enrollment_date` date DEFAULT NULL,
+  `status` enum('Active','Completed','Dropped') DEFAULT 'Active',
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
---
--- Dumping data for table `student_courses`
---
-
-INSERT INTO `student_courses` (`enrollment_id`, `student_id`, `course_id`, `semester`, `year`, `grade`, `gpa`, `status`, `enrollment_date`) VALUES
-(1, 'CS-26-001', 1, 3, 2026, NULL, NULL, 'enrolled', '2026-01-20'),
-(2, 'CS-26-001', 2, 3, 2026, NULL, NULL, 'enrolled', '2026-01-20'),
-(3, 'CS-26-002', 1, 3, 2026, NULL, NULL, 'enrolled', '2026-01-20');
 
 -- --------------------------------------------------------
 
 --
--- Table structure for table `submissions`
+-- Table structure for table `student_enrollments`
 --
 
-CREATE TABLE `submissions` (
-  `submission_id` int(11) NOT NULL,
-  `assignment_id` int(11) DEFAULT NULL,
-  `student_id` varchar(20) DEFAULT NULL,
-  `file_path` varchar(255) DEFAULT NULL,
-  `submitted_at` datetime DEFAULT current_timestamp(),
-  `marks_obtained` decimal(5,2) DEFAULT NULL,
-  `feedback` text DEFAULT NULL
+CREATE TABLE `student_enrollments` (
+  `enrollment_id` int(11) NOT NULL,
+  `student_id` varchar(50) NOT NULL,
+  `course_id` int(11) NOT NULL,
+  `section_id` int(11) DEFAULT NULL,
+  `enrollment_date` date DEFAULT NULL,
+  `status` enum('Active','Completed','Dropped') DEFAULT 'Active',
+  `grade` varchar(5) DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `student_fee`
+--
+
+CREATE TABLE `student_fee` (
+  `student_fee_id` int(11) NOT NULL,
+  `student_id` int(11) NOT NULL,
+  `semester_id` int(11) NOT NULL,
+  `session_id` int(11) NOT NULL,
+  `fee_structure_id` int(11) NOT NULL,
+  `total_amount` decimal(12,2) NOT NULL DEFAULT 0.00,
+  `paid_amount` decimal(12,2) NOT NULL DEFAULT 0.00,
+  `remaining_amount` decimal(12,2) GENERATED ALWAYS AS (`total_amount` - `paid_amount`) STORED,
+  `due_date` date DEFAULT NULL,
+  `status` enum('Unpaid','Partially Paid','Paid','Overdue') NOT NULL DEFAULT 'Unpaid',
+  `generated_by` int(11) NOT NULL,
+  `generated_at` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `student_fee_assignment`
+--
+
+CREATE TABLE `student_fee_assignment` (
+  `assignment_id` int(11) NOT NULL,
+  `student_id` int(11) NOT NULL,
+  `fee_structure_id` int(11) NOT NULL,
+  `semester_id` int(11) NOT NULL,
+  `assigned_by` int(11) NOT NULL,
+  `assigned_at` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `student_fee_details`
+--
+
+CREATE TABLE `student_fee_details` (
+  `id` int(11) NOT NULL,
+  `student_fee_id` int(11) NOT NULL,
+  `fee_head_id` int(11) NOT NULL,
+  `amount` decimal(10,2) NOT NULL,
+  `discount_amount` decimal(10,2) NOT NULL DEFAULT 0.00,
+  `net_amount` decimal(10,2) GENERATED ALWAYS AS (`amount` - `discount_amount`) STORED
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `student_fee_discounts`
+--
+
+CREATE TABLE `student_fee_discounts` (
+  `discount_id` int(11) NOT NULL,
+  `student_id` int(11) NOT NULL,
+  `fee_head_id` int(11) NOT NULL,
+  `semester_id` int(11) NOT NULL,
+  `action_type` enum('Add','Remove','Reduce') NOT NULL,
+  `amount` decimal(10,2) NOT NULL DEFAULT 0.00,
+  `reason` varchar(255) DEFAULT NULL,
+  `applied_by` int(11) NOT NULL,
+  `applied_at` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `student_grades`
+--
+
+CREATE TABLE `student_grades` (
+  `grade_id` int(11) NOT NULL,
+  `student_id` int(11) NOT NULL,
+  `course_id` int(11) NOT NULL,
+  `semester` varchar(20) DEFAULT NULL,
+  `academic_year` varchar(20) DEFAULT NULL,
+  `total_credits` decimal(5,2) DEFAULT NULL,
+  `earned_credits` decimal(5,2) DEFAULT NULL,
+  `gpa` decimal(3,2) DEFAULT NULL,
+  `cgpa` decimal(3,2) DEFAULT NULL,
+  `status` enum('active','completed','probation') DEFAULT 'active',
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `student_promotions`
+--
+
+CREATE TABLE `student_promotions` (
+  `promotion_id` int(11) NOT NULL,
+  `student_id` int(11) NOT NULL,
+  `from_semester` varchar(20) DEFAULT NULL,
+  `to_semester` varchar(20) DEFAULT NULL,
+  `from_academic_year` varchar(20) DEFAULT NULL,
+  `to_academic_year` varchar(20) DEFAULT NULL,
+  `promotion_date` date DEFAULT NULL,
+  `status` enum('pending','approved','rejected') DEFAULT 'pending',
+  `approved_by` int(11) DEFAULT NULL,
+  `remarks` text DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `teachers`
+--
+
+CREATE TABLE `teachers` (
+  `teacher_id` int(11) NOT NULL,
+  `user_id` int(11) DEFAULT NULL,
+  `teacher_name` varchar(150) NOT NULL,
+  `designation` varchar(100) DEFAULT NULL,
+  `email` varchar(150) NOT NULL,
+  `phone` varchar(20) DEFAULT NULL,
+  `department_id` int(11) NOT NULL,
+  `status` enum('Active','Inactive') NOT NULL DEFAULT 'Active',
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+--
+-- Dumping data for table `teachers`
+--
+
+INSERT INTO `teachers` (`teacher_id`, `user_id`, `teacher_name`, `designation`, `email`, `phone`, `department_id`, `status`, `created_at`) VALUES
+(1, 19, 'Dr. Sara Khan', 'Professor', 'sara.khan@university.edu', NULL, 1, 'Active', '2026-07-26 18:14:23'),
+(2, 20, 'Teacher Demo', 'Lecturer', 'teacher.demo@university.edu', NULL, 1, 'Active', '2026-07-26 18:14:23');
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `teacher_courses`
+--
+
+CREATE TABLE `teacher_courses` (
+  `id` int(11) NOT NULL,
+  `teacher_id` int(11) NOT NULL,
+  `course_id` int(11) NOT NULL,
+  `semester_id` int(11) NOT NULL,
+  `session_id` int(11) NOT NULL,
+  `section` varchar(5) NOT NULL DEFAULT 'A'
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `timetable`
+--
+
+CREATE TABLE `timetable` (
+  `id` int(11) NOT NULL,
+  `course_id` int(11) NOT NULL,
+  `teacher_id` int(11) NOT NULL,
+  `day_of_week` enum('Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday') NOT NULL,
+  `start_time` time NOT NULL,
+  `end_time` time NOT NULL,
+  `room_no` varchar(30) NOT NULL,
+  `semester_id` int(11) NOT NULL,
+  `session_id` int(11) NOT NULL,
+  `section` varchar(5) NOT NULL DEFAULT 'A'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 -- --------------------------------------------------------
@@ -1607,105 +1567,138 @@ CREATE TABLE `submissions` (
 
 CREATE TABLE `users` (
   `user_id` int(11) NOT NULL,
-  `email` varchar(100) NOT NULL,
-  `password_hash` varchar(255) NOT NULL,
-  `full_name` varchar(100) NOT NULL,
+  `full_name` varchar(150) NOT NULL,
+  `username` varchar(100) NOT NULL,
+  `login_id` varchar(20) DEFAULT NULL,
+  `email` varchar(150) NOT NULL,
   `phone` varchar(20) DEFAULT NULL,
-  `role_id` int(11) DEFAULT NULL,
-  `is_active` tinyint(1) DEFAULT 1,
-  `created_at` datetime DEFAULT current_timestamp()
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+  `password_hash` varchar(255) NOT NULL,
+  `role_id` int(11) NOT NULL,
+  `department_id` int(11) DEFAULT NULL,
+  `profile_photo` varchar(255) DEFAULT NULL,
+  `status` enum('Active','Inactive') NOT NULL DEFAULT 'Active',
+  `last_login_at` datetime DEFAULT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
 -- Dumping data for table `users`
 --
 
-INSERT INTO `users` (`user_id`, `email`, `password_hash`, `full_name`, `phone`, `role_id`, `is_active`, `created_at`) VALUES
-(1, 'admin@university.edu', '$2y$10$9dyD7r1kzdwv8BnLvmFsiefqVxH3VwQEaBukCxxi8sq2M0MFZPPHC', 'Dr. Ahmed Khan', '0300-1234567', 1, 1, '2026-06-27 18:33:55'),
-(2, 'sso@university.edu', '$2y$10$9dyD7r1kzdwv8BnLvmFsiefqVxH3VwQEaBukCxxi8sq2M0MFZPPHC', 'Mr. Ali Raza', '0300-7654321', 2, 1, '2026-06-27 18:33:55'),
-(3, 'account@university.edu', '$2y$10$9dyD7r1kzdwv8BnLvmFsiefqVxH3VwQEaBukCxxi8sq2M0MFZPPHC', 'Mr. Usman Malik', '0300-9876543', 6, 1, '2026-06-27 18:33:55'),
-(4, 'faculty@university.edu', '$2y$10$9dyD7r1kzdwv8BnLvmFsiefqVxH3VwQEaBukCxxi8sq2M0MFZPPHC', 'Dr. Samina Akhtar', '0300-5555555', 3, 1, '2026-06-27 18:33:55'),
-(5, 'student1@university.edu', '$2y$10$9dyD7r1kzdwv8BnLvmFsiefqVxH3VwQEaBukCxxi8sq2M0MFZPPHC', 'Muhammad Ali', '0310-1111111', 4, 1, '2026-06-27 18:33:55'),
-(6, 'student2@university.edu', '$2y$10$9dyD7r1kzdwv8BnLvmFsiefqVxH3VwQEaBukCxxi8sq2M0MFZPPHC', 'Usman Ahmed', '0310-3333333', 4, 1, '2026-06-27 18:33:55');
+INSERT INTO `users` (`user_id`, `full_name`, `username`, `login_id`, `email`, `phone`, `password_hash`, `role_id`, `department_id`, `profile_photo`, `status`, `last_login_at`, `created_at`, `updated_at`) VALUES
+(9, 'Finance Officer', 'finance', NULL, 'finance@university.edu', NULL, '$2y$10$/1EMmmb0U6EmkY.7Q4J41Oj4kcccQGXFvFlohIcYanxSTdUB5NiMy', 3, NULL, NULL, 'Active', '2026-07-25 17:45:49', '2026-07-23 03:23:21', '2026-07-26 18:43:58'),
+(10, 'Administrator', 'admin', NULL, 'admin@university.edu', NULL, '$2y$10$UrlVAX.MWByoeJgrsjB.v.6YNR0qYzjgLVnyhl7qalx1ODwE20Y9.', 1, NULL, NULL, 'Active', '2026-07-23 14:47:29', '2026-07-23 03:23:21', '2026-07-26 18:43:59'),
+(11, 'Teacher Demo', 'teacher', NULL, 'teacher@university.edu', NULL, '$2y$10$gaFZIA81NyLrtwP5RjqQ0.4iK67mEhd4PXmR6ss15ciF8sDjSScr2', 2, NULL, NULL, 'Active', '2026-07-25 15:50:23', '2026-07-23 03:23:21', '2026-07-26 18:43:59'),
+(12, 'Student Demo', 'student', NULL, 'student@university.edu', NULL, '$2y$10$ru8gezLWKYtIiFbnXqsLMOaHNp1CynW3ATdkojjB0erRUIV1rxQne', 4, NULL, NULL, 'Active', '2026-07-23 14:45:53', '2026-07-23 03:23:21', '2026-07-26 18:43:59'),
+(13, 'Examiner', 'examiner', NULL, 'examiner@university.edu', NULL, '$2y$10$8gqW4wQ3msFNTGq0UcouMurF4Ly4bIGB6Z/KT9JIPDSWjLhsZlqK.', 6, NULL, NULL, 'Active', NULL, '2026-07-25 12:59:01', '2026-07-26 18:43:59'),
+(14, 'SSO Admin', 'sso_admin', NULL, 'sso@university.edu', NULL, '$2y$10$/XVw7LehbAKgFuNsQgLyyuBbySScpJYr8x5eceFxrrWCLDxPic1O2', 1, NULL, NULL, 'Active', NULL, '2026-07-26 10:57:00', '2026-07-26 18:44:00'),
+(15, 'Exam Officer', 'exam_admin', NULL, 'exam@university.edu', NULL, '$2y$10$WA2OIYd4t1eNpjzL0rzHae2exiL0qEKe3RLxNHJ8qeGNhJ5qcjQSq', 6, NULL, NULL, 'Active', NULL, '2026-07-26 10:57:00', '2026-07-26 18:44:00'),
+(19, 'Dr. Sara Khan', 'sara.khan', '5001', 'sara.khan@university.edu', NULL, '$2y$10$CHpKfvUqpcOBhCES1bCVgO9urK3bhn5o0NOWrqJFUERvDyTHfZ1Mq', 2, NULL, NULL, 'Active', NULL, '2026-07-26 18:13:52', '2026-07-26 18:44:00'),
+(20, 'Teacher Demo', 'teacher.demo', '5002', 'teacher.demo@university.edu', NULL, '$2y$10$KpNnLcnl140COvIZtgbj8eUhtQIKwRC8iGYBB42jfkE2YXo7ehhLK', 2, NULL, NULL, 'Active', NULL, '2026-07-26 18:13:52', '2026-07-26 18:44:00'),
+(21, 'Ali Raza', 'ali.raza', '9001', 'ali.raza@university.edu', NULL, '$2y$10$Jf22SiM7FGyoT9BLXIl24uGVuivmpqSdsi.Kyj8r0V1epH3rvfgvS', 4, NULL, NULL, 'Active', NULL, '2026-07-26 18:13:52', '2026-07-26 18:44:00'),
+(22, 'Student Demo', 'student.demo', '9002', 'student.demo@university.edu', NULL, '$2y$10$JHSLxirVE9m2CKndkrZSmu.FUcYaNjDt.pbep7x.GLpzg7ha/cd2q', 4, NULL, NULL, 'Active', NULL, '2026-07-26 18:13:52', '2026-07-26 18:44:00');
 
 -- --------------------------------------------------------
 
 --
--- Stand-in structure for view `vw_course_enrollment`
+-- Stand-in structure for view `vw_pending_admissions`
 -- (See below for the actual view)
 --
-CREATE TABLE `vw_course_enrollment` (
-`course_code` varchar(20)
-,`course_name` varchar(100)
-,`enrolled_students` bigint(21)
-,`faculty_id` int(11)
+CREATE TABLE `vw_pending_admissions` (
+`application_id` int(11)
+,`temp_application_no` varchar(30)
+,`full_name` varchar(150)
+,`program_id` int(11)
+,`session_id` int(11)
+,`submitted_at` datetime
 );
 
 -- --------------------------------------------------------
 
 --
--- Stand-in structure for view `vw_student_details`
+-- Stand-in structure for view `vw_student_profile`
 -- (See below for the actual view)
 --
-CREATE TABLE `vw_student_details` (
-`student_id` varchar(20)
-,`full_name` varchar(100)
-,`email` varchar(100)
-,`phone` varchar(20)
-,`program_name` varchar(100)
-,`section` varchar(5)
-,`batch_year` int(11)
-,`semester` int(11)
-,`student_status` enum('pending','confirmed','active','inactive','graduated')
+CREATE TABLE `vw_student_profile` (
+`student_id` int(11)
+,`roll_no` varchar(30)
+,`full_name` varchar(150)
+,`father_name` varchar(150)
+,`program` varchar(100)
+,`current_session` varchar(50)
+,`current_semester` varchar(50)
+,`batch_year` smallint(6)
+,`status` enum('Active','Freeze','Graduated','Dropped','Suspended')
+,`total_amount` decimal(12,2)
+,`paid_amount` decimal(12,2)
+,`remaining_amount` decimal(12,2)
+,`fee_status` enum('Unpaid','Partially Paid','Paid','Overdue')
 );
 
 -- --------------------------------------------------------
 
 --
--- Structure for view `vw_course_enrollment`
+-- Structure for view `vw_pending_admissions`
 --
-DROP TABLE IF EXISTS `vw_course_enrollment`;
+DROP TABLE IF EXISTS `vw_pending_admissions`;
 
-CREATE ALGORITHM=UNDEFINED DEFINER=`root`@`localhost` SQL SECURITY DEFINER VIEW `vw_course_enrollment`  AS SELECT `c`.`course_code` AS `course_code`, `c`.`course_name` AS `course_name`, count(`sc`.`student_id`) AS `enrolled_students`, `f`.`user_id` AS `faculty_id` FROM (((`courses` `c` left join `student_courses` `sc` on(`c`.`course_id` = `sc`.`course_id`)) left join `faculty_courses` `fc` on(`c`.`course_id` = `fc`.`course_id`)) left join `faculty` `f` on(`fc`.`faculty_id` = `f`.`faculty_id`)) GROUP BY `c`.`course_id` ;
+CREATE ALGORITHM=UNDEFINED DEFINER=`root`@`localhost` SQL SECURITY DEFINER VIEW `vw_pending_admissions`  AS SELECT `admission_applications`.`application_id` AS `application_id`, `admission_applications`.`temp_application_no` AS `temp_application_no`, `admission_applications`.`full_name` AS `full_name`, `admission_applications`.`program_id` AS `program_id`, `admission_applications`.`session_id` AS `session_id`, `admission_applications`.`submitted_at` AS `submitted_at` FROM `admission_applications` WHERE `admission_applications`.`application_status` in ('Submitted','Under Review') ORDER BY `admission_applications`.`submitted_at` ASC ;
 
 -- --------------------------------------------------------
 
 --
--- Structure for view `vw_student_details`
+-- Structure for view `vw_student_profile`
 --
-DROP TABLE IF EXISTS `vw_student_details`;
+DROP TABLE IF EXISTS `vw_student_profile`;
 
-CREATE ALGORITHM=UNDEFINED DEFINER=`root`@`localhost` SQL SECURITY DEFINER VIEW `vw_student_details`  AS SELECT `s`.`student_id` AS `student_id`, `u`.`full_name` AS `full_name`, `u`.`email` AS `email`, `u`.`phone` AS `phone`, `p`.`program_name` AS `program_name`, `s`.`section` AS `section`, `s`.`batch_year` AS `batch_year`, `s`.`semester` AS `semester`, `s`.`status` AS `student_status` FROM ((`students` `s` join `users` `u` on(`s`.`user_id` = `u`.`user_id`)) join `programs` `p` on(`s`.`program_id` = `p`.`program_id`)) ;
+CREATE ALGORITHM=UNDEFINED DEFINER=`root`@`localhost` SQL SECURITY DEFINER VIEW `vw_student_profile`  AS SELECT `st`.`student_id` AS `student_id`, `st`.`roll_no` AS `roll_no`, `st`.`full_name` AS `full_name`, `st`.`father_name` AS `father_name`, `d`.`department_name` AS `program`, `se`.`session_name` AS `current_session`, `sm`.`semester_name` AS `current_semester`, `st`.`batch_year` AS `batch_year`, `st`.`status` AS `status`, `sf`.`total_amount` AS `total_amount`, `sf`.`paid_amount` AS `paid_amount`, `sf`.`remaining_amount` AS `remaining_amount`, `sf`.`status` AS `fee_status` FROM ((((`students` `st` join `departments` `d` on(`d`.`department_id` = `st`.`program_id`)) join `sessions` `se` on(`se`.`session_id` = `st`.`current_session_id`)) join `semesters` `sm` on(`sm`.`semester_id` = `st`.`current_semester_id`)) left join `student_fee` `sf` on(`sf`.`student_id` = `st`.`student_id` and `sf`.`semester_id` = `st`.`current_semester_id`)) ;
 
 --
 -- Indexes for dumped tables
 --
 
 --
+-- Indexes for table `activity_logs`
+--
+ALTER TABLE `activity_logs`
+  ADD PRIMARY KEY (`log_id`),
+  ADD KEY `fk_log_user` (`performed_by`);
+
+--
 -- Indexes for table `admission_applications`
 --
 ALTER TABLE `admission_applications`
   ADD PRIMARY KEY (`application_id`),
-  ADD UNIQUE KEY `email` (`email`),
-  ADD KEY `program_applied` (`program_applied`),
-  ADD KEY `reviewed_by` (`reviewed_by`);
+  ADD UNIQUE KEY `temp_application_no` (`temp_application_no`),
+  ADD KEY `fk_appl_program` (`program_id`),
+  ADD KEY `fk_appl_session` (`session_id`),
+  ADD KEY `fk_appl_sem` (`applied_semester_id`),
+  ADD KEY `fk_appl_reviewer` (`reviewed_by`);
 
 --
--- Indexes for table `assignments`
+-- Indexes for table `admission_students`
 --
-ALTER TABLE `assignments`
-  ADD PRIMARY KEY (`assignment_id`),
-  ADD KEY `course_id` (`course_id`),
-  ADD KEY `faculty_id` (`faculty_id`);
+ALTER TABLE `admission_students`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `student_id` (`student_id`);
+
+--
+-- Indexes for table `applications`
+--
+ALTER TABLE `applications`
+  ADD PRIMARY KEY (`application_id`),
+  ADD KEY `idx_student` (`student_id`),
+  ADD KEY `idx_status` (`status`);
 
 --
 -- Indexes for table `attendance`
 --
 ALTER TABLE `attendance`
   ADD PRIMARY KEY (`attendance_id`),
-  ADD KEY `student_id` (`student_id`),
-  ADD KEY `course_id` (`course_id`),
-  ADD KEY `faculty_id` (`faculty_id`);
+  ADD UNIQUE KEY `uq_student_course_date` (`student_id`,`course_id`,`class_date`),
+  ADD KEY `fk_att_course` (`course_id`),
+  ADD KEY `fk_att_teacher` (`teacher_id`);
 
 --
 -- Indexes for table `courses`
@@ -1713,62 +1706,316 @@ ALTER TABLE `attendance`
 ALTER TABLE `courses`
   ADD PRIMARY KEY (`course_id`),
   ADD UNIQUE KEY `course_code` (`course_code`),
-  ADD KEY `program_id` (`program_id`);
+  ADD KEY `fk_course_dept` (`department_id`),
+  ADD KEY `fk_course_sem` (`semester_id`);
 
 --
 -- Indexes for table `departments`
 --
 ALTER TABLE `departments`
-  ADD PRIMARY KEY (`dept_id`),
-  ADD UNIQUE KEY `dept_code` (`dept_code`);
+  ADD PRIMARY KEY (`department_id`),
+  ADD UNIQUE KEY `department_code` (`department_code`);
+
+--
+-- Indexes for table `examinations`
+--
+ALTER TABLE `examinations`
+  ADD PRIMARY KEY (`exam_id`),
+  ADD KEY `fk_exm_session` (`session_id`),
+  ADD KEY `fk_exm_sem` (`semester_id`),
+  ADD KEY `fk_exm_creator` (`created_by`);
+
+--
+-- Indexes for table `exam_attendance`
+--
+ALTER TABLE `exam_attendance`
+  ADD PRIMARY KEY (`attendance_id`),
+  ADD KEY `idx_exam_attendance_student` (`student_id`),
+  ADD KEY `idx_exam_attendance_exam` (`exam_id`);
 
 --
 -- Indexes for table `exam_results`
 --
 ALTER TABLE `exam_results`
   ADD PRIMARY KEY (`result_id`),
-  ADD KEY `student_id` (`student_id`),
-  ADD KEY `exam_id` (`exam_id`);
+  ADD KEY `idx_exam_results_student` (`student_id`),
+  ADD KEY `idx_exam_results_exam` (`exam_id`),
+  ADD KEY `idx_exam_results_status` (`status`);
 
 --
 -- Indexes for table `exam_schedules`
 --
 ALTER TABLE `exam_schedules`
   ADD PRIMARY KEY (`exam_id`),
-  ADD KEY `course_id` (`course_id`);
+  ADD KEY `idx_schedule_course_date` (`course_id`,`date`);
 
 --
 -- Indexes for table `faculty`
 --
 ALTER TABLE `faculty`
   ADD PRIMARY KEY (`faculty_id`),
-  ADD UNIQUE KEY `user_id` (`user_id`),
-  ADD UNIQUE KEY `employee_id` (`employee_id`),
-  ADD KEY `department_id` (`department_id`);
+  ADD KEY `fk_faculty_dept` (`department_id`);
 
 --
--- Indexes for table `faculty_courses`
+-- Indexes for table `fee_heads`
 --
-ALTER TABLE `faculty_courses`
-  ADD PRIMARY KEY (`assignment_id`),
-  ADD KEY `faculty_id` (`faculty_id`),
-  ADD KEY `course_id` (`course_id`);
+ALTER TABLE `fee_heads`
+  ADD PRIMARY KEY (`fee_head_id`),
+  ADD UNIQUE KEY `fee_head_name` (`fee_head_name`);
+
+--
+-- Indexes for table `fee_payments`
+--
+ALTER TABLE `fee_payments`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `student_id` (`student_id`);
 
 --
 -- Indexes for table `fee_records`
 --
 ALTER TABLE `fee_records`
   ADD PRIMARY KEY (`fee_id`),
-  ADD KEY `student_id` (`student_id`),
-  ADD KEY `verified_by` (`verified_by`);
+  ADD KEY `idx_student` (`student_id`),
+  ADD KEY `idx_status` (`status`);
+
+--
+-- Indexes for table `fee_structures`
+--
+ALTER TABLE `fee_structures`
+  ADD PRIMARY KEY (`fee_structure_id`),
+  ADD UNIQUE KEY `uq_program_session_sem` (`program_id`,`session_id`,`semester_id`),
+  ADD KEY `fk_fs_session` (`session_id`),
+  ADD KEY `fk_fs_semester` (`semester_id`),
+  ADD KEY `fk_fs_creator` (`created_by`);
+
+--
+-- Indexes for table `fee_structure_details`
+--
+ALTER TABLE `fee_structure_details`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `uq_structure_head` (`fee_structure_id`,`fee_head_id`),
+  ADD KEY `fk_fsd_head` (`fee_head_id`);
+
+--
+-- Indexes for table `installments`
+--
+ALTER TABLE `installments`
+  ADD PRIMARY KEY (`installment_id`),
+  ADD UNIQUE KEY `uq_stf_installment_no` (`student_fee_id`,`installment_no`);
+
+--
+-- Indexes for table `lms_academic_calendar`
+--
+ALTER TABLE `lms_academic_calendar`
+  ADD PRIMARY KEY (`event_id`),
+  ADD KEY `idx_date` (`event_date`);
+
+--
+-- Indexes for table `lms_announcements`
+--
+ALTER TABLE `lms_announcements`
+  ADD PRIMARY KEY (`announcement_id`),
+  ADD KEY `idx_course` (`course_id`);
+
+--
+-- Indexes for table `lms_applications`
+--
+ALTER TABLE `lms_applications`
+  ADD PRIMARY KEY (`application_id`),
+  ADD KEY `idx_user_id` (`user_id`),
+  ADD KEY `idx_status` (`status`);
+
+--
+-- Indexes for table `lms_assignments`
+--
+ALTER TABLE `lms_assignments`
+  ADD PRIMARY KEY (`assignment_id`),
+  ADD KEY `idx_course` (`course_id`);
+
+--
+-- Indexes for table `lms_course_materials`
+--
+ALTER TABLE `lms_course_materials`
+  ADD PRIMARY KEY (`material_id`),
+  ADD KEY `idx_course` (`course_id`);
+
+--
+-- Indexes for table `lms_datesheets`
+--
+ALTER TABLE `lms_datesheets`
+  ADD PRIMARY KEY (`datesheet_id`),
+  ADD KEY `idx_course` (`course_id`);
+
+--
+-- Indexes for table `lms_enrollments`
+--
+ALTER TABLE `lms_enrollments`
+  ADD PRIMARY KEY (`enrollment_id`),
+  ADD KEY `idx_course` (`course_id`),
+  ADD KEY `idx_student` (`student_user_id`);
+
+--
+-- Indexes for table `lms_exams`
+--
+ALTER TABLE `lms_exams`
+  ADD PRIMARY KEY (`exam_id`),
+  ADD KEY `idx_course` (`course_id`);
+
+--
+-- Indexes for table `lms_fees`
+--
+ALTER TABLE `lms_fees`
+  ADD PRIMARY KEY (`fee_id`),
+  ADD KEY `idx_student` (`student_user_id`);
+
+--
+-- Indexes for table `lms_lectures`
+--
+ALTER TABLE `lms_lectures`
+  ADD PRIMARY KEY (`lecture_id`),
+  ADD KEY `idx_course` (`course_id`);
+
+--
+-- Indexes for table `lms_marks`
+--
+ALTER TABLE `lms_marks`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `idx_course_student` (`course_id`,`student_user_id`);
+
+--
+-- Indexes for table `lms_mark_finalizations`
+--
+ALTER TABLE `lms_mark_finalizations`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `uk_course_student` (`course_id`,`student_user_id`);
+
+--
+-- Indexes for table `lms_messages`
+--
+ALTER TABLE `lms_messages`
+  ADD PRIMARY KEY (`message_id`),
+  ADD KEY `idx_recipient` (`recipient_user_id`);
+
+--
+-- Indexes for table `lms_notifications`
+--
+ALTER TABLE `lms_notifications`
+  ADD PRIMARY KEY (`notification_id`),
+  ADD KEY `idx_recipient` (`recipient_user_id`);
+
+--
+-- Indexes for table `lms_queries`
+--
+ALTER TABLE `lms_queries`
+  ADD PRIMARY KEY (`query_id`),
+  ADD KEY `idx_student` (`student_user_id`);
+
+--
+-- Indexes for table `lms_quizzes`
+--
+ALTER TABLE `lms_quizzes`
+  ADD PRIMARY KEY (`quiz_id`),
+  ADD KEY `idx_course` (`course_id`);
+
+--
+-- Indexes for table `lms_quiz_results`
+--
+ALTER TABLE `lms_quiz_results`
+  ADD PRIMARY KEY (`result_id`),
+  ADD KEY `idx_quiz` (`quiz_id`),
+  ADD KEY `idx_student` (`student_user_id`);
+
+--
+-- Indexes for table `lms_reports`
+--
+ALTER TABLE `lms_reports`
+  ADD PRIMARY KEY (`report_id`);
+
+--
+-- Indexes for table `lms_settings`
+--
+ALTER TABLE `lms_settings`
+  ADD PRIMARY KEY (`setting_id`),
+  ADD UNIQUE KEY `uk_user_key` (`user_id`,`setting_key`);
+
+--
+-- Indexes for table `lms_student_answers`
+--
+ALTER TABLE `lms_student_answers`
+  ADD PRIMARY KEY (`answer_id`),
+  ADD KEY `idx_quiz_student` (`quiz_id`,`student_user_id`);
+
+--
+-- Indexes for table `lms_submissions`
+--
+ALTER TABLE `lms_submissions`
+  ADD PRIMARY KEY (`submission_id`),
+  ADD KEY `idx_assignment` (`assignment_id`),
+  ADD KEY `idx_student` (`student_user_id`);
+
+--
+-- Indexes for table `lms_timetable`
+--
+ALTER TABLE `lms_timetable`
+  ADD PRIMARY KEY (`timetable_id`),
+  ADD KEY `idx_course` (`course_id`);
+
+--
+-- Indexes for table `lms_transcripts`
+--
+ALTER TABLE `lms_transcripts`
+  ADD PRIMARY KEY (`transcript_id`),
+  ADD KEY `idx_student` (`student_user_id`);
+
+--
+-- Indexes for table `payments`
+--
+ALTER TABLE `payments`
+  ADD PRIMARY KEY (`payment_id`),
+  ADD KEY `fk_pay_stf` (`student_fee_id`),
+  ADD KEY `fk_pay_student` (`student_id`),
+  ADD KEY `fk_pay_officer` (`received_by`);
+
+--
+-- Indexes for table `payment_reversals`
+--
+ALTER TABLE `payment_reversals`
+  ADD PRIMARY KEY (`reversal_id`),
+  ADD KEY `fk_rev_payment` (`payment_id`),
+  ADD KEY `fk_rev_officer` (`reversed_by`);
 
 --
 -- Indexes for table `programs`
 --
 ALTER TABLE `programs`
-  ADD PRIMARY KEY (`program_id`),
-  ADD UNIQUE KEY `program_code` (`program_code`),
-  ADD KEY `dept_id` (`dept_id`);
+  ADD PRIMARY KEY (`program_id`);
+
+--
+-- Indexes for table `question_bank`
+--
+ALTER TABLE `question_bank`
+  ADD PRIMARY KEY (`question_id`),
+  ADD KEY `idx_questions_exam` (`exam_id`),
+  ADD KEY `idx_questions_course` (`course_id`),
+  ADD KEY `idx_questions_difficulty` (`difficulty_level`);
+
+--
+-- Indexes for table `question_papers`
+--
+ALTER TABLE `question_papers`
+  ADD PRIMARY KEY (`paper_id`),
+  ADD KEY `fk_qp_exam` (`exam_id`),
+  ADD KEY `fk_qp_course` (`course_id`),
+  ADD KEY `fk_qp_teacher` (`teacher_id`);
+
+--
+-- Indexes for table `receipts`
+--
+ALTER TABLE `receipts`
+  ADD PRIMARY KEY (`receipt_id`),
+  ADD UNIQUE KEY `payment_id` (`payment_id`),
+  ADD UNIQUE KEY `receipt_no` (`receipt_no`),
+  ADD KEY `fk_rcpt_issuer` (`issued_by`);
 
 --
 -- Indexes for table `roles`
@@ -1778,55 +2025,279 @@ ALTER TABLE `roles`
   ADD UNIQUE KEY `role_name` (`role_name`);
 
 --
--- Indexes for table `section_change_requests`
+-- Indexes for table `sbe_auth_users`
 --
-ALTER TABLE `section_change_requests`
-  ADD PRIMARY KEY (`request_id`),
-  ADD KEY `student_id` (`student_id`),
-  ADD KEY `reviewed_by` (`reviewed_by`);
+ALTER TABLE `sbe_auth_users`
+  ADD PRIMARY KEY (`auth_id`),
+  ADD UNIQUE KEY `login_id` (`login_id`),
+  ADD KEY `fk_sbeauth_teacher` (`teacher_id`),
+  ADD KEY `fk_sbeauth_student` (`student_id`);
+
+--
+-- Indexes for table `sbe_exams`
+--
+ALTER TABLE `sbe_exams`
+  ADD PRIMARY KEY (`exam_id`),
+  ADD UNIQUE KEY `exam_code` (`exam_code`),
+  ADD KEY `fk_sbeexam_course` (`course_id`),
+  ADD KEY `fk_sbeexam_teacher` (`teacher_id`);
+
+--
+-- Indexes for table `sbe_exam_questions`
+--
+ALTER TABLE `sbe_exam_questions`
+  ADD PRIMARY KEY (`exam_question_id`),
+  ADD UNIQUE KEY `uq_exam_question` (`exam_id`,`question_id`),
+  ADD UNIQUE KEY `uq_exam_order` (`exam_id`,`question_order`),
+  ADD KEY `fk_sbeeq_question` (`question_id`);
+
+--
+-- Indexes for table `sbe_exam_results`
+--
+ALTER TABLE `sbe_exam_results`
+  ADD PRIMARY KEY (`exam_result_id`),
+  ADD UNIQUE KEY `uq_studentexam_result` (`student_exam_id`),
+  ADD KEY `fk_sberes_exam` (`exam_id`),
+  ADD KEY `fk_sberes_student` (`student_id`);
+
+--
+-- Indexes for table `sbe_exam_schedule`
+--
+ALTER TABLE `sbe_exam_schedule`
+  ADD PRIMARY KEY (`schedule_id`),
+  ADD KEY `fk_sbesched_exam` (`exam_id`),
+  ADD KEY `fk_sbesched_sem` (`semester_id`);
+
+--
+-- Indexes for table `sbe_question_bank`
+--
+ALTER TABLE `sbe_question_bank`
+  ADD PRIMARY KEY (`question_id`),
+  ADD KEY `fk_qb_course` (`course_id`),
+  ADD KEY `fk_qb_teacher` (`teacher_id`);
+
+--
+-- Indexes for table `sbe_student_answers`
+--
+ALTER TABLE `sbe_student_answers`
+  ADD PRIMARY KEY (`student_answer_id`),
+  ADD UNIQUE KEY `uq_studentexam_question` (`student_exam_id`,`question_id`),
+  ADD KEY `fk_sbesa_question` (`question_id`);
+
+--
+-- Indexes for table `sbe_student_exams`
+--
+ALTER TABLE `sbe_student_exams`
+  ADD PRIMARY KEY (`student_exam_id`),
+  ADD UNIQUE KEY `uq_schedule_student_attempt` (`schedule_id`,`student_id`,`attempt_no`),
+  ADD KEY `fk_sbese_exam` (`exam_id`),
+  ADD KEY `fk_sbese_student` (`student_id`);
+
+--
+-- Indexes for table `scholarships`
+--
+ALTER TABLE `scholarships`
+  ADD PRIMARY KEY (`scholarship_id`),
+  ADD KEY `fk_sch_student` (`student_id`),
+  ADD KEY `fk_sch_semester` (`semester_id`),
+  ADD KEY `fk_sch_approver` (`approved_by`);
+
+--
+-- Indexes for table `sections`
+--
+ALTER TABLE `sections`
+  ADD PRIMARY KEY (`section_id`),
+  ADD UNIQUE KEY `unique_section` (`section_name`,`academic_year`);
+
+--
+-- Indexes for table `section_courses`
+--
+ALTER TABLE `section_courses`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `unique_section_course` (`section_id`,`course_id`),
+  ADD KEY `idx_section` (`section_id`),
+  ADD KEY `idx_course` (`course_id`);
+
+--
+-- Indexes for table `semesters`
+--
+ALTER TABLE `semesters`
+  ADD PRIMARY KEY (`semester_id`),
+  ADD UNIQUE KEY `uq_dept_sem` (`department_id`,`semester_number`);
+
+--
+-- Indexes for table `semester_courses`
+--
+ALTER TABLE `semester_courses`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `uq_sem_course` (`semester_id`,`course_id`),
+  ADD KEY `fk_semc_course` (`course_id`);
+
+--
+-- Indexes for table `sessions`
+--
+ALTER TABLE `sessions`
+  ADD PRIMARY KEY (`session_id`),
+  ADD UNIQUE KEY `session_name` (`session_name`);
+
+--
+-- Indexes for table `sso_applications`
+--
+ALTER TABLE `sso_applications`
+  ADD PRIMARY KEY (`application_id`),
+  ADD KEY `fk_ssoapp_student` (`student_id`),
+  ADD KEY `fk_ssoapp_resolver` (`resolved_by`);
 
 --
 -- Indexes for table `students`
 --
 ALTER TABLE `students`
   ADD PRIMARY KEY (`student_id`),
-  ADD UNIQUE KEY `user_id` (`user_id`),
   ADD UNIQUE KEY `application_id` (`application_id`),
-  ADD KEY `program_id` (`program_id`);
+  ADD UNIQUE KEY `roll_no` (`roll_no`),
+  ADD KEY `fk_stu_program` (`program_id`),
+  ADD KEY `fk_stu_adm_session` (`admission_session_id`),
+  ADD KEY `fk_stu_cur_session` (`current_session_id`),
+  ADD KEY `fk_stu_cur_sem` (`current_semester_id`);
 
 --
 -- Indexes for table `student_courses`
 --
 ALTER TABLE `student_courses`
-  ADD PRIMARY KEY (`enrollment_id`),
-  ADD KEY `student_id` (`student_id`),
-  ADD KEY `course_id` (`course_id`);
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `unique_student_course` (`student_id`,`course_id`);
 
 --
--- Indexes for table `submissions`
+-- Indexes for table `student_enrollments`
 --
-ALTER TABLE `submissions`
-  ADD PRIMARY KEY (`submission_id`),
-  ADD KEY `assignment_id` (`assignment_id`),
-  ADD KEY `student_id` (`student_id`);
+ALTER TABLE `student_enrollments`
+  ADD PRIMARY KEY (`enrollment_id`),
+  ADD UNIQUE KEY `unique_enrollment` (`student_id`,`course_id`),
+  ADD KEY `idx_student` (`student_id`),
+  ADD KEY `idx_course` (`course_id`);
+
+--
+-- Indexes for table `student_fee`
+--
+ALTER TABLE `student_fee`
+  ADD PRIMARY KEY (`student_fee_id`),
+  ADD UNIQUE KEY `uq_student_semester_fee` (`student_id`,`semester_id`),
+  ADD KEY `fk_stf_sem` (`semester_id`),
+  ADD KEY `fk_stf_session` (`session_id`),
+  ADD KEY `fk_stf_fs` (`fee_structure_id`),
+  ADD KEY `fk_stf_generator` (`generated_by`);
+
+--
+-- Indexes for table `student_fee_assignment`
+--
+ALTER TABLE `student_fee_assignment`
+  ADD PRIMARY KEY (`assignment_id`),
+  ADD UNIQUE KEY `uq_student_semester_assignment` (`student_id`,`semester_id`),
+  ADD KEY `fk_sfa_fs` (`fee_structure_id`),
+  ADD KEY `fk_sfa_sem` (`semester_id`),
+  ADD KEY `fk_sfa_officer` (`assigned_by`);
+
+--
+-- Indexes for table `student_fee_details`
+--
+ALTER TABLE `student_fee_details`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `uq_stf_head` (`student_fee_id`,`fee_head_id`),
+  ADD KEY `fk_sfdet_head` (`fee_head_id`);
+
+--
+-- Indexes for table `student_fee_discounts`
+--
+ALTER TABLE `student_fee_discounts`
+  ADD PRIMARY KEY (`discount_id`),
+  ADD KEY `fk_sfd_student` (`student_id`),
+  ADD KEY `fk_sfd_semester` (`semester_id`),
+  ADD KEY `fk_sfd_officer` (`applied_by`),
+  ADD KEY `fk_sfd_head` (`fee_head_id`);
+
+--
+-- Indexes for table `student_grades`
+--
+ALTER TABLE `student_grades`
+  ADD PRIMARY KEY (`grade_id`),
+  ADD KEY `idx_student_grades_student` (`student_id`),
+  ADD KEY `idx_student_grades_course` (`course_id`);
+
+--
+-- Indexes for table `student_promotions`
+--
+ALTER TABLE `student_promotions`
+  ADD PRIMARY KEY (`promotion_id`),
+  ADD KEY `idx_student_promotions_student` (`student_id`),
+  ADD KEY `fk_student_promotions_approved` (`approved_by`);
+
+--
+-- Indexes for table `teachers`
+--
+ALTER TABLE `teachers`
+  ADD PRIMARY KEY (`teacher_id`),
+  ADD UNIQUE KEY `email` (`email`),
+  ADD KEY `fk_teacher_user` (`user_id`),
+  ADD KEY `fk_teacher_dept` (`department_id`);
+
+--
+-- Indexes for table `teacher_courses`
+--
+ALTER TABLE `teacher_courses`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `uq_course_sem_session_section` (`course_id`,`semester_id`,`session_id`,`section`),
+  ADD KEY `fk_tc_teacher` (`teacher_id`),
+  ADD KEY `fk_tc_sem` (`semester_id`),
+  ADD KEY `fk_tc_session` (`session_id`);
+
+--
+-- Indexes for table `timetable`
+--
+ALTER TABLE `timetable`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `uq_room_slot` (`room_no`,`day_of_week`,`start_time`,`session_id`),
+  ADD KEY `fk_tt_course` (`course_id`),
+  ADD KEY `fk_tt_teacher` (`teacher_id`),
+  ADD KEY `fk_tt_sem` (`semester_id`),
+  ADD KEY `fk_tt_session` (`session_id`);
 
 --
 -- Indexes for table `users`
 --
 ALTER TABLE `users`
   ADD PRIMARY KEY (`user_id`),
+  ADD UNIQUE KEY `username` (`username`),
   ADD UNIQUE KEY `email` (`email`),
-  ADD KEY `role_id` (`role_id`);
+  ADD KEY `fk_users_role` (`role_id`),
+  ADD KEY `fk_users_dept` (`department_id`);
 
 --
 -- AUTO_INCREMENT for dumped tables
 --
 
 --
--- AUTO_INCREMENT for table `assignments`
+-- AUTO_INCREMENT for table `activity_logs`
 --
-ALTER TABLE `assignments`
-  MODIFY `assignment_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
+ALTER TABLE `activity_logs`
+  MODIFY `log_id` bigint(20) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `admission_applications`
+--
+ALTER TABLE `admission_applications`
+  MODIFY `application_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=21;
+
+--
+-- AUTO_INCREMENT for table `admission_students`
+--
+ALTER TABLE `admission_students`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `applications`
+--
+ALTER TABLE `applications`
+  MODIFY `application_id` int(11) NOT NULL AUTO_INCREMENT;
 
 --
 -- AUTO_INCREMENT for table `attendance`
@@ -1838,13 +2309,25 @@ ALTER TABLE `attendance`
 -- AUTO_INCREMENT for table `courses`
 --
 ALTER TABLE `courses`
-  MODIFY `course_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=8;
+  MODIFY `course_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=17;
 
 --
 -- AUTO_INCREMENT for table `departments`
 --
 ALTER TABLE `departments`
-  MODIFY `dept_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=6;
+  MODIFY `department_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=23;
+
+--
+-- AUTO_INCREMENT for table `examinations`
+--
+ALTER TABLE `examinations`
+  MODIFY `exam_id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `exam_attendance`
+--
+ALTER TABLE `exam_attendance`
+  MODIFY `attendance_id` int(11) NOT NULL AUTO_INCREMENT;
 
 --
 -- AUTO_INCREMENT for table `exam_results`
@@ -1862,25 +2345,217 @@ ALTER TABLE `exam_schedules`
 -- AUTO_INCREMENT for table `faculty`
 --
 ALTER TABLE `faculty`
-  MODIFY `faculty_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
+  MODIFY `faculty_id` int(11) NOT NULL AUTO_INCREMENT;
 
 --
--- AUTO_INCREMENT for table `faculty_courses`
+-- AUTO_INCREMENT for table `fee_heads`
 --
-ALTER TABLE `faculty_courses`
-  MODIFY `assignment_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
+ALTER TABLE `fee_heads`
+  MODIFY `fee_head_id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `fee_payments`
+--
+ALTER TABLE `fee_payments`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
 
 --
 -- AUTO_INCREMENT for table `fee_records`
 --
 ALTER TABLE `fee_records`
-  MODIFY `fee_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
+  MODIFY `fee_id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `fee_structures`
+--
+ALTER TABLE `fee_structures`
+  MODIFY `fee_structure_id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `fee_structure_details`
+--
+ALTER TABLE `fee_structure_details`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `installments`
+--
+ALTER TABLE `installments`
+  MODIFY `installment_id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `lms_academic_calendar`
+--
+ALTER TABLE `lms_academic_calendar`
+  MODIFY `event_id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `lms_announcements`
+--
+ALTER TABLE `lms_announcements`
+  MODIFY `announcement_id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `lms_applications`
+--
+ALTER TABLE `lms_applications`
+  MODIFY `application_id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `lms_assignments`
+--
+ALTER TABLE `lms_assignments`
+  MODIFY `assignment_id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `lms_course_materials`
+--
+ALTER TABLE `lms_course_materials`
+  MODIFY `material_id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `lms_datesheets`
+--
+ALTER TABLE `lms_datesheets`
+  MODIFY `datesheet_id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `lms_enrollments`
+--
+ALTER TABLE `lms_enrollments`
+  MODIFY `enrollment_id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `lms_exams`
+--
+ALTER TABLE `lms_exams`
+  MODIFY `exam_id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `lms_fees`
+--
+ALTER TABLE `lms_fees`
+  MODIFY `fee_id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `lms_lectures`
+--
+ALTER TABLE `lms_lectures`
+  MODIFY `lecture_id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `lms_marks`
+--
+ALTER TABLE `lms_marks`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `lms_mark_finalizations`
+--
+ALTER TABLE `lms_mark_finalizations`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `lms_messages`
+--
+ALTER TABLE `lms_messages`
+  MODIFY `message_id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `lms_notifications`
+--
+ALTER TABLE `lms_notifications`
+  MODIFY `notification_id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `lms_queries`
+--
+ALTER TABLE `lms_queries`
+  MODIFY `query_id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `lms_quizzes`
+--
+ALTER TABLE `lms_quizzes`
+  MODIFY `quiz_id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `lms_quiz_results`
+--
+ALTER TABLE `lms_quiz_results`
+  MODIFY `result_id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `lms_reports`
+--
+ALTER TABLE `lms_reports`
+  MODIFY `report_id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `lms_settings`
+--
+ALTER TABLE `lms_settings`
+  MODIFY `setting_id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `lms_student_answers`
+--
+ALTER TABLE `lms_student_answers`
+  MODIFY `answer_id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `lms_submissions`
+--
+ALTER TABLE `lms_submissions`
+  MODIFY `submission_id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `lms_timetable`
+--
+ALTER TABLE `lms_timetable`
+  MODIFY `timetable_id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `lms_transcripts`
+--
+ALTER TABLE `lms_transcripts`
+  MODIFY `transcript_id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `payments`
+--
+ALTER TABLE `payments`
+  MODIFY `payment_id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `payment_reversals`
+--
+ALTER TABLE `payment_reversals`
+  MODIFY `reversal_id` int(11) NOT NULL AUTO_INCREMENT;
 
 --
 -- AUTO_INCREMENT for table `programs`
 --
 ALTER TABLE `programs`
-  MODIFY `program_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=6;
+  MODIFY `program_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=7;
+
+--
+-- AUTO_INCREMENT for table `question_bank`
+--
+ALTER TABLE `question_bank`
+  MODIFY `question_id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `question_papers`
+--
+ALTER TABLE `question_papers`
+  MODIFY `paper_id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `receipts`
+--
+ALTER TABLE `receipts`
+  MODIFY `receipt_id` int(11) NOT NULL AUTO_INCREMENT;
 
 --
 -- AUTO_INCREMENT for table `roles`
@@ -1889,142 +2564,477 @@ ALTER TABLE `roles`
   MODIFY `role_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=7;
 
 --
--- AUTO_INCREMENT for table `section_change_requests`
+-- AUTO_INCREMENT for table `sbe_auth_users`
 --
-ALTER TABLE `section_change_requests`
-  MODIFY `request_id` int(11) NOT NULL AUTO_INCREMENT;
+ALTER TABLE `sbe_auth_users`
+  MODIFY `auth_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=5;
+
+--
+-- AUTO_INCREMENT for table `sbe_exams`
+--
+ALTER TABLE `sbe_exams`
+  MODIFY `exam_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
+
+--
+-- AUTO_INCREMENT for table `sbe_exam_questions`
+--
+ALTER TABLE `sbe_exam_questions`
+  MODIFY `exam_question_id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `sbe_exam_results`
+--
+ALTER TABLE `sbe_exam_results`
+  MODIFY `exam_result_id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `sbe_exam_schedule`
+--
+ALTER TABLE `sbe_exam_schedule`
+  MODIFY `schedule_id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `sbe_question_bank`
+--
+ALTER TABLE `sbe_question_bank`
+  MODIFY `question_id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `sbe_student_answers`
+--
+ALTER TABLE `sbe_student_answers`
+  MODIFY `student_answer_id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `sbe_student_exams`
+--
+ALTER TABLE `sbe_student_exams`
+  MODIFY `student_exam_id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `scholarships`
+--
+ALTER TABLE `scholarships`
+  MODIFY `scholarship_id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `sections`
+--
+ALTER TABLE `sections`
+  MODIFY `section_id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `section_courses`
+--
+ALTER TABLE `section_courses`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `semesters`
+--
+ALTER TABLE `semesters`
+  MODIFY `semester_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=42;
+
+--
+-- AUTO_INCREMENT for table `semester_courses`
+--
+ALTER TABLE `semester_courses`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `sessions`
+--
+ALTER TABLE `sessions`
+  MODIFY `session_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=8;
+
+--
+-- AUTO_INCREMENT for table `sso_applications`
+--
+ALTER TABLE `sso_applications`
+  MODIFY `application_id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `students`
+--
+ALTER TABLE `students`
+  MODIFY `student_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
 
 --
 -- AUTO_INCREMENT for table `student_courses`
 --
 ALTER TABLE `student_courses`
-  MODIFY `enrollment_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
 
 --
--- AUTO_INCREMENT for table `submissions`
+-- AUTO_INCREMENT for table `student_enrollments`
 --
-ALTER TABLE `submissions`
-  MODIFY `submission_id` int(11) NOT NULL AUTO_INCREMENT;
+ALTER TABLE `student_enrollments`
+  MODIFY `enrollment_id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `student_fee`
+--
+ALTER TABLE `student_fee`
+  MODIFY `student_fee_id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `student_fee_assignment`
+--
+ALTER TABLE `student_fee_assignment`
+  MODIFY `assignment_id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `student_fee_details`
+--
+ALTER TABLE `student_fee_details`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `student_fee_discounts`
+--
+ALTER TABLE `student_fee_discounts`
+  MODIFY `discount_id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `student_grades`
+--
+ALTER TABLE `student_grades`
+  MODIFY `grade_id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `student_promotions`
+--
+ALTER TABLE `student_promotions`
+  MODIFY `promotion_id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `teachers`
+--
+ALTER TABLE `teachers`
+  MODIFY `teacher_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
+
+--
+-- AUTO_INCREMENT for table `teacher_courses`
+--
+ALTER TABLE `teacher_courses`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+
+--
+-- AUTO_INCREMENT for table `timetable`
+--
+ALTER TABLE `timetable`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
 
 --
 -- AUTO_INCREMENT for table `users`
 --
 ALTER TABLE `users`
-  MODIFY `user_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=7;
+  MODIFY `user_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=23;
 
 --
 -- Constraints for dumped tables
 --
 
 --
+-- Constraints for table `activity_logs`
+--
+ALTER TABLE `activity_logs`
+  ADD CONSTRAINT `fk_log_user` FOREIGN KEY (`performed_by`) REFERENCES `users` (`user_id`);
+
+--
 -- Constraints for table `admission_applications`
 --
 ALTER TABLE `admission_applications`
-  ADD CONSTRAINT `admission_applications_ibfk_1` FOREIGN KEY (`program_applied`) REFERENCES `programs` (`program_id`),
-  ADD CONSTRAINT `admission_applications_ibfk_2` FOREIGN KEY (`reviewed_by`) REFERENCES `users` (`user_id`);
-
---
--- Constraints for table `assignments`
---
-ALTER TABLE `assignments`
-  ADD CONSTRAINT `assignments_ibfk_1` FOREIGN KEY (`course_id`) REFERENCES `courses` (`course_id`),
-  ADD CONSTRAINT `assignments_ibfk_2` FOREIGN KEY (`faculty_id`) REFERENCES `faculty` (`faculty_id`);
+  ADD CONSTRAINT `fk_appl_program` FOREIGN KEY (`program_id`) REFERENCES `departments` (`department_id`),
+  ADD CONSTRAINT `fk_appl_reviewer` FOREIGN KEY (`reviewed_by`) REFERENCES `users` (`user_id`),
+  ADD CONSTRAINT `fk_appl_sem` FOREIGN KEY (`applied_semester_id`) REFERENCES `semesters` (`semester_id`),
+  ADD CONSTRAINT `fk_appl_session` FOREIGN KEY (`session_id`) REFERENCES `sessions` (`session_id`);
 
 --
 -- Constraints for table `attendance`
 --
 ALTER TABLE `attendance`
-  ADD CONSTRAINT `attendance_ibfk_1` FOREIGN KEY (`student_id`) REFERENCES `students` (`student_id`),
-  ADD CONSTRAINT `attendance_ibfk_2` FOREIGN KEY (`course_id`) REFERENCES `courses` (`course_id`),
-  ADD CONSTRAINT `attendance_ibfk_3` FOREIGN KEY (`faculty_id`) REFERENCES `faculty` (`faculty_id`);
+  ADD CONSTRAINT `fk_att_course` FOREIGN KEY (`course_id`) REFERENCES `courses` (`course_id`),
+  ADD CONSTRAINT `fk_att_student` FOREIGN KEY (`student_id`) REFERENCES `students` (`student_id`),
+  ADD CONSTRAINT `fk_att_teacher` FOREIGN KEY (`teacher_id`) REFERENCES `teachers` (`teacher_id`);
 
 --
 -- Constraints for table `courses`
 --
 ALTER TABLE `courses`
-  ADD CONSTRAINT `courses_ibfk_1` FOREIGN KEY (`program_id`) REFERENCES `programs` (`program_id`);
+  ADD CONSTRAINT `fk_course_dept` FOREIGN KEY (`department_id`) REFERENCES `departments` (`department_id`) ON DELETE SET NULL,
+  ADD CONSTRAINT `fk_course_sem` FOREIGN KEY (`semester_id`) REFERENCES `semesters` (`semester_id`);
+
+--
+-- Constraints for table `examinations`
+--
+ALTER TABLE `examinations`
+  ADD CONSTRAINT `fk_exm_creator` FOREIGN KEY (`created_by`) REFERENCES `users` (`user_id`),
+  ADD CONSTRAINT `fk_exm_sem` FOREIGN KEY (`semester_id`) REFERENCES `semesters` (`semester_id`),
+  ADD CONSTRAINT `fk_exm_session` FOREIGN KEY (`session_id`) REFERENCES `sessions` (`session_id`);
+
+--
+-- Constraints for table `exam_attendance`
+--
+ALTER TABLE `exam_attendance`
+  ADD CONSTRAINT `fk_exam_attendance_exam` FOREIGN KEY (`exam_id`) REFERENCES `exam_schedules` (`exam_id`),
+  ADD CONSTRAINT `fk_exam_attendance_student` FOREIGN KEY (`student_id`) REFERENCES `students` (`student_id`);
 
 --
 -- Constraints for table `exam_results`
 --
 ALTER TABLE `exam_results`
-  ADD CONSTRAINT `exam_results_ibfk_1` FOREIGN KEY (`student_id`) REFERENCES `students` (`student_id`),
-  ADD CONSTRAINT `exam_results_ibfk_2` FOREIGN KEY (`exam_id`) REFERENCES `exam_schedules` (`exam_id`);
-
---
--- Constraints for table `exam_schedules`
---
-ALTER TABLE `exam_schedules`
-  ADD CONSTRAINT `exam_schedules_ibfk_1` FOREIGN KEY (`course_id`) REFERENCES `courses` (`course_id`);
+  ADD CONSTRAINT `fk_exam_results_exam` FOREIGN KEY (`exam_id`) REFERENCES `exam_schedules` (`exam_id`),
+  ADD CONSTRAINT `fk_exam_results_student` FOREIGN KEY (`student_id`) REFERENCES `students` (`student_id`);
 
 --
 -- Constraints for table `faculty`
 --
 ALTER TABLE `faculty`
-  ADD CONSTRAINT `faculty_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`user_id`),
-  ADD CONSTRAINT `faculty_ibfk_2` FOREIGN KEY (`department_id`) REFERENCES `departments` (`dept_id`);
+  ADD CONSTRAINT `fk_faculty_dept` FOREIGN KEY (`department_id`) REFERENCES `departments` (`department_id`);
 
 --
--- Constraints for table `faculty_courses`
+-- Constraints for table `fee_payments`
 --
-ALTER TABLE `faculty_courses`
-  ADD CONSTRAINT `faculty_courses_ibfk_1` FOREIGN KEY (`faculty_id`) REFERENCES `faculty` (`faculty_id`),
-  ADD CONSTRAINT `faculty_courses_ibfk_2` FOREIGN KEY (`course_id`) REFERENCES `courses` (`course_id`);
+ALTER TABLE `fee_payments`
+  ADD CONSTRAINT `fee_payments_ibfk_1` FOREIGN KEY (`student_id`) REFERENCES `admission_students` (`id`);
 
 --
--- Constraints for table `fee_records`
+-- Constraints for table `fee_structures`
 --
-ALTER TABLE `fee_records`
-  ADD CONSTRAINT `fee_records_ibfk_1` FOREIGN KEY (`student_id`) REFERENCES `students` (`student_id`),
-  ADD CONSTRAINT `fee_records_ibfk_2` FOREIGN KEY (`verified_by`) REFERENCES `users` (`user_id`);
+ALTER TABLE `fee_structures`
+  ADD CONSTRAINT `fk_fs_creator` FOREIGN KEY (`created_by`) REFERENCES `users` (`user_id`),
+  ADD CONSTRAINT `fk_fs_program` FOREIGN KEY (`program_id`) REFERENCES `departments` (`department_id`),
+  ADD CONSTRAINT `fk_fs_semester` FOREIGN KEY (`semester_id`) REFERENCES `semesters` (`semester_id`),
+  ADD CONSTRAINT `fk_fs_session` FOREIGN KEY (`session_id`) REFERENCES `sessions` (`session_id`);
 
 --
--- Constraints for table `programs`
+-- Constraints for table `fee_structure_details`
 --
-ALTER TABLE `programs`
-  ADD CONSTRAINT `programs_ibfk_1` FOREIGN KEY (`dept_id`) REFERENCES `departments` (`dept_id`);
+ALTER TABLE `fee_structure_details`
+  ADD CONSTRAINT `fk_fsd_head` FOREIGN KEY (`fee_head_id`) REFERENCES `fee_heads` (`fee_head_id`),
+  ADD CONSTRAINT `fk_fsd_structure` FOREIGN KEY (`fee_structure_id`) REFERENCES `fee_structures` (`fee_structure_id`) ON DELETE CASCADE;
 
 --
--- Constraints for table `section_change_requests`
+-- Constraints for table `installments`
 --
-ALTER TABLE `section_change_requests`
-  ADD CONSTRAINT `section_change_requests_ibfk_1` FOREIGN KEY (`student_id`) REFERENCES `students` (`student_id`),
-  ADD CONSTRAINT `section_change_requests_ibfk_2` FOREIGN KEY (`reviewed_by`) REFERENCES `users` (`user_id`);
+ALTER TABLE `installments`
+  ADD CONSTRAINT `fk_inst_stf` FOREIGN KEY (`student_fee_id`) REFERENCES `student_fee` (`student_fee_id`) ON DELETE CASCADE;
+
+--
+-- Constraints for table `lms_applications`
+--
+ALTER TABLE `lms_applications`
+  ADD CONSTRAINT `lms_applications_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`user_id`) ON DELETE CASCADE;
+
+--
+-- Constraints for table `payments`
+--
+ALTER TABLE `payments`
+  ADD CONSTRAINT `fk_pay_officer` FOREIGN KEY (`received_by`) REFERENCES `users` (`user_id`),
+  ADD CONSTRAINT `fk_pay_stf` FOREIGN KEY (`student_fee_id`) REFERENCES `student_fee` (`student_fee_id`),
+  ADD CONSTRAINT `fk_pay_student` FOREIGN KEY (`student_id`) REFERENCES `students` (`student_id`);
+
+--
+-- Constraints for table `payment_reversals`
+--
+ALTER TABLE `payment_reversals`
+  ADD CONSTRAINT `fk_rev_officer` FOREIGN KEY (`reversed_by`) REFERENCES `users` (`user_id`),
+  ADD CONSTRAINT `fk_rev_payment` FOREIGN KEY (`payment_id`) REFERENCES `payments` (`payment_id`);
+
+--
+-- Constraints for table `question_papers`
+--
+ALTER TABLE `question_papers`
+  ADD CONSTRAINT `fk_qp_course` FOREIGN KEY (`course_id`) REFERENCES `courses` (`course_id`),
+  ADD CONSTRAINT `fk_qp_exam` FOREIGN KEY (`exam_id`) REFERENCES `examinations` (`exam_id`),
+  ADD CONSTRAINT `fk_qp_teacher` FOREIGN KEY (`teacher_id`) REFERENCES `teachers` (`teacher_id`);
+
+--
+-- Constraints for table `receipts`
+--
+ALTER TABLE `receipts`
+  ADD CONSTRAINT `fk_rcpt_issuer` FOREIGN KEY (`issued_by`) REFERENCES `users` (`user_id`),
+  ADD CONSTRAINT `fk_rcpt_payment` FOREIGN KEY (`payment_id`) REFERENCES `payments` (`payment_id`);
+
+--
+-- Constraints for table `sbe_auth_users`
+--
+ALTER TABLE `sbe_auth_users`
+  ADD CONSTRAINT `fk_sbeauth_student` FOREIGN KEY (`student_id`) REFERENCES `students` (`student_id`),
+  ADD CONSTRAINT `fk_sbeauth_teacher` FOREIGN KEY (`teacher_id`) REFERENCES `teachers` (`teacher_id`);
+
+--
+-- Constraints for table `sbe_exams`
+--
+ALTER TABLE `sbe_exams`
+  ADD CONSTRAINT `fk_sbeexam_course` FOREIGN KEY (`course_id`) REFERENCES `courses` (`course_id`),
+  ADD CONSTRAINT `fk_sbeexam_teacher` FOREIGN KEY (`teacher_id`) REFERENCES `teachers` (`teacher_id`);
+
+--
+-- Constraints for table `sbe_exam_questions`
+--
+ALTER TABLE `sbe_exam_questions`
+  ADD CONSTRAINT `fk_sbeeq_exam` FOREIGN KEY (`exam_id`) REFERENCES `sbe_exams` (`exam_id`),
+  ADD CONSTRAINT `fk_sbeeq_question` FOREIGN KEY (`question_id`) REFERENCES `sbe_question_bank` (`question_id`);
+
+--
+-- Constraints for table `sbe_exam_results`
+--
+ALTER TABLE `sbe_exam_results`
+  ADD CONSTRAINT `fk_sberes_exam` FOREIGN KEY (`exam_id`) REFERENCES `sbe_exams` (`exam_id`),
+  ADD CONSTRAINT `fk_sberes_student` FOREIGN KEY (`student_id`) REFERENCES `students` (`student_id`),
+  ADD CONSTRAINT `fk_sberes_studentexam` FOREIGN KEY (`student_exam_id`) REFERENCES `sbe_student_exams` (`student_exam_id`);
+
+--
+-- Constraints for table `sbe_exam_schedule`
+--
+ALTER TABLE `sbe_exam_schedule`
+  ADD CONSTRAINT `fk_sbesched_exam` FOREIGN KEY (`exam_id`) REFERENCES `sbe_exams` (`exam_id`),
+  ADD CONSTRAINT `fk_sbesched_sem` FOREIGN KEY (`semester_id`) REFERENCES `semesters` (`semester_id`);
+
+--
+-- Constraints for table `sbe_question_bank`
+--
+ALTER TABLE `sbe_question_bank`
+  ADD CONSTRAINT `fk_qb_course` FOREIGN KEY (`course_id`) REFERENCES `courses` (`course_id`),
+  ADD CONSTRAINT `fk_qb_teacher` FOREIGN KEY (`teacher_id`) REFERENCES `teachers` (`teacher_id`);
+
+--
+-- Constraints for table `sbe_student_answers`
+--
+ALTER TABLE `sbe_student_answers`
+  ADD CONSTRAINT `fk_sbesa_question` FOREIGN KEY (`question_id`) REFERENCES `sbe_question_bank` (`question_id`),
+  ADD CONSTRAINT `fk_sbesa_studentexam` FOREIGN KEY (`student_exam_id`) REFERENCES `sbe_student_exams` (`student_exam_id`);
+
+--
+-- Constraints for table `sbe_student_exams`
+--
+ALTER TABLE `sbe_student_exams`
+  ADD CONSTRAINT `fk_sbese_exam` FOREIGN KEY (`exam_id`) REFERENCES `sbe_exams` (`exam_id`),
+  ADD CONSTRAINT `fk_sbese_schedule` FOREIGN KEY (`schedule_id`) REFERENCES `sbe_exam_schedule` (`schedule_id`),
+  ADD CONSTRAINT `fk_sbese_student` FOREIGN KEY (`student_id`) REFERENCES `students` (`student_id`);
+
+--
+-- Constraints for table `scholarships`
+--
+ALTER TABLE `scholarships`
+  ADD CONSTRAINT `fk_sch_approver` FOREIGN KEY (`approved_by`) REFERENCES `users` (`user_id`),
+  ADD CONSTRAINT `fk_sch_semester` FOREIGN KEY (`semester_id`) REFERENCES `semesters` (`semester_id`),
+  ADD CONSTRAINT `fk_sch_student` FOREIGN KEY (`student_id`) REFERENCES `students` (`student_id`);
+
+--
+-- Constraints for table `semesters`
+--
+ALTER TABLE `semesters`
+  ADD CONSTRAINT `fk_sem_dept` FOREIGN KEY (`department_id`) REFERENCES `departments` (`department_id`);
+
+--
+-- Constraints for table `semester_courses`
+--
+ALTER TABLE `semester_courses`
+  ADD CONSTRAINT `fk_semc_course` FOREIGN KEY (`course_id`) REFERENCES `courses` (`course_id`),
+  ADD CONSTRAINT `fk_semc_sem` FOREIGN KEY (`semester_id`) REFERENCES `semesters` (`semester_id`);
+
+--
+-- Constraints for table `sso_applications`
+--
+ALTER TABLE `sso_applications`
+  ADD CONSTRAINT `fk_ssoapp_resolver` FOREIGN KEY (`resolved_by`) REFERENCES `users` (`user_id`),
+  ADD CONSTRAINT `fk_ssoapp_student` FOREIGN KEY (`student_id`) REFERENCES `students` (`student_id`);
 
 --
 -- Constraints for table `students`
 --
 ALTER TABLE `students`
-  ADD CONSTRAINT `students_ibfk_1` FOREIGN KEY (`user_id`) REFERENCES `users` (`user_id`),
-  ADD CONSTRAINT `students_ibfk_2` FOREIGN KEY (`application_id`) REFERENCES `admission_applications` (`application_id`),
-  ADD CONSTRAINT `students_ibfk_3` FOREIGN KEY (`program_id`) REFERENCES `programs` (`program_id`);
+  ADD CONSTRAINT `fk_stu_adm_session` FOREIGN KEY (`admission_session_id`) REFERENCES `sessions` (`session_id`),
+  ADD CONSTRAINT `fk_stu_application` FOREIGN KEY (`application_id`) REFERENCES `admission_applications` (`application_id`),
+  ADD CONSTRAINT `fk_stu_cur_sem` FOREIGN KEY (`current_semester_id`) REFERENCES `semesters` (`semester_id`),
+  ADD CONSTRAINT `fk_stu_cur_session` FOREIGN KEY (`current_session_id`) REFERENCES `sessions` (`session_id`),
+  ADD CONSTRAINT `fk_stu_program` FOREIGN KEY (`program_id`) REFERENCES `departments` (`department_id`);
 
 --
--- Constraints for table `student_courses`
+-- Constraints for table `student_fee`
 --
-ALTER TABLE `student_courses`
-  ADD CONSTRAINT `student_courses_ibfk_1` FOREIGN KEY (`student_id`) REFERENCES `students` (`student_id`),
-  ADD CONSTRAINT `student_courses_ibfk_2` FOREIGN KEY (`course_id`) REFERENCES `courses` (`course_id`);
+ALTER TABLE `student_fee`
+  ADD CONSTRAINT `fk_stf_fs` FOREIGN KEY (`fee_structure_id`) REFERENCES `fee_structures` (`fee_structure_id`),
+  ADD CONSTRAINT `fk_stf_generator` FOREIGN KEY (`generated_by`) REFERENCES `users` (`user_id`),
+  ADD CONSTRAINT `fk_stf_sem` FOREIGN KEY (`semester_id`) REFERENCES `semesters` (`semester_id`),
+  ADD CONSTRAINT `fk_stf_session` FOREIGN KEY (`session_id`) REFERENCES `sessions` (`session_id`),
+  ADD CONSTRAINT `fk_stf_student` FOREIGN KEY (`student_id`) REFERENCES `students` (`student_id`);
 
 --
--- Constraints for table `submissions`
+-- Constraints for table `student_fee_assignment`
 --
-ALTER TABLE `submissions`
-  ADD CONSTRAINT `submissions_ibfk_1` FOREIGN KEY (`assignment_id`) REFERENCES `assignments` (`assignment_id`),
-  ADD CONSTRAINT `submissions_ibfk_2` FOREIGN KEY (`student_id`) REFERENCES `students` (`student_id`);
+ALTER TABLE `student_fee_assignment`
+  ADD CONSTRAINT `fk_sfa_fs` FOREIGN KEY (`fee_structure_id`) REFERENCES `fee_structures` (`fee_structure_id`),
+  ADD CONSTRAINT `fk_sfa_officer` FOREIGN KEY (`assigned_by`) REFERENCES `users` (`user_id`),
+  ADD CONSTRAINT `fk_sfa_sem` FOREIGN KEY (`semester_id`) REFERENCES `semesters` (`semester_id`),
+  ADD CONSTRAINT `fk_sfa_student` FOREIGN KEY (`student_id`) REFERENCES `students` (`student_id`);
+
+--
+-- Constraints for table `student_fee_details`
+--
+ALTER TABLE `student_fee_details`
+  ADD CONSTRAINT `fk_sfdet_head` FOREIGN KEY (`fee_head_id`) REFERENCES `fee_heads` (`fee_head_id`),
+  ADD CONSTRAINT `fk_sfdet_stf` FOREIGN KEY (`student_fee_id`) REFERENCES `student_fee` (`student_fee_id`) ON DELETE CASCADE;
+
+--
+-- Constraints for table `student_fee_discounts`
+--
+ALTER TABLE `student_fee_discounts`
+  ADD CONSTRAINT `fk_sfd_head` FOREIGN KEY (`fee_head_id`) REFERENCES `fee_heads` (`fee_head_id`),
+  ADD CONSTRAINT `fk_sfd_officer` FOREIGN KEY (`applied_by`) REFERENCES `users` (`user_id`),
+  ADD CONSTRAINT `fk_sfd_semester` FOREIGN KEY (`semester_id`) REFERENCES `semesters` (`semester_id`),
+  ADD CONSTRAINT `fk_sfd_student` FOREIGN KEY (`student_id`) REFERENCES `students` (`student_id`);
+
+--
+-- Constraints for table `student_grades`
+--
+ALTER TABLE `student_grades`
+  ADD CONSTRAINT `fk_student_grades_course` FOREIGN KEY (`course_id`) REFERENCES `courses` (`course_id`),
+  ADD CONSTRAINT `fk_student_grades_student` FOREIGN KEY (`student_id`) REFERENCES `students` (`student_id`);
+
+--
+-- Constraints for table `student_promotions`
+--
+ALTER TABLE `student_promotions`
+  ADD CONSTRAINT `fk_student_promotions_approved` FOREIGN KEY (`approved_by`) REFERENCES `users` (`user_id`),
+  ADD CONSTRAINT `fk_student_promotions_student` FOREIGN KEY (`student_id`) REFERENCES `students` (`student_id`);
+
+--
+-- Constraints for table `teachers`
+--
+ALTER TABLE `teachers`
+  ADD CONSTRAINT `fk_teacher_dept` FOREIGN KEY (`department_id`) REFERENCES `departments` (`department_id`),
+  ADD CONSTRAINT `fk_teacher_user` FOREIGN KEY (`user_id`) REFERENCES `users` (`user_id`);
+
+--
+-- Constraints for table `teacher_courses`
+--
+ALTER TABLE `teacher_courses`
+  ADD CONSTRAINT `fk_tc_course` FOREIGN KEY (`course_id`) REFERENCES `courses` (`course_id`),
+  ADD CONSTRAINT `fk_tc_sem` FOREIGN KEY (`semester_id`) REFERENCES `semesters` (`semester_id`),
+  ADD CONSTRAINT `fk_tc_session` FOREIGN KEY (`session_id`) REFERENCES `sessions` (`session_id`),
+  ADD CONSTRAINT `fk_tc_teacher` FOREIGN KEY (`teacher_id`) REFERENCES `teachers` (`teacher_id`);
+
+--
+-- Constraints for table `timetable`
+--
+ALTER TABLE `timetable`
+  ADD CONSTRAINT `fk_tt_course` FOREIGN KEY (`course_id`) REFERENCES `courses` (`course_id`),
+  ADD CONSTRAINT `fk_tt_sem` FOREIGN KEY (`semester_id`) REFERENCES `semesters` (`semester_id`),
+  ADD CONSTRAINT `fk_tt_session` FOREIGN KEY (`session_id`) REFERENCES `sessions` (`session_id`),
+  ADD CONSTRAINT `fk_tt_teacher` FOREIGN KEY (`teacher_id`) REFERENCES `teachers` (`teacher_id`);
 
 --
 -- Constraints for table `users`
 --
 ALTER TABLE `users`
-  ADD CONSTRAINT `users_ibfk_1` FOREIGN KEY (`role_id`) REFERENCES `roles` (`role_id`);
+  ADD CONSTRAINT `fk_users_dept` FOREIGN KEY (`department_id`) REFERENCES `departments` (`department_id`),
+  ADD CONSTRAINT `fk_users_role` FOREIGN KEY (`role_id`) REFERENCES `roles` (`role_id`);
 COMMIT;
 
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
 /*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
-
-
--- =====================================================================
--- END OF SCRIPT
--- =====================================================================
