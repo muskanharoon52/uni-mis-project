@@ -48,6 +48,7 @@ session_start();
         <a href="index.php" class="navbar-brand">University MIS</a>
         <ul class="navbar-nav">
             <li><a href="index.php">Home</a></li>
+            <li><a href="modules/lms/public/login.php">LMS</a></li>
             <li><a href="mis.php">MIS Portal</a></li>
             <li><a href="modules/examination/login.php">Examination</a></li>
             <li><a href="modules/sso/login.php">SSO Login</a></li>
@@ -67,12 +68,12 @@ session_start();
                         <span class="badge badge-disabled">Coming Soon</span>
                     </li>
                     <li>
-                        <span>Teacher</span>
-                        <span class="badge badge-disabled">Coming Soon</span>
+                        <a href="modules/lms/public/login.php">Teacher</a>
+                        <span class="badge badge-active">active</span>
                     </li>
                     <li>
-                        <span>Student</span>
-                        <span class="badge badge-disabled">Coming Soon</span>
+                        <a href="modules/lms/public/login.php">Student</a>
+                        <span class="badge badge-active">active</span>
                     </li>
                 </ul>
             </div>
