@@ -51,7 +51,7 @@ session_start();
             <li><a href="index.php">Home</a></li>
             <li><a href="modules/lms/public/login.php">LMS</a></li>
             <li><a href="modules/sbe/login.php">SBE</a></li>
-            <li><a href="mis.php">MIS Portal</a></li>
+            <li><a href="modules/admission/auth/login.php">Admission</a></li>
             <li><a href="modules/examination/login.php">Examination</a></li>
             <li><a href="modules/sso/login.php">SSO Login</a></li>
             <li><a href="modules/finance/login.php">Finance</a></li>
@@ -88,8 +88,8 @@ session_start();
                         <span class="badge badge-active">active</span>
                     </li>
                     <li>
-                        <span>Admission</span>
-                        <span class="badge badge-disabled">Coming Soon</span>
+                        <a href="modules/admission/auth/login.php">Admission</a>
+                        <span class="badge badge-active">active</span>
                     </li>
                     <li>
                         <a href="modules/sso/login.php">SSO</a>
