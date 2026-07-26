@@ -47,14 +47,14 @@ function getCurrentUser() {
 // ============================================
 // SIMPLE LOGIN - Plain Password Check
 // ============================================
-function loginUser($email, $password) {
+function loginUser($username, $password) {
     $conn = getConnection();
-    $email = mysqli_real_escape_string($conn, $email);
+    $username = mysqli_real_escape_string($conn, $username);
     $password = mysqli_real_escape_string($conn, $password);
     
     $query = "SELECT u.*, r.role_name FROM users u 
               LEFT JOIN roles r ON u.role_id = r.role_id 
-              WHERE u.email = '$email'";
+              WHERE u.username = '$username'";
     $result = mysqli_query($conn, $query);
     $user = mysqli_fetch_assoc($result);
     
@@ -65,6 +65,7 @@ function loginUser($email, $password) {
     // ✅ DIRECT COMPARE - Plain password
     if ($password === $user['password_hash']) {
         $_SESSION['user_id'] = $user['user_id'];
+        $_SESSION['role_id'] = $user['role_id'] ?? 0;
         $_SESSION['role_name'] = $user['role_name'] ?? 'user';
         $_SESSION['full_name'] = $user['full_name'] ?? 'User';
         return true;

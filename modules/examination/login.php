@@ -1,18 +1,18 @@
 <?php
-require_once __DIR__ . '../../config/db_connect.php';
+require_once __DIR__ . '/../../config/db_connect.php';
 require_once __DIR__ . '/../sso/includes/auth.php';
 
 $error = '';
 
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
-    $email = $_POST['email'] ?? '';
+    $username = $_POST['username'] ?? '';
     $password = $_POST['password'] ?? '';
 
-    if (loginUser($email, $password)) {
+    if (loginUser($username, $password)) {
         header('Location: examination/dashboard.php');
         exit;
     } else {
-        $error = 'Invalid email or password!';
+        $error = 'Invalid username or password!';
     }
 }
 ?>
@@ -49,10 +49,10 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         <?php endif; ?>
         <form method="POST">
             <div class="mb-3">
-                <label class="form-label fw-semibold">Email Address</label>
+                <label class="form-label fw-semibold">Username</label>
                 <div class="input-group">
-                    <span class="input-group-text"><i class="fas fa-envelope"></i></span>
-                    <input type="email" name="email" class="form-control" placeholder="exam@university.edu" required>
+                    <span class="input-group-text"><i class="fas fa-user"></i></span>
+                    <input type="text" name="username" class="form-control" placeholder="Enter Username" required>
                 </div>
             </div>
             <div class="mb-3">
