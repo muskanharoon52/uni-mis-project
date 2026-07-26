@@ -7,4 +7,4 @@ require __DIR__ . '/includes/helpers.php';
 require __DIR__ . '/includes/auth.php';
 
 auth_logout();
-redirect('index.php');
+redirect('../../index.php');

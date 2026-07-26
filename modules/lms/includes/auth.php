@@ -30,7 +30,7 @@ function auth_login(array $user): void
     $_SESSION['lms_auth_user'] = [
         'id'           => (int) ($user['id'] ?? $user['user_id'] ?? 0),
         'login_id'     => (string) ($user['login_id'] ?? ''),
-        'role'         => (string) ($user['role'] ?? ''),
+        'role'         => strtolower((string) ($user['role'] ?? '')),
         'name'         => (string) ($user['name'] ?? $user['full_name'] ?? ''),
         'department'   => (string) ($user['department'] ?? ''),
         'program'      => (string) ($user['program'] ?? ''),
@@ -64,8 +64,11 @@ function require_role(string $role): array
 {
     $user = require_login();
 
-    if ($user['role'] !== $role) {
-        header('Location: ' . app_url('public/login.php'));
+    if (strtolower($user['role']) !== strtolower($role)) {
+        $redirect = $user['role'] === 'teacher'
+            ? app_url('teacher/dashboard.php')
+            : app_url('student/dashboard.php');
+        header('Location: ' . $redirect);
         exit;
     }
 

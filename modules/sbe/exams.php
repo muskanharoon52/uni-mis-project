@@ -45,9 +45,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         redirect('exams.php');
     }
 
+    // Validate course_id exists before proceeding
+    $courseId = (int) $_POST['course_id'];
+    if ($courseId <= 0) {
+        $_SESSION['message'] = 'Please select a valid course.';
+        redirect('exams.php');
+    }
+
+    // Check if the course exists in the database
+    $checkCourse = $db->prepare('SELECT course_id FROM courses WHERE course_id = :id');
+    $checkCourse->execute([':id' => $courseId]);
+    if (!$checkCourse->fetch()) {
+        $_SESSION['message'] = 'Selected course does not exist. Please select a valid course.';
+        redirect('exams.php');
+    }
+
     $payload = [
         'exam_code'          => trim((string) $_POST['exam_code']),
-        'course_id'          => (int) $_POST['course_id'],
+        'course_id'          => $courseId,
         'teacher_id'         => $teacherId,
         'title'              => trim((string) $_POST['title']),
         'exam_type'          => (string) $_POST['exam_type'],
@@ -165,7 +180,7 @@ require __DIR__ . '/includes/header.php';
                             </option>
                         <?php endforeach; ?>
                         <?php if (empty($courses)): ?>
-                            <option value="1" <?= old($form, 'course_id') === '1' ? 'selected' : '' ?>>1 &mdash; Default Course</option>
+                            <option value="" disabled>No courses available. Please add courses first.</option>
                         <?php endif; ?>
                     </select>
                 </div>
