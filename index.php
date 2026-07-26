@@ -31,6 +31,7 @@ session_start();
         .module-card h2 { font-size: 1.2rem; font-weight: 700; color: #1a1d29; margin-bottom: 16px; display: flex; align-items: center; gap: 10px; }
         .module-card h2 .icon { width: 40px; height: 40px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; }
         .icon-lms { background: #ede9fe; color: #7c3aed; }
+        .icon-sbe { background: #fef3c7; color: #d97706; }
         .icon-mis { background: #ecfdf5; color: #059669; }
         .sub-menu { list-style: none; padding: 0; }
         .sub-menu li { padding: 8px 0; border-bottom: 1px solid #f3f4f6; display: flex; justify-content: space-between; align-items: center; }
@@ -49,6 +50,7 @@ session_start();
         <ul class="navbar-nav">
             <li><a href="index.php">Home</a></li>
             <li><a href="modules/lms/public/login.php">LMS</a></li>
+            <li><a href="modules/sbe/login.php">SBE</a></li>
             <li><a href="mis.php">MIS Portal</a></li>
             <li><a href="modules/examination/login.php">Examination</a></li>
             <li><a href="modules/sso/login.php">SSO Login</a></li>
@@ -64,8 +66,8 @@ session_start();
                 <p style="color:#6b7280;font-size:0.9rem;margin-bottom:16px;">Course materials, assignments, grades, and student communications</p>
                 <ul class="sub-menu">
                     <li>
-                        <span>SBE (Admin Portal)</span>
-                        <span class="badge badge-disabled">Coming Soon</span>
+                        <a href="modules/sbe/login.php">SBE (Admin Portal)</a>
+                        <span class="badge badge-active">active</span>
                     </li>
                     <li>
                         <a href="modules/lms/public/login.php">Teacher</a>
