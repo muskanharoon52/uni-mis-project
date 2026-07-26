@@ -5,55 +5,78 @@ session_start();
 $module = isset($_GET['module']) ? $_GET['module'] : 'mis';
 $error = isset($_GET['error']) ? $_GET['error'] : '';
 
-// Include database connection
-include __DIR__ . '../../../config/db_connect.php';
+// Include database connection - Fixed path
+// Adjust this path based on your actual file structure
+include __DIR__ . '/../../config/db_connect.php';  // Changed path
+
+// Check if connection exists
+if (!isset($conn) || $conn->connect_error) {
+    die("Database connection failed: " . ($conn->connect_error ?? 'Connection not established'));
+}
 
 $login_error = '';
 $already_logged_in = isset($_SESSION['user_id']);
 
-// If user is already logged in and tries to login again, we still show the form
-// but they can logout first or login with different credentials
-
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
-    $username = mysqli_real_escape_string($conn, $_POST['username']);
-    $password = $_POST['password'];
-    $module = mysqli_real_escape_string($conn, $_POST['module']);
-
-    // Query to find user
-    $sql = "SELECT u.*, r.role_name FROM users u 
-            JOIN roles r ON u.role_id = r.role_id 
-            WHERE u.username = '$username' AND u.status = 'Active'";
-    $result = mysqli_query($conn, $sql);
-
-    if (mysqli_num_rows($result) == 1) {
-        $user = mysqli_fetch_assoc($result);
+    // Get and sanitize inputs
+    $username = trim($_POST['username'] ?? '');
+    $password = $_POST['password'] ?? '';
+    $module = trim($_POST['module'] ?? 'mis');
+    
+    // Validate inputs
+    if (empty($username) || empty($password)) {
+        $login_error = 'Please enter both username and password';
+    } else {
+        // Use prepared statements to prevent SQL injection
+        $sql = "SELECT u.*, r.role_name FROM users u 
+                JOIN roles r ON u.role_id = r.role_id 
+                WHERE u.username = ? AND u.status = 'Active'";
         
-        // Simple password check (plain text)
-        if ($password == $user['password_hash']) {
-            $_SESSION['user_id'] = $user['user_id'];
-            $_SESSION['username'] = $user['username'];
-            $_SESSION['full_name'] = $user['full_name'];
-            $_SESSION['role_id'] = $user['role_id'];
-            $_SESSION['role_name'] = $user['role_name'];
-            $_SESSION['module'] = $module;
+        $stmt = mysqli_prepare($conn, $sql);
+        mysqli_stmt_bind_param($stmt, "s", $username);
+        mysqli_stmt_execute($stmt);
+        $result = mysqli_stmt_get_result($stmt);
 
-            // Update last login
-            $update_sql = "UPDATE users SET last_login_at = NOW() WHERE user_id = '{$user['user_id']}'";
-            mysqli_query($conn, $update_sql);
+        if (mysqli_num_rows($result) == 1) {
+            $user = mysqli_fetch_assoc($result);
+            
+            // Check password - If using plain text (not recommended)
+            if ($password == $user['password_hash']) {
+                // If using password_hash (recommended):
+                // if (password_verify($password, $user['password_hash'])) {
+                
+                // Regenerate session ID for security
+                session_regenerate_id(true);
+                
+                $_SESSION['user_id'] = $user['user_id'];
+                $_SESSION['username'] = $user['username'];
+                $_SESSION['full_name'] = $user['full_name'];
+                $_SESSION['role_id'] = $user['role_id'];
+                $_SESSION['role_name'] = $user['role_name'];
+                $_SESSION['module'] = $module;
 
-            // Redirect based on role AFTER successful login
-            if ($user['role_id'] == 3 || $user['role_id'] == 1) {
-                header('Location: ../finance/dashboard.php');
-                exit();
+                // Update last login using prepared statement
+                $update_sql = "UPDATE users SET last_login_at = NOW() WHERE user_id = ?";
+                $update_stmt = mysqli_prepare($conn, $update_sql);
+                mysqli_stmt_bind_param($update_stmt, "i", $user['user_id']);
+                mysqli_stmt_execute($update_stmt);
+                mysqli_stmt_close($update_stmt);
+
+                // Redirect based on role
+                if ($user['role_id'] == 3 || $user['role_id'] == 1) {
+                    header('Location: ../finance/dashboard.php');
+                    exit();
+                } else {
+                    header('Location: ../index.php');
+                    exit();
+                }
             } else {
-                header('Location: ../index.php');
-                exit();
+                $login_error = 'Invalid password!';
             }
         } else {
-            $login_error = 'Invalid password!';
+            $login_error = 'Username not found or account inactive!';
         }
-    } else {
-        $login_error = 'Username not found!';
+        mysqli_stmt_close($stmt);
     }
 }
 ?>
@@ -62,7 +85,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Login - <?php echo ucfirst($module); ?> Module</title>
+    <title>Login - <?php echo htmlspecialchars(ucfirst($module)); ?> Module</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
@@ -175,9 +198,9 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     <div class="logo">
         <i class="fas fa-university"></i>
     </div>
-    <h3>Login to <?php echo ucfirst($module); ?></h3>
+    <h3>Login to <?php echo htmlspecialchars(ucfirst($module)); ?></h3>
     <div class="module-badge">
-        <span><i class="fas fa-<?php echo $module == 'mis' ? 'building-columns' : 'graduation-cap'; ?>"></i> <?php echo strtoupper($module); ?> Module</span>
+        <span><i class="fas fa-<?php echo $module == 'mis' ? 'building-columns' : 'graduation-cap'; ?>"></i> <?php echo htmlspecialchars(strtoupper($module)); ?> Module</span>
     </div>
 
     <?php if ($already_logged_in): ?>
@@ -190,7 +213,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     <?php endif; ?>
 
     <?php if (!empty($login_error)): ?>
-        <div class="alert alert-danger"><?php echo $login_error; ?></div>
+        <div class="alert alert-danger"><?php echo htmlspecialchars($login_error); ?></div>
     <?php endif; ?>
 
     <?php if (!empty($error)): ?>
@@ -198,7 +221,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     <?php endif; ?>
 
     <form method="POST" action="">
-        <input type="hidden" name="module" value="<?php echo $module; ?>">
+        <input type="hidden" name="module" value="<?php echo htmlspecialchars($module); ?>">
         
         <div class="mb-3">
             <label for="username" class="form-label">Username</label>
