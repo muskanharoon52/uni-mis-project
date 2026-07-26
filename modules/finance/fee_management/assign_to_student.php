@@ -1,7 +1,7 @@
 <?php
 // fee_management/assign_to_student.php - Assign Fee to Student (AUTO AMOUNT)
 
-require_once __DIR__ . '/../config/db_connect.php';
+require_once __DIR__ . '../../../config/db_connect.php';
 require_once __DIR__ . '/../includes/auth.php';
 
 if (!isLoggedIn()) {

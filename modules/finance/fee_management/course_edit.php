@@ -1,7 +1,7 @@
 <?php
 // fee_management/course_edit.php - Edit Course Fee (FIXED)
 
-require_once __DIR__ . '/../config/db_connect.php';
+require_once __DIR__ . '../../../config/db_connect.php';
 require_once __DIR__ . '/../includes/auth.php';
 
 if (!isLoggedIn()) {

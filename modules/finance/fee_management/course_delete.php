@@ -1,7 +1,7 @@
 <?php
 // fee_management/course_delete.php - Delete Course Fee
 
-require_once __DIR__ . '/../config/db_connect.php';
+require_once __DIR__ . '../../../config/db_connect.php';
 require_once __DIR__ . '/../includes/auth.php';
 
 if (!isLoggedIn()) {

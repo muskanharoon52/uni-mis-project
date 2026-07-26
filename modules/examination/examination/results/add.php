@@ -1,5 +1,5 @@
 <?php
-require_once '../../config/db_connect.php';
+require_once '../../../../config/db_connect.php';
 require_once '../models/ExamResult.php';
 require_once '../models/ExamSchedule.php';
 

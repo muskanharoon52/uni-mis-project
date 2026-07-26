@@ -6,7 +6,7 @@ $module = isset($_GET['module']) ? $_GET['module'] : 'mis';
 $error = isset($_GET['error']) ? $_GET['error'] : '';
 
 // Include database connection
-include __DIR__ . '/../../config/db_connect.php';
+include __DIR__ . '../../../config/db_connect.php';
 
 $login_error = '';
 $already_logged_in = isset($_SESSION['user_id']);

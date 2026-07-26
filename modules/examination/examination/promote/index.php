@@ -1,5 +1,5 @@
 <?php
-require_once '../../config/db_connect.php';
+require_once '../../../../config/db_connect.php';
 require_once '../models/StudentPromotion.php';
 include '../../includes/header.php';
 $hideSidebarToggle = true;

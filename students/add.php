@@ -1,7 +1,7 @@
 <?php
 // students/add.php - Add Student (COMPLETE FIXED)
 
-require_once __DIR__ . '/../config/db_connect.php';
+require_once __DIR__ . '../config/db_connect.php';
 require_once __DIR__ . '/../includes/auth.php';
 
 // Check if logged in

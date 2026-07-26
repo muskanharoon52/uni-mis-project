@@ -1,7 +1,7 @@
 <?php
 // scholarship/calculate.php - GPA Based Scholarship (COMPLETE)
 
-require_once __DIR__ . '/../config/db_connect.php';
+require_once __DIR__ . '../../../config/db_connect.php';
 require_once __DIR__ . '/../includes/auth.php';
 
 if (!isLoggedIn()) {

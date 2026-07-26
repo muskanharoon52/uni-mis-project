@@ -1,7 +1,7 @@
 <?php
 // includes/auth.php - Simple Login (Plain Password)
 
-require_once __DIR__ . '/../../config/db_connect.php';
+require_once __DIR__ . '../../../config/db_connect.php';
 
 if (session_status() === PHP_SESSION_NONE) {
     session_start();

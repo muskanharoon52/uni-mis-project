@@ -5,7 +5,7 @@ if (session_status() === PHP_SESSION_NONE) {
 }
 
 // Include database connection
-include __DIR__ . '/../../config/db_connect.php';
+include __DIR__ . '../../../config/db_connect.php';
 
 // Check if user is logged in
 if (!isset($_SESSION['user_id'])) {

@@ -6,7 +6,7 @@ if (!isset($_SESSION['user_id'])) {
     exit();
 }
 
-require_once '../../config/db_connect.php';
+require_once '../../../config/db_connect.php';
 include '../includes/header.php';
 include '../includes/navbar.php';
 

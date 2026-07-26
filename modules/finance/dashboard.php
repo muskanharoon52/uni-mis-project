@@ -14,7 +14,7 @@ if ($_SESSION['role_id'] != 3 && $_SESSION['role_id'] != 1) {
 }
 
 // Include database connection
-include __DIR__ . '/../../config/db_connect.php';
+include __DIR__ . '../../config/db_connect.php';
 
 // Include header
 include __DIR__ . '/includes/header.php';

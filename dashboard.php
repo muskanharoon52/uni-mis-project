@@ -2,7 +2,7 @@
 // dashboard.php - ULTIMATE DASHBOARD
 
 session_start();
-require_once __DIR__ . '/config/db_connect.php';
+require_once __DIR__ . 'config/db_connect.php';
 require_once __DIR__ . '/modules/sso/includes/auth.php';
 
 // Check if logged in

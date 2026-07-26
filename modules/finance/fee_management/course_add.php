@@ -1,7 +1,7 @@
 <?php
 // fee_management/course_add.php - Add Course Fee (SIMPLE - No Semester)
 
-require_once __DIR__ . '/../config/db_connect.php';
+require_once __DIR__ . '../../../config/db_connect.php';
 require_once __DIR__ . '/../includes/auth.php';
 
 if (!isLoggedIn()) {
