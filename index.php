@@ -1,3 +1,7 @@
+<?php
+// Start session to check if user is logged in
+session_start();
+?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -31,6 +35,9 @@
         .badge-active { background: #dcfce7; color: #16a34a; }
         .badge-placeholder { background: #fef3c7; color: #d97706; }
         .section-title { font-size: 1.1rem; font-weight: 600; color: #374151; margin-bottom: 12px; margin-top: 8px; }
+        .already-logged { margin-top: 20px; padding: 10px; background: #e8f0fe; border-radius: 10px; color: #667eea; font-size: 0.9rem; }
+        .already-logged a { color: #667eea; font-weight: 600; text-decoration: none; }
+        .already-logged a:hover { text-decoration: underline; }
     </style>
 </head>
 <body>
@@ -40,11 +47,19 @@
             <li><a href="index.php">Home</a></li>
             <li><a href="examination/index.php">Examination</a></li>
             <li><a href="login.php">SSO Login</a></li>
+            <li><a href="finance/dashboard.php">Finance</a></li>
         </ul>
     </nav>
     <div class="container">
         <h1>University Management Information System</h1>
         <p class="subtitle">Select a module to continue</p>
+        <?php if (isset($_SESSION['user_id'])): ?>
+            <div class="already-logged">
+                <i class="fas fa-info-circle"></i> You are currently logged in as
+                <strong><?php echo htmlspecialchars($_SESSION['full_name'] ?? 'User'); ?></strong>
+                (<a href="logout.php">Logout</a>)
+            </div>
+        <?php endif; ?>
         <div class="module-grid">
             <div class="module-card">
                 <h2><span class="icon icon-lms">&#128218;</span> LMS (Learning Management)</h2>
@@ -82,6 +97,10 @@
                     </li>
                     <li>
                         <a href="examination/index.php">Examination</a>
+                        <span class="badge badge-active">active</span>
+                    </li>
+                    <li>
+                        <a href="finance/dashboard.php">Finance</a>
                         <span class="badge badge-active">active</span>
                     </li>
                 </ul>
