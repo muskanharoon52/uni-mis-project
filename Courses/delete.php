@@ -1,7 +1,7 @@
 <?php
 // Courses/delete.php - Delete Course (COMPLETE FIX)
 
-require_once __DIR__ . '/../config/db.php';
+require_once __DIR__ . '/../config/db_connect.php';
 require_once __DIR__ . '/../includes/auth.php';
 
 if (!isLoggedIn()) {

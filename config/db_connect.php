@@ -1,4 +1,6 @@
 <?php
+// config/db_connect.php
+
 $host = "localhost";
 $user = "root";
 $password = "";
@@ -10,6 +12,13 @@ if (!$conn) {
     die("Connection failed: " . mysqli_connect_error());
 }
 
-// Uncomment below line to test connection
-// echo "Database connected successfully!";
+mysqli_set_charset($conn, "utf8mb4");
+
+// ✅ CORRECT BASE_URL for your project
+define('BASE_URL', 'http://localhost/uni-mis-project/');
+
+function getConnection() {
+    global $conn;
+    return $conn;
+}
 ?>

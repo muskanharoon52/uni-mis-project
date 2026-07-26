@@ -1,5 +1,5 @@
 <?php
-require_once '../config/database.php';
+require_once '../config/db_connect.php';
 include '../includes/header.php';
 include '../includes/navbar.php';
 

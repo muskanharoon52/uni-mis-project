@@ -2,7 +2,7 @@
 // semester_courses/view.php - View course assignments
 
 // Include database (session is already started in db.php)
-require_once __DIR__ . '/../config/db.php';
+require_once __DIR__ . '/../config/db_connect.php';
 require_once __DIR__ . '/../includes/auth.php';
 requireLogin();
 

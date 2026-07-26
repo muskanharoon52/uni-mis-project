@@ -1,7 +1,7 @@
 <?php
-// fee_management/structure_delete.php - Delete Fee Structure
+// fee_management/course_delete.php - Delete Course Fee
 
-require_once __DIR__ . '/../config/db.php';
+require_once __DIR__ . '/../config/db_connect.php';
 require_once __DIR__ . '/../includes/auth.php';
 
 if (!isLoggedIn()) {
@@ -21,11 +21,9 @@ $conn = getConnection();
 $id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
 
 if ($id > 0) {
-    mysqli_query($conn, "SET FOREIGN_KEY_CHECKS = 0");
-    mysqli_query($conn, "DELETE FROM fee_structures WHERE fee_structure_id = $id");
-    mysqli_query($conn, "SET FOREIGN_KEY_CHECKS = 1");
+    mysqli_query($conn, "DELETE FROM course_fees WHERE fee_id = $id");
 }
 
-header('Location: index.php?tab=structures&deleted=1');
+header('Location: index.php?tab=course_fees&deleted=1');
 exit;
 ?>

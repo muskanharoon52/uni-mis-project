@@ -1,6 +1,6 @@
 <?php
 
-include("../../config/database.php");
+include("../../config/db_connect.php");
 
 $query = "SELECT program_id, program_name
           FROM programs
