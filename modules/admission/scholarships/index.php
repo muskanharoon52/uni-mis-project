@@ -27,7 +27,8 @@ if ($flash): ?>
 <div class="row">
     <?php 
     try {
-        $active = $pdo->query("SELECT * FROM admission_scholarships WHERE status='active' ORDER BY id DESC")->fetchAll();
+        // FIXED: Changed 'id' to 'scholarship_id'
+        $active = $pdo->query("SELECT * FROM admission_scholarships WHERE status='active' ORDER BY scholarship_id DESC")->fetchAll();
     } catch (PDOException $e) {
         $active = [];
         echo '<div class="col-12"><div class="alert alert-danger">Error loading scholarships: ' . $e->getMessage() . '</div></div>';
@@ -41,39 +42,41 @@ if ($flash): ?>
         <div class="col-md-4 mb-3">
             <div class="card h-100 border-success">
                 <div class="card-header bg-success text-white d-flex justify-content-between align-items-center">
+                    <!-- FIXED: Changed $s['id'] to $s['scholarship_id'] -->
                     <strong><?= htmlspecialchars($s['scholarship_name']) ?></strong>
                     <span class="badge bg-light text-dark"><?= htmlspecialchars($s['scholarship_type'] ?? 'Merit') ?></span>
                 </div>
                 <div class="card-body">
-                    <p><?= htmlspecialchars($s['description'] ?? 'No description') ?></p>
+                    <p><?= htmlspecialchars($s['remarks'] ?? 'No description') ?></p>
                     <hr>
                     <div class="row">
                         <div class="col-6">
                             <small class="text-muted">Amount</small><br>
-                            <strong><?= formatCurrency($s['amount'] ?? 0) ?></strong>
+                            <strong><?= isset($s['amount']) ? formatCurrency($s['amount']) : 'N/A' ?></strong>
                         </div>
                         <div class="col-6">
-                            <small class="text-muted">Min %</small><br>
-                            <strong><?= number_format($s['min_marks_percentage'] ?? 0, 2) ?>%</strong>
+                            <small class="text-muted">Percentage</small><br>
+                            <strong><?= number_format($s['percentage'] ?? 0, 2) ?>%</strong>
                         </div>
                     </div>
                     <div class="row mt-2">
                         <div class="col-6">
-                            <small class="text-muted">Slots</small><br>
-                            <strong><?= $s['total_slots'] ?? 'Unlimited' ?></strong>
+                            <small class="text-muted">Duration</small><br>
+                            <strong><?= htmlspecialchars($s['duration'] ?? 'N/A') ?></strong>
                         </div>
                         <div class="col-6">
-                            <small class="text-muted">Deadline</small><br>
-                            <strong><?= isset($s['deadline']) ? date('d M Y', strtotime($s['deadline'])) : 'N/A' ?></strong>
+                            <small class="text-muted">Status</small><br>
+                            <strong>
+                                <span class="badge bg-<?= $s['status'] == 'active' ? 'success' : 'warning' ?>">
+                                    <?= ucfirst($s['status'] ?? 'N/A') ?>
+                                </span>
+                            </strong>
                         </div>
-                    </div>
-                    <div class="mt-2">
-                        <small class="text-muted">Scholarship %</small><br>
-                        <strong><?= number_format($s['scholarship_percentage'] ?? 0, 2) ?>%</strong>
                     </div>
                 </div>
                 <div class="card-footer">
-                    <a href="apply.php?scholarship_id=<?= $s['id'] ?>" class="btn btn-success btn-sm w-100">
+                    <!-- FIXED: Changed $s['id'] to $s['scholarship_id'] -->
+                    <a href="apply.php?scholarship_id=<?= $s['scholarship_id'] ?>" class="btn btn-success btn-sm w-100">
                         <i class="fas fa-hand-holding-heart"></i> Apply Now
                     </a>
                 </div>
@@ -101,17 +104,19 @@ if ($flash): ?>
             <tbody>
                 <?php 
                 try {
+                    // FIXED: Changed table names and column references
                     $apps = $pdo->query("
                         SELECT sa.*, 
-                               COALESCE(s.full_name, s.student_name, 'N/A') AS student_name, 
+                               st.full_name AS student_name, 
                                sch.scholarship_name 
                         FROM admission_scholarship_applications sa
-                        LEFT JOIN admission_students s ON sa.student_id = s.id
-                        LEFT JOIN admission_scholarships sch ON sa.scholarship_id = sch.id
-                        ORDER BY sa.application_date DESC
+                        LEFT JOIN students st ON sa.student_id = st.student_id
+                        LEFT JOIN admission_scholarships sch ON sa.scholarship_id = sch.scholarship_id
+                        ORDER BY sa.created_at DESC
                     ")->fetchAll();
                 } catch (PDOException $e) {
                     $apps = [];
+                    echo '<tr><td colspan="6" class="text-center text-danger">Error loading applications: ' . $e->getMessage() . '</td></tr>';
                 }
                 
                 if (empty($apps)): 
@@ -123,7 +128,7 @@ if ($flash): ?>
                         <td><?= htmlspecialchars($app['student_name'] ?? 'N/A') ?></td>
                         <td><?= htmlspecialchars($app['scholarship_name'] ?? 'N/A') ?></td>
                         <td><strong><?= number_format($app['percentage'] ?? 0, 2) ?>%</strong></td>
-                        <td><?= isset($app['application_date']) ? date('d M Y', strtotime($app['application_date'])) : 'N/A' ?></td>
+                        <td><?= isset($app['created_at']) ? date('d M Y', strtotime($app['created_at'])) : 'N/A' ?></td>
                         <td>
                             <?php 
                             $status = $app['status'] ?? 'pending';
@@ -131,6 +136,7 @@ if ($flash): ?>
                                 'pending' => 'warning',
                                 'approved' => 'success',
                                 'rejected' => 'danger',
+                                'active' => 'success',
                                 default => 'secondary'
                             };
                             ?>
@@ -140,7 +146,7 @@ if ($flash): ?>
                             <a href="view_application.php?id=<?= $app['id'] ?? 0 ?>" class="btn btn-sm btn-info">
                                 <i class="fas fa-eye"></i>
                             </a>
-                            <?php if($status == 'pending'): ?>
+                            <?php if($status == 'pending' || $status == 'Under Review'): ?>
                             <a href="review_application.php?id=<?= $app['id'] ?? 0 ?>" class="btn btn-sm btn-primary">
                                 <i class="fas fa-check"></i>
                             </a>

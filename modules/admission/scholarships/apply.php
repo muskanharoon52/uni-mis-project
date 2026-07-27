@@ -12,8 +12,11 @@ $students = $pdo->query("
     ORDER BY s.student_name
 ")->fetchAll();
 
-// Get active scholarships
-$scholarships = $pdo->query("SELECT * FROM admission_scholarships WHERE status='active' ORDER BY deadline ASC")->fetchAll();
+// Get active scholarships - FIXED: Changed 'deadline' to 'scholarship_id'
+$scholarships = $pdo->query("SELECT * FROM admission_scholarships WHERE status='active' ORDER BY scholarship_id DESC")->fetchAll();
+
+// Also get scholarships with different statuses
+$all_scholarships = $pdo->query("SELECT * FROM admission_scholarships ORDER BY scholarship_id DESC")->fetchAll();
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     try {
@@ -33,7 +36,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         
         // Get student's program fee
-        $student = $pdo->prepare("SELECT program_id FROM admission_students WHERE id = ?");
+        $student = $pdo->prepare("SELECT program_id FROM students WHERE student_id = ?");
         $student->execute([$student_id]);
         $student_data = $student->fetch();
         
@@ -117,8 +120,8 @@ if ($flash): ?>
                         <select name="student_id" class="form-select" required>
                             <option value="">-- Select Student --</option>
                             <?php foreach($students as $s): ?>
-                            <option value="<?= $s['id'] ?>">
-                                <?= $s['student_name'] ?> (<?= $s['student_id'] ?>) - <?= $s['department_name'] ?? 'N/A' ?>
+                            <option value="<?= $s['student_id'] ?>">
+                                <?= htmlspecialchars($s['student_name'] ?? $s['full_name'] ?? 'N/A') ?> (<?= $s['student_id'] ?? 'N/A' ?>) - <?= $s['department_name'] ?? 'N/A' ?>
                             </option>
                             <?php endforeach; ?>
                         </select>
@@ -128,9 +131,9 @@ if ($flash): ?>
                         <label class="form-label">Select Scholarship *</label>
                         <select name="scholarship_id" class="form-select" required id="scholarshipSelect">
                             <option value="">-- Select Scholarship --</option>
-                            <?php foreach($scholarships as $s): ?>
-                            <option value="<?= $s['id'] ?>">
-                                <?= $s['scholarship_name'] ?> - <?= $s['scholarship_type'] ?? 'Merit' ?>
+                            <?php foreach($all_scholarships as $s): ?>
+                            <option value="<?= $s['scholarship_id'] ?>">
+                                <?= htmlspecialchars($s['scholarship_name']) ?> - <?= $s['scholarship_type'] ?? 'Merit' ?> (<?= $s['percentage'] ?>%)
                             </option>
                             <?php endforeach; ?>
                         </select>
