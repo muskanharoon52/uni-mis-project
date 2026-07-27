@@ -30,11 +30,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $user = null;
     }
 
-    // Fallback: check shared users table by username
     if (!$user) {
         try {
             $mappedRole = $role === 'teacher' ? 'Teacher' : 'Student';
-            $roleName = $role === 'teacher' ? 'Teacher' : 'Student';
             $stmt = db()->prepare('SELECT u.*, r.role_name FROM users u LEFT JOIN roles r ON r.role_id = u.role_id WHERE u.username = :login_id LIMIT 1');
             $stmt->execute([':login_id' => $loginId]);
             $dbUser = $stmt->fetch();
@@ -53,24 +51,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 
-    $fallback = $config['demo_auth'][$role][$loginId] ?? null;
-    $fallbackValid = $fallback && hash_equals((string) $fallback['password'], $password);
-
-    if ($user && $user['status'] === 'Active' && (password_verify($password, $user['password_hash']) || hash_equals((string) $user['password_hash'], $password))) {
+    if ($user && $user['status'] === 'Active' && password_verify($password, $user['password_hash'])) {
         auth_login($user);
         redirect($role === 'student' ? 'student-home.php' : 'teacher-home.php');
-    }
-
-    if ($fallbackValid) {
-        $mappedRole = $role === 'teacher' ? 'Teacher' : 'Student';
-        auth_login([
-            'auth_id'      => 0,
-            'role'         => $mappedRole,
-            'login_id'     => $loginId,
-            'display_name' => $fallback['display_name'],
-            'status'       => 'Active',
-        ]);
-        redirect($mappedRole === 'Student' ? 'student-home.php' : 'teacher-home.php');
     }
 
     $error = 'Invalid credentials or inactive account.';
@@ -88,55 +71,65 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="assets/css/style.css">
 </head>
-<body class="login-page" style="background: #f4f5f8;">
+<body class="login-page">
 
-<div class="login-container" style="max-width: 960px; min-height: 560px; border-radius: var(--radius-lg); box-shadow: 0 20px 40px rgba(0,0,0,0.06); background: #fff;">
-    <section class="login-hero" style="background: linear-gradient(135deg, #a5b4fc 0%, #6366f1 40%, #4338ca 100%); padding: 48px; display: flex; flex-direction: column; justify-content: space-between; border: none; overflow: hidden; position: relative;">
-        <div style="font-size: 2.8rem; font-weight: 800; color: #fff; line-height: 1; user-select: none;">*</div>
-        <div style="margin-top: auto; color: #fff;">
-            <p style="opacity: 0.85; font-size: 0.95rem; margin-bottom: 8px; font-weight: 500;">SBE Portal</p>
-            <h2 style="font-size: 1.8rem; font-weight: 700; line-height: 1.35; color: #fff; margin: 0; letter-spacing: -0.02em;">Secure access to exams, schedules, and results</h2>
+<div class="login-container">
+    <section class="login-hero">
+        <div class="login-brand">
+            <div class="brand-mark">SBE</div>
+        </div>
+        <div class="login-title">
+            <h1>System Based Examination</h1>
+            <p>Secure access to exams, schedules, question banks, and results.</p>
+        </div>
+        <div class="hero-points">
+            <div class="hero-point">
+                <div class="role-pill">TCH</div>
+                <div>
+                    <strong>Faculty Portal</strong>
+                    <p class="small">Create exams, manage question banks, and review results.</p>
+                </div>
+            </div>
+            <div class="hero-point">
+                <div class="role-pill">STU</div>
+                <div>
+                    <strong>Student Portal</strong>
+                    <p class="small">Take exams, view schedules, and check results.</p>
+                </div>
+            </div>
         </div>
     </section>
 
-    <aside class="login-panel" style="padding: 48px; display: flex; flex-direction: column; justify-content: center; background: #fff;">
-        <div style="font-size: 2.2rem; font-weight: 800; color: var(--accent); line-height: 1; margin-bottom: 20px; user-select: none;">*</div>
-
-        <h3 style="font-size: 1.7rem; font-weight: 700; letter-spacing: -0.02em; color: var(--text-strong); margin: 0 0 6px;">Sign in to SBE</h3>
-        <p style="color: var(--muted); font-size: 0.88rem; margin: 0 0 24px; line-height: 1.5;">Access your exams, question banks, and results snapshot instantly.</p>
+    <aside class="login-panel">
+        <div style="font-size:2rem;font-weight:800;color:var(--accent);margin-bottom:18px;">&#9733;</div>
+        <h3>Sign in to SBE</h3>
+        <p class="muted" style="margin-bottom:22px;">Access your exams and results instantly.</p>
 
         <?php if ($error): ?>
-            <div class="alert alert-error" style="margin-bottom: 16px; font-size: 0.84rem; border-radius: 8px;"><?= e($error) ?></div>
+            <div class="alert alert-error" style="margin-bottom:16px;"><?= e($error) ?></div>
         <?php endif; ?>
 
         <form method="post" onsubmit="setLoading(this)">
-            <div class="login-tabs" style="background: var(--panel-strong); border-radius: var(--radius-sm); border: 1px solid var(--border); padding: 3px; display: flex; margin-bottom: 20px;">
-                <button class="login-tab active" type="button" onclick="setRole('teacher', this)" style="flex: 1; padding: 8px 0; font-size: 0.86rem; border-radius: 6px; font-weight: 600; text-align: center; border: none; cursor: pointer; transition: all 0.2s;">Faculty / Teacher</button>
-                <button class="login-tab" type="button" onclick="setRole('student', this)" style="flex: 1; padding: 8px 0; font-size: 0.86rem; border-radius: 6px; font-weight: 600; text-align: center; border: none; cursor: pointer; transition: all 0.2s;">Student</button>
+            <div class="login-tabs">
+                <button class="login-tab active" type="button" onclick="setRole('teacher', this)">Faculty / Teacher</button>
+                <button class="login-tab" type="button" onclick="setRole('student', this)">Student</button>
             </div>
-            
+
             <input type="hidden" name="role" id="selected-role" value="teacher">
 
-            <div class="field" style="margin-bottom: 16px;">
-                <label style="font-size: 0.84rem; font-weight: 600; color: var(--text-strong); display: block; margin-bottom: 6px;">User ID</label>
-                <input type="text" name="login_id" required placeholder="Enter your ID" autocomplete="username" style="width: 100%; min-height: 42px; border-radius: 8px; border: 1px solid var(--border); padding: 10px 14px; font-size: 0.9rem;">
+            <div class="field" style="margin-bottom:16px;">
+                <label>User ID</label>
+                <input type="text" name="login_id" required placeholder="Enter your ID" autocomplete="username">
             </div>
 
-            <div class="field password-field" style="margin-bottom: 24px; position: relative;">
-                <label style="font-size: 0.84rem; font-weight: 600; color: var(--text-strong); display: block; margin-bottom: 6px;">Password</label>
-                <div style="position: relative;">
-                    <input type="password" name="password" id="pass-field" required placeholder="Enter password" autocomplete="current-password" style="width: 100%; min-height: 42px; border-radius: 8px; border: 1px solid var(--border); padding: 10px 42px 10px 14px; font-size: 0.9rem;">
-                    <button class="password-toggle" type="button" onclick="togglePass()" style="position: absolute; right: 12px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; font-size: 1rem; color: var(--muted); padding: 4px;">&#128065;</button>
-                </div>
+            <div class="field password-field" style="margin-bottom:24px;">
+                <label>Password</label>
+                <input type="password" name="password" id="pass-field" required placeholder="Enter password" autocomplete="current-password">
+                <button class="password-toggle" type="button" onclick="togglePass()">&#128065;</button>
             </div>
 
-            <button class="btn btn-primary" type="submit" style="width: 100%; min-height: 44px; border-radius: 8px; font-size: 0.9rem; font-weight: 600; background: var(--accent); color: #fff; border: none; cursor: pointer; transition: all 0.2s;">Get Started</button>
+            <button class="btn btn-primary" type="submit" style="width:100%;min-height:44px;">Sign In</button>
         </form>
-
-        <div style="margin-top: 20px; padding: 12px; background: #f8f9fa; border-radius: 8px; font-size: 0.8rem; color: #666; line-height: 1.6;">
-            <strong>Demo:</strong> teacher / password123 &middot; student / password123<br>
-            <strong>Or use IDs:</strong> 5001 / teacher123 &middot; 9001 / student123
-        </div>
     </aside>
 </div>
 
@@ -149,11 +142,7 @@ function setRole(role, btn) {
 
 function togglePass() {
     const input = document.getElementById('pass-field');
-    if (input.type === 'password') {
-        input.type = 'text';
-    } else {
-        input.type = 'password';
-    }
+    input.type = input.type === 'password' ? 'text' : 'password';
 }
 
 function setLoading(form) {

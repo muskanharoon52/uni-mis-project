@@ -80,118 +80,129 @@ $unreadTeacher = (int) mysqli_fetch_column(mysqli_query($conn, "SELECT COUNT(*) 
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="<?= BASE_URL ?>modules/lms/public/assets/style.css?v=<?= filemtime(__DIR__ . '/../lms/public/assets/style.css') ?>">
-    <style>
-        .sso-topbar { display:flex; align-items:center; justify-content:space-between; padding:16px 22px; margin-bottom:24px; border:1px solid #e2e8f0; border-radius:14px; background:#fff; box-shadow:0 1px 4px rgba(0,0,0,0.04); }
-        .sso-topbar h2 { font-size:1.25rem; font-weight:700; color:#0f172a; margin:0; }
-        .sso-topbar-links { display:flex; gap:8px; align-items:center; }
-        .sso-topbar-links a { padding:7px 14px; border-radius:8px; font-size:.82rem; font-weight:600; color:#64748b; transition:all .15s; text-decoration:none; }
-        .sso-topbar-links a:hover { background:#f1f5f9; color:#0f172a; }
-        .sso-topbar-links a.active { background:linear-gradient(135deg,#6366f1,#4f46e5); color:#fff; }
-        .sso-user-pill { display:flex; align-items:center; gap:8px; padding:6px 12px 6px 6px; border-radius:10px; border:1px solid #e2e8f0; background:#fff; }
-        .sso-user-avatar { width:30px; height:30px; border-radius:7px; background:linear-gradient(135deg,#6366f1,#818cf8); display:grid; place-items:center; font-weight:700; font-size:.72rem; color:#fff; }
-        .sso-user-name { font-size:.8rem; font-weight:600; color:#0f172a; }
-        .target-tabs { display:flex; gap:0; border:1px solid #e2e8f0; border-radius:10px; padding:4px; background:#f1f5f9; margin-bottom:18px; }
-        .target-tab { flex:1; padding:9px 14px; border-radius:7px; border:none; background:transparent; color:#64748b; font-family:inherit; font-size:.84rem; font-weight:600; cursor:pointer; transition:all .2s; }
-        .target-tab:hover { color:#334155; }
-        .target-tab.active { background:#fff; color:#6366f1; box-shadow:0 1px 4px rgba(0,0,0,0.06); border:1px solid #e2e8f0; }
-    </style>
 </head>
 <body>
-<div style="max-width:1100px; margin:0 auto; padding:28px 32px;">
-    <div class="sso-topbar">
-        <div style="display:flex;align-items:center;gap:16px;">
-            <div class="brand-mark" style="width:36px;height:36px;border-radius:8px;font-size:.75rem;">SSO</div>
-            <h2>SSO Admin Panel</h2>
-        </div>
-        <div class="sso-topbar-links">
-            <a href="<?= BASE_URL ?>modules/sso/messages.php" class="active">Messages</a>
-            <a href="<?= BASE_URL ?>modules/sso/logout.php">Logout</a>
-        </div>
-        <div class="sso-user-pill">
-            <div class="sso-user-avatar"><?= strtoupper(substr($_SESSION['full_name'] ?? 'A', 0, 1)) ?></div>
-            <span class="sso-user-name"><?= htmlspecialchars($_SESSION['full_name'] ?? 'Admin') ?></span>
-        </div>
-    </div>
-
-    <div style="display:grid; grid-template-columns:1fr 1fr; gap:20px; align-items:start;">
-        <div>
-            <div class="card">
-                <div class="card-header">
-                    <h3>Send Message</h3>
-                    <p class="muted">Choose recipients and compose your message.</p>
-                </div>
-                <?php if ($message): ?><div class="alert alert-success"><?= htmlspecialchars($message) ?></div><?php endif; ?>
-                <?php if ($error): ?><div class="alert alert-error"><?= htmlspecialchars($error) ?></div><?php endif; ?>
-                <form method="post" id="msg-form">
-                    <div class="target-tabs">
-                        <button type="button" class="target-tab active" onclick="setTarget('students', this)">&#127891; Students</button>
-                        <button type="button" class="target-tab" onclick="setTarget('teachers', this)">&#128104;&#8205;&#127979; Teachers</button>
-                    </div>
-                    <input type="hidden" name="target" id="msg-target" value="students">
-                    <div class="field">
-                        <label>Title</label>
-                        <input type="text" name="title" required placeholder="e.g. Campus Notice, Schedule Update">
-                    </div>
-                    <div class="field">
-                        <label>Message</label>
-                        <textarea name="body" required rows="6" placeholder="Write your message here..."></textarea>
-                    </div>
-                    <button class="btn btn-primary" type="submit">Send Message</button>
-                </form>
+<div class="app-shell">
+    <aside class="sidebar">
+        <a href="<?= BASE_URL ?>" class="brand">
+            <div class="brand-mark">SSO</div>
+            <div>
+                <h1>SSO Admin</h1>
+                <p>System Administration</p>
             </div>
-        </div>
+        </a>
+        <nav class="nav">
+            <span class="nav-section-label">Communication</span>
+            <a class="active" href="<?= BASE_URL ?>modules/sso/messages.php">
+                <span class="nav-icon">&#128172;</span> Messages
+            </a>
+            <span class="nav-section-label">Account</span>
+            <a href="<?= BASE_URL ?>modules/sso/logout.php">
+                <span class="nav-icon">&#10140;</span> Logout
+            </a>
+        </nav>
+    </aside>
 
-        <div>
-            <div class="card" style="margin-bottom:16px;">
-                <div class="card-header"><h3>Overview</h3></div>
-                <div style="display:flex;gap:12px;padding:0 4px;flex-wrap:wrap;">
-                    <div style="flex:1;min-width:120px;">
-                        <div class="stat-label">Total Sent</div>
-                        <div class="stat-number" style="font-size:1.3rem;"><?= $totalSent ?></div>
-                    </div>
-                    <div style="flex:1;min-width:120px;">
-                        <div class="stat-label">Unread (Students)</div>
-                        <div class="stat-number" style="font-size:1.3rem;color:#f59e0b;"><?= $unreadStudent ?></div>
-                    </div>
-                    <div style="flex:1;min-width:120px;">
-                        <div class="stat-label">Unread (Teachers)</div>
-                        <div class="stat-number" style="font-size:1.3rem;color:#f59e0b;"><?= $unreadTeacher ?></div>
+    <main class="content">
+        <div class="topbar">
+            <div>
+                <span class="eyebrow">SSO Admin</span>
+                <h2>Messages</h2>
+            </div>
+            <div class="topbar-actions">
+                <div class="topbar-user-dropdown">
+                    <button class="topbar-user-btn">
+                        <span class="topbar-user-avatar"><?= strtoupper(substr($_SESSION['full_name'] ?? 'A', 0, 1)) ?></span>
+                        <span class="topbar-user-name"><?= htmlspecialchars($_SESSION['full_name'] ?? 'Admin') ?></span>
+                        <span class="topbar-chevron">&#9662;</span>
+                    </button>
+                    <div class="topbar-dropdown-menu">
+                        <a href="<?= BASE_URL ?>modules/sso/logout.php">&#x2192; Logout</a>
                     </div>
                 </div>
             </div>
+        </div>
 
-            <div class="card">
-                <div class="card-header"><h3>Recent Messages</h3></div>
-                <?php if (empty($recent)): ?>
-                    <p class="muted" style="padding:16px 0;">No messages sent yet.</p>
-                <?php else: ?>
-                    <div class="table-responsive">
-                        <table class="table">
-                            <thead>
-                                <tr><th>Title</th><th>To</th><th>Sent</th></tr>
-                            </thead>
-                            <tbody>
-                                <?php foreach ($recent as $r): ?>
-                                    <tr>
-                                        <td style="font-weight:600;"><?= htmlspecialchars($r['title']) ?></td>
-                                        <td>
-                                            <span class="badge badge-outline"><?= htmlspecialchars($r['target_group'] ?? 'Students') ?></span>
-                                            <span class="muted" style="margin-left:4px;">(<?= (int) $r['recipient_count'] ?>)</span>
-                                        </td>
-                                        <td class="muted"><?= date('M j, g:i A', strtotime($r['created_at'])) ?></td>
-                                    </tr>
-                                <?php endforeach; ?>
-                            </tbody>
-                        </table>
+        <div class="grid-2">
+            <div>
+                <div class="card">
+                    <div class="card-header">
+                        <h3>Send Message</h3>
+                        <p class="muted">Choose recipients and compose your message.</p>
                     </div>
-                <?php endif; ?>
+                    <?php if ($message): ?><div class="alert alert-success"><?= htmlspecialchars($message) ?></div><?php endif; ?>
+                    <?php if ($error): ?><div class="alert alert-error"><?= htmlspecialchars($error) ?></div><?php endif; ?>
+                    <form method="post" id="msg-form">
+                        <div class="login-tabs">
+                            <button type="button" class="login-tab active" onclick="setTarget('students', this)">&#127891; Students</button>
+                            <button type="button" class="login-tab" onclick="setTarget('teachers', this)">&#128104;&#8205;&#127979; Teachers</button>
+                        </div>
+                        <input type="hidden" name="target" id="msg-target" value="students">
+                        <div class="field">
+                            <label>Title</label>
+                            <input type="text" name="title" required placeholder="e.g. Campus Notice, Schedule Update">
+                        </div>
+                        <div class="field">
+                            <label>Message</label>
+                            <textarea name="body" required rows="6" placeholder="Write your message here..."></textarea>
+                        </div>
+                        <button class="btn btn-primary" type="submit">Send Message</button>
+                    </form>
+                </div>
+            </div>
+
+            <div>
+                <div class="card" style="margin-bottom:16px;">
+                    <div class="card-header"><h3>Overview</h3></div>
+                    <div class="stat-row" style="grid-template-columns:repeat(3,1fr);margin-bottom:0;">
+                        <div class="stat-card-v2">
+                            <div class="stat-label">Total Sent</div>
+                            <div class="stat-number"><?= $totalSent ?></div>
+                        </div>
+                        <div class="stat-card-v2">
+                            <div class="stat-label">Unread (Students)</div>
+                            <div class="stat-number" style="color:var(--warning);"><?= $unreadStudent ?></div>
+                        </div>
+                        <div class="stat-card-v2">
+                            <div class="stat-label">Unread (Teachers)</div>
+                            <div class="stat-number" style="color:var(--warning);"><?= $unreadTeacher ?></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header"><h3>Recent Messages</h3></div>
+                    <?php if (empty($recent)): ?>
+                        <p class="muted" style="padding:16px 0;">No messages sent yet.</p>
+                    <?php else: ?>
+                        <div class="table-responsive">
+                            <table>
+                                <thead>
+                                    <tr><th>Title</th><th>To</th><th>Sent</th></tr>
+                                </thead>
+                                <tbody>
+                                    <?php foreach ($recent as $r): ?>
+                                        <tr>
+                                            <td style="font-weight:600;"><?= htmlspecialchars($r['title']) ?></td>
+                                            <td>
+                                                <span class="badge badge-outline"><?= htmlspecialchars($r['target_group'] ?? 'Students') ?></span>
+                                                <span class="muted" style="margin-left:4px;">(<?= (int) $r['recipient_count'] ?>)</span>
+                                            </td>
+                                            <td class="muted"><?= date('M j, g:i A', strtotime($r['created_at'])) ?></td>
+                                        </tr>
+                                    <?php endforeach; ?>
+                                </tbody>
+                            </table>
+                        </div>
+                    <?php endif; ?>
+                </div>
             </div>
         </div>
-    </div>
+    </main>
 </div>
 <script>
 function setTarget(target, btn) {
-    document.querySelectorAll('.target-tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.login-tab').forEach(t => t.classList.remove('active'));
     btn.classList.add('active');
     document.getElementById('msg-target').value = target;
 }

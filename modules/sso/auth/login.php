@@ -1,37 +1,30 @@
 <?php
 session_start();
 
-// Get module from URL parameter
 $module = isset($_GET['module']) ? $_GET['module'] : 'mis';
 $error = isset($_GET['error']) ? $_GET['error'] : '';
 
-// Include database connection - Fixed path
-// Adjust this path based on your actual file structure
-include __DIR__ . '/../../config/db_connect.php';  // Changed path
+include __DIR__ . '/../../config/db_connect.php';
 
-// Check if connection exists
 if (!isset($conn) || $conn->connect_error) {
-    die("Database connection failed: " . ($conn->connect_error ?? 'Connection not established'));
+    die("Database connection failed.");
 }
 
 $login_error = '';
 $already_logged_in = isset($_SESSION['user_id']);
 
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
-    // Get and sanitize inputs
     $username = trim($_POST['username'] ?? '');
     $password = $_POST['password'] ?? '';
     $module = trim($_POST['module'] ?? 'mis');
-    
-    // Validate inputs
+
     if (empty($username) || empty($password)) {
-        $login_error = 'Please enter both username and password';
+        $login_error = 'Please enter both username and password.';
     } else {
-        // Use prepared statements to prevent SQL injection
-        $sql = "SELECT u.*, r.role_name FROM users u 
-                JOIN roles r ON u.role_id = r.role_id 
+        $sql = "SELECT u.*, r.role_name FROM users u
+                JOIN roles r ON u.role_id = r.role_id
                 WHERE u.username = ? AND u.status = 'Active'";
-        
+
         $stmt = mysqli_prepare($conn, $sql);
         mysqli_stmt_bind_param($stmt, "s", $username);
         mysqli_stmt_execute($stmt);
@@ -39,15 +32,10 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 
         if (mysqli_num_rows($result) == 1) {
             $user = mysqli_fetch_assoc($result);
-            
-            // Check password - If using plain text (not recommended)
+
             if ($password == $user['password_hash']) {
-                // If using password_hash (recommended):
-                // if (password_verify($password, $user['password_hash'])) {
-                
-                // Regenerate session ID for security
                 session_regenerate_id(true);
-                
+
                 $_SESSION['user_id'] = $user['user_id'];
                 $_SESSION['username'] = $user['username'];
                 $_SESSION['full_name'] = $user['full_name'];
@@ -55,14 +43,12 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 $_SESSION['role_name'] = $user['role_name'];
                 $_SESSION['module'] = $module;
 
-                // Update last login using prepared statement
                 $update_sql = "UPDATE users SET last_login_at = NOW() WHERE user_id = ?";
                 $update_stmt = mysqli_prepare($conn, $update_sql);
                 mysqli_stmt_bind_param($update_stmt, "i", $user['user_id']);
                 mysqli_stmt_execute($update_stmt);
                 mysqli_stmt_close($update_stmt);
 
-                // Redirect based on role
                 if ($user['role_id'] == 3 || $user['role_id'] == 1) {
                     header('Location: ../finance/dashboard.php');
                     exit();
@@ -71,192 +57,109 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     exit();
                 }
             } else {
-                $login_error = 'Invalid password!';
+                $login_error = 'Invalid password.';
             }
         } else {
-            $login_error = 'Username not found or account inactive!';
+            $login_error = 'Username not found or account inactive.';
         }
         mysqli_stmt_close($stmt);
     }
 }
 ?>
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Login - <?php echo htmlspecialchars(ucfirst($module)); ?> Module</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <style>
-        body {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-        }
-        .login-container {
-            background: rgba(255, 255, 255, 0.95);
-            border-radius: 20px;
-            padding: 40px;
-            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
-            max-width: 420px;
-            width: 90%;
-        }
-        .login-container .logo {
-            text-align: center;
-            font-size: 3rem;
-            color: #667eea;
-            margin-bottom: 10px;
-        }
-        .login-container h3 {
-            text-align: center;
-            font-weight: 600;
-            color: #2c3e50;
-        }
-        .login-container .module-badge {
-            text-align: center;
-            display: block;
-            margin: 10px 0 20px;
-        }
-        .login-container .module-badge span {
-            background: #667eea;
-            color: #fff;
-            padding: 5px 20px;
-            border-radius: 20px;
-            font-size: 0.85rem;
-            font-weight: 600;
-        }
-        .login-container .back-link {
-            text-align: center;
-            margin-top: 15px;
-        }
-        .login-container .back-link a {
-            color: #667eea;
-            text-decoration: none;
-            font-size: 0.9rem;
-        }
-        .login-container .back-link a:hover {
-            text-decoration: underline;
-        }
-        .btn-login {
-            background: #667eea;
-            color: #fff;
-            border: none;
-            padding: 12px;
-            font-weight: 600;
-            width: 100%;
-            border-radius: 8px;
-            transition: 0.3s;
-        }
-        .btn-login:hover {
-            background: #5a6fd6;
-            color: #fff;
-        }
-        .btn-login:disabled {
-            background: #bdc3c7;
-            cursor: not-allowed;
-        }
-        .form-control:focus {
-            border-color: #667eea;
-            box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25);
-        }
-        .demo-credentials {
-            background: #f8f9fa;
-            padding: 15px;
-            border-radius: 8px;
-            margin-top: 15px;
-            font-size: 0.85rem;
-        }
-        .demo-credentials small {
-            color: #7f8c8d;
-        }
-        .already-logged-alert {
-            background: #e8f0fe;
-            border: 1px solid #667eea;
-            color: #2c3e50;
-            padding: 12px 15px;
-            border-radius: 10px;
-            margin-bottom: 20px;
-            text-align: center;
-        }
-        .already-logged-alert a {
-            color: #667eea;
-            font-weight: 600;
-            text-decoration: none;
-        }
-        .already-logged-alert a:hover {
-            text-decoration: underline;
-        }
-    </style>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Sign In | <?= htmlspecialchars(ucfirst($module)) ?> Module</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="<?= BASE_URL ?>modules/lms/public/assets/style.css?v=<?= filemtime($_SERVER['DOCUMENT_ROOT'] . '/uni-mis-project/modules/lms/public/assets/style.css') ?>">
 </head>
-<body>
+<body class="login-page">
 
 <div class="login-container">
-    <div class="logo">
-        <i class="fas fa-university"></i>
-    </div>
-    <h3>Login to <?php echo htmlspecialchars(ucfirst($module)); ?></h3>
-    <div class="module-badge">
-        <span><i class="fas fa-<?php echo $module == 'mis' ? 'building-columns' : 'graduation-cap'; ?>"></i> <?php echo htmlspecialchars(strtoupper($module)); ?> Module</span>
-    </div>
-
-    <?php if ($already_logged_in): ?>
-        <div class="already-logged-alert">
-            <i class="fas fa-info-circle"></i> You are already logged in as 
-            <strong><?php echo htmlspecialchars($_SESSION['full_name'] ?? 'User'); ?></strong><br>
-            <a href="../index.php">Go to Home</a> | 
-            <a href="logout.php">Logout</a>
+    <section class="login-hero">
+        <div class="login-brand">
+            <div class="brand-mark">SSO</div>
         </div>
-    <?php endif; ?>
-
-    <?php if (!empty($login_error)): ?>
-        <div class="alert alert-danger"><?php echo htmlspecialchars($login_error); ?></div>
-    <?php endif; ?>
-
-    <?php if (!empty($error)): ?>
-        <div class="alert alert-danger"><?php echo htmlspecialchars($error); ?></div>
-    <?php endif; ?>
-
-    <form method="POST" action="">
-        <input type="hidden" name="module" value="<?php echo htmlspecialchars($module); ?>">
-        
-        <div class="mb-3">
-            <label for="username" class="form-label">Username</label>
-            <div class="input-group">
-                <span class="input-group-text"><i class="fas fa-user"></i></span>
-                <input type="text" class="form-control" id="username" name="username" 
-                       placeholder="Enter your username" required autofocus>
+        <div class="login-title">
+            <h1>University Single Sign-On</h1>
+            <p>One account for all modules — LMS, Finance, Admission, and Examination.</p>
+        </div>
+        <div class="hero-points">
+            <div class="hero-point">
+                <div class="role-pill">SEC</div>
+                <div>
+                    <strong>Secure Authentication</strong>
+                    <p class="small">Centralized login with role-based access control.</p>
+                </div>
+            </div>
+            <div class="hero-point">
+                <div class="role-pill">ACC</div>
+                <div>
+                    <strong>Unified Account</strong>
+                    <p class="small">Same credentials work across all university modules.</p>
+                </div>
             </div>
         </div>
+    </section>
 
-        <div class="mb-3">
-            <label for="password" class="form-label">Password</label>
-            <div class="input-group">
-                <span class="input-group-text"><i class="fas fa-lock"></i></span>
-                <input type="password" class="form-control" id="password" name="password" 
-                       placeholder="Enter your password" required>
+    <aside class="login-panel">
+        <div style="font-size:2rem;font-weight:800;color:var(--accent);margin-bottom:18px;">&#9733;</div>
+        <h3>Sign In</h3>
+        <p class="muted" style="margin-bottom:22px;">Use your University account to continue.</p>
+
+        <?php if ($already_logged_in): ?>
+            <div class="alert alert-success" style="margin-bottom:16px;">
+                Already logged in as <strong><?= htmlspecialchars($_SESSION['full_name'] ?? 'User') ?></strong>.
+                <a href="../index.php" style="color:var(--accent);font-weight:600;">Go to Home</a> |
+                <a href="logout.php" style="color:var(--danger);font-weight:600;">Logout</a>
             </div>
+        <?php endif; ?>
+
+        <?php if (!empty($login_error)): ?>
+            <div class="alert alert-error" style="margin-bottom:16px;"><?= htmlspecialchars($login_error) ?></div>
+        <?php endif; ?>
+
+        <?php if (!empty($error)): ?>
+            <div class="alert alert-error" style="margin-bottom:16px;"><?= htmlspecialchars($error) ?></div>
+        <?php endif; ?>
+
+        <form method="post" onsubmit="setLoading(this)">
+            <input type="hidden" name="module" value="<?= htmlspecialchars($module) ?>">
+
+            <div class="field" style="margin-bottom:16px;">
+                <label>Username</label>
+                <input type="text" name="username" required placeholder="Enter your username" autocomplete="username" autofocus>
+            </div>
+
+            <div class="field password-field" style="margin-bottom:24px;">
+                <label>Password</label>
+                <input type="password" name="password" id="pass-field" required placeholder="Enter password" autocomplete="current-password">
+                <button class="password-toggle" type="button" onclick="togglePass()">&#128065;</button>
+            </div>
+
+            <button class="btn btn-primary" type="submit" style="width:100%;min-height:44px;">Sign In</button>
+        </form>
+
+        <div class="login-footer">
+            <p class="small"><a href="../index.php" style="color:var(--accent);font-weight:600;">&#8592; Back to Module Selection</a></p>
         </div>
-
-        <button type="submit" class="btn-login">
-            <i class="fas fa-sign-in-alt"></i> Login
-        </button>
-
-        <div class="back-link">
-            <a href="../index.php"><i class="fas fa-arrow-left"></i> Back to Module Selection</a>
-        </div>
-    </form>
-
-    <div class="demo-credentials">
-        <small><i class="fas fa-info-circle"></i> Demo Credentials:</small><br>
-        <small><strong>Finance:</strong> finance / finance123</small><br>
-        <small><strong>Admin:</strong> admin / admin123</small>
-    </div>
+    </aside>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+function togglePass() {
+    const input = document.getElementById('pass-field');
+    input.type = input.type === 'password' ? 'text' : 'password';
+}
+function setLoading(form) {
+    const btn = form.querySelector('button[type="submit"]');
+    btn.classList.add('btn-loading');
+    btn.disabled = true;
+}
+</script>
 </body>
 </html>

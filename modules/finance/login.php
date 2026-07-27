@@ -12,64 +12,93 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         header('Location: dashboard.php');
         exit;
     } else {
-        $error = 'Invalid username or password!';
+        $error = 'Invalid username or password.';
     }
 }
 ?>
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Login - Finance Module</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <style>
-        body { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; display: flex; align-items: center; justify-content: center; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
-        .login-card { background: white; border-radius: 20px; padding: 40px; box-shadow: 0 20px 60px rgba(0,0,0,0.3); width: 100%; max-width: 420px; }
-        .login-card h2 { color: #333; font-weight: 700; }
-        .login-card .subtitle { color: #666; font-size: 14px; margin-bottom: 30px; }
-        .form-control { border-radius: 10px; padding: 12px 15px; }
-        .btn-login { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border: none; padding: 12px; border-radius: 10px; font-weight: 600; color: white; width: 100%; }
-        .btn-login:hover { transform: translateY(-2px); box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4); }
-        .logo-icon { font-size: 48px; color: #667eea; margin-bottom: 15px; }
-        .credentials-box { background: #f8f9fa; padding: 15px; border-radius: 8px; font-size: 13px; margin-top: 20px; }
-        .credentials-box p { margin: 4px 0; }
-    </style>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Sign In | Finance Module</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="<?= BASE_URL ?>modules/lms/public/assets/style.css?v=<?= filemtime(__DIR__ . '/../lms/public/assets/style.css') ?>">
 </head>
-<body>
-    <div class="login-card">
-        <div class="text-center">
-            <i class="fas fa-building-columns logo-icon"></i>
-            <h2>Finance Module</h2>
-            <p class="subtitle">Login to access finance management</p>
+<body class="login-page">
+
+<div class="login-container">
+    <section class="login-hero">
+        <div class="login-brand">
+            <div class="brand-mark">FIN</div>
         </div>
+        <div class="login-title">
+            <h1>University Finance Management</h1>
+            <p>Manage fee structures, student billing, payments, receipts, and financial reporting from a single dashboard.</p>
+        </div>
+        <div class="hero-points">
+            <div class="hero-point">
+                <div class="role-pill">FEE</div>
+                <div>
+                    <strong>Fee Management</strong>
+                    <p class="small">Define fee heads, structures, and generate student invoices.</p>
+                </div>
+            </div>
+            <div class="hero-point">
+                <div class="role-pill">PAY</div>
+                <div>
+                    <strong>Payments & Receipts</strong>
+                    <p class="small">Record payments, issue receipts, and track collections.</p>
+                </div>
+            </div>
+            <div class="hero-point">
+                <div class="role-pill">RPT</div>
+                <div>
+                    <strong>Financial Reports</strong>
+                    <p class="small">View summaries, outstanding dues, and collection analytics.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <aside class="login-panel">
+        <div style="font-size:2rem;font-weight:800;color:var(--accent);margin-bottom:18px;">&#9733;</div>
+        <h3>Sign in to Finance</h3>
+        <p class="muted" style="margin-bottom:22px;">Use your University account to access finance tools.</p>
+
         <?php if ($error): ?>
-        <div class="alert alert-danger"><?php echo htmlspecialchars($error); ?></div>
+            <div class="alert alert-error" style="margin-bottom:16px;"><?= htmlspecialchars($error) ?></div>
         <?php endif; ?>
-        <form method="POST">
-            <div class="mb-3">
-                <label class="form-label fw-semibold">Username</label>
-                <div class="input-group">
-                    <span class="input-group-text"><i class="fas fa-user"></i></span>
-                    <input type="text" name="username" class="form-control" placeholder="Enter Username" required>
-                </div>
+
+        <form method="post" onsubmit="setLoading(this)">
+            <div class="field" style="margin-bottom:16px;">
+                <label>Username</label>
+                <input type="text" name="username" required placeholder="Enter your username" autocomplete="username">
             </div>
-            <div class="mb-3">
-                <label class="form-label fw-semibold">Password</label>
-                <div class="input-group">
-                    <span class="input-group-text"><i class="fas fa-lock"></i></span>
-                    <input type="password" name="password" class="form-control" placeholder="Enter password" required>
-                </div>
+
+            <div class="field password-field" style="margin-bottom:24px;">
+                <label>Password</label>
+                <input type="password" name="password" id="pass-field" required placeholder="Enter password" autocomplete="current-password">
+                <button class="password-toggle" type="button" onclick="togglePass()">&#128065;</button>
             </div>
-            <button type="submit" class="btn btn-login"><i class="fas fa-sign-in-alt me-2"></i> Login</button>
+
+            <button class="btn btn-primary" type="submit" style="width:100%;min-height:44px;">Sign In</button>
         </form>
-        <hr>
-        <div class="credentials-box">
-            <p class="mb-1"><strong>Demo Credentials:</strong></p>
-            <p class="mb-0">Finance Officer: <strong>finance / password123</strong></p>
-            <p class="mb-0">Admin: <strong>admin / admin123</strong></p>
-        </div>
-    </div>
+    </aside>
+</div>
+
+<script>
+function togglePass() {
+    const input = document.getElementById('pass-field');
+    input.type = input.type === 'password' ? 'text' : 'password';
+}
+function setLoading(form) {
+    const btn = form.querySelector('button[type="submit"]');
+    btn.classList.add('btn-loading');
+    btn.disabled = true;
+}
+</script>
 </body>
 </html>
