@@ -11,10 +11,8 @@ if ($_SESSION['role_id'] != 3 && $_SESSION['role_id'] != 1) {
     exit();
 }
 
-// Include database connection - FIXED: Added slash
+// Include database connection
 include_once __DIR__ . '/../../../config/db_connect.php';
-
-// Include header - FIXED: Use include_once
 include_once __DIR__ . '/../includes/header.php';
 require_once __DIR__ . '/../includes/lms_sync.php';
 
@@ -52,16 +50,105 @@ if (isset($_GET['student_id']) && !empty($_GET['student_id'])) {
     }
 }
 
-// Fetch semesters and sessions
-$semester_sql = "SELECT * FROM semesters ORDER BY semester_number";
+// Fetch semesters
+$semester_sql = "SELECT MIN(semester_id) as semester_id, 
+                        semester_name, 
+                        MIN(semester_number) as semester_number 
+                 FROM semesters 
+                 GROUP BY semester_name
+                 ORDER BY CAST(MIN(semester_number) AS UNSIGNED)";
 $semester_result = mysqli_query($conn, $semester_sql);
 
+// Fetch sessions
 $session_sql = "SELECT * FROM sessions WHERE status = 'Active' ORDER BY session_name";
 $session_result = mysqli_query($conn, $session_sql);
 
 // Fetch fee heads for dropdown
 $fee_heads_sql = "SELECT fee_head_id, fee_head_name, description FROM fee_heads WHERE status = 'Active' AND deleted_at IS NULL ORDER BY fee_head_name";
 $fee_heads_result = mysqli_query($conn, $fee_heads_sql);
+
+// --- CREATE FEE STRUCTURE IF NOT EXISTS ---
+function createFeeStructure($conn, $program_id, $session_id, $semester_id) {
+    // Check if program exists in departments
+    $prog_check = "SELECT department_id, department_name FROM departments WHERE department_id = '$program_id'";
+    $prog_result = mysqli_query($conn, $prog_check);
+    if (mysqli_num_rows($prog_result) == 0) {
+        return "Program not found!";
+    }
+    
+    // Check if fee structure already exists
+    $check_sql = "SELECT fee_structure_id FROM fee_structures 
+                  WHERE program_id = '$program_id' 
+                  AND session_id = '$session_id' 
+                  AND semester_id = '$semester_id'";
+    $check_result = mysqli_query($conn, $check_sql);
+    
+    if (mysqli_num_rows($check_result) > 0) {
+        return "Fee structure already exists";
+    }
+    
+    // Get a valid user_id
+    $created_by = isset($_SESSION['user_id']) ? intval($_SESSION['user_id']) : 0;
+    
+    if ($created_by == 0) {
+        $user_check = mysqli_query($conn, "SELECT user_id FROM users WHERE status = 'Active' LIMIT 1");
+        if (mysqli_num_rows($user_check) > 0) {
+            $user_row = mysqli_fetch_assoc($user_check);
+            $created_by = $user_row['user_id'];
+        } else {
+            return "No active users found. Please create a user first.";
+        }
+    }
+    
+    // Get fee heads and create default amounts
+    $fee_heads = mysqli_query($conn, "SELECT fee_head_id FROM fee_heads WHERE status = 'Active'");
+    $total_amount = 0;
+    $fee_details = [];
+    
+    while ($fh = mysqli_fetch_assoc($fee_heads)) {
+        $amount = 0;
+        $name_query = "SELECT fee_head_name FROM fee_heads WHERE fee_head_id = '{$fh['fee_head_id']}'";
+        $name_result = mysqli_query($conn, $name_query);
+        $name_row = mysqli_fetch_assoc($name_result);
+        
+        switch ($name_row['fee_head_name']) {
+            case 'Tuition Fee': $amount = 50000; break;
+            case 'Admission Fee': $amount = 10000; break;
+            case 'Exam Fee': $amount = 5000; break;
+            case 'Library Fee': $amount = 3000; break;
+            case 'Lab Fee': $amount = 4000; break;
+            case 'Sports Fee': $amount = 2000; break;
+            case 'Transport Fee': $amount = 8000; break;
+            default: $amount = 5000; break;
+        }
+        
+        $fee_details[] = ['fee_head_id' => $fh['fee_head_id'], 'amount' => $amount];
+        $total_amount += $amount;
+    }
+    
+    if (empty($fee_details)) {
+        return "No fee heads found. Please add fee heads first.";
+    }
+    
+    $insert_sql = "INSERT INTO fee_structures 
+                   (program_id, session_id, semester_id, total_amount, status, created_by) 
+                   VALUES ('$program_id', '$session_id', '$semester_id', '$total_amount', 'Active', '$created_by')";
+    
+    if (mysqli_query($conn, $insert_sql)) {
+        $fee_structure_id = mysqli_insert_id($conn);
+        
+        foreach ($fee_details as $detail) {
+            $detail_sql = "INSERT INTO fee_structure_details 
+                          (fee_structure_id, fee_head_id, amount) 
+                          VALUES ('$fee_structure_id', '{$detail['fee_head_id']}', '{$detail['amount']}')";
+            mysqli_query($conn, $detail_sql);
+        }
+        
+        return "Fee structure created successfully!";
+    } else {
+        return "Error creating fee structure: " . mysqli_error($conn);
+    }
+}
 
 // --- GENERATE FEE + PAYMENT LOGIC ---
 if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['generate_fee'])) {
@@ -89,7 +176,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['generate_fee'])) {
         $prog_row = mysqli_fetch_assoc($prog_result);
         $program_id = $prog_row['program_id'];
 
-        // Get fee structure
+        // Check if fee structure exists
         $fs_sql = "SELECT fee_structure_id, total_amount 
                    FROM fee_structures 
                    WHERE program_id = '$program_id' 
@@ -99,13 +186,22 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['generate_fee'])) {
         $fs_result = mysqli_query($conn, $fs_sql);
         
         if (mysqli_num_rows($fs_result) == 0) {
-            $error = "No fee structure found for this student's program, session, and semester!";
-        } else {
+            $create_result = createFeeStructure($conn, $program_id, $session_id, $semester_id);
+            if (strpos($create_result, 'Error') !== false || strpos($create_result, 'not found') !== false) {
+                $error = "No fee structure found. " . $create_result;
+            } else {
+                $fs_result = mysqli_query($conn, $fs_sql);
+                if (mysqli_num_rows($fs_result) == 0) {
+                    $error = "Failed to create fee structure. Please check your fee heads configuration.";
+                }
+            }
+        }
+        
+        if (empty($error) && mysqli_num_rows($fs_result) > 0) {
             $fs_row = mysqli_fetch_assoc($fs_result);
             $fee_structure_id = $fs_row['fee_structure_id'];
             $total_amount = $fs_row['total_amount'];
 
-            // Get fee head amount
             $fee_head_amount = 0;
             if ($fee_head_id > 0) {
                 $head_sql = "SELECT amount FROM fee_structure_details WHERE fee_structure_id = '$fee_structure_id' AND fee_head_id = '$fee_head_id'";
@@ -147,7 +243,12 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['generate_fee'])) {
                             mysqli_query($conn, $sfd_sql);
                         }
 
+                        // Handle installments - FIXED: Check for duplicates
                         if ($payment_type == 'installments' && $installment_count > 1) {
+                            // First, delete any existing installments for this student_fee_id
+                            $delete_inst_sql = "DELETE FROM installments WHERE student_fee_id = '$student_fee_id'";
+                            mysqli_query($conn, $delete_inst_sql);
+                            
                             $installment_amount = round($total_amount / $installment_count, 2);
                             $remainder = round($total_amount - ($installment_amount * $installment_count), 2);
                             
@@ -319,7 +420,10 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['generate_fee'])) {
                 <label class="form-label">Semester <span class="text-danger">*</span></label>
                 <select class="form-select" name="semester_id" required>
                     <option value="">Select Semester</option>
-                    <?php while($row = mysqli_fetch_assoc($semester_result)): ?>
+                    <?php 
+                    mysqli_data_seek($semester_result, 0);
+                    while($row = mysqli_fetch_assoc($semester_result)): 
+                    ?>
                         <option value="<?php echo $row['semester_id']; ?>">
                             <?php echo htmlspecialchars($row['semester_name']); ?>
                         </option>

@@ -11,147 +11,52 @@ if (!isLoggedIn()) {
 $user = getCurrentUser();
 $role = $user['role_name'] ?? 'User';
 
-// Helper function to check if column exists
-if (!function_exists('columnExists')) {
-    function columnExists($conn, $table, $column) {
-        try {
-            $query = "SHOW COLUMNS FROM $table LIKE '$column'";
-            $result = mysqli_query($conn, $query);
-            return ($result && mysqli_num_rows($result) > 0);
-        } catch (Exception $e) {
-            return false;
-        }
-    }
-}
+// Use global $conn
+global $conn;
 
-// Helper function to get table columns
-if (!function_exists('getTableColumns')) {
-    function getTableColumns($conn, $table) {
-        try {
-            $columns = [];
-            $query = "SHOW COLUMNS FROM $table";
-            $result = mysqli_query($conn, $query);
-            if ($result) {
-                while ($row = mysqli_fetch_assoc($result)) {
-                    $columns[] = $row['Field'];
-                }
-            }
-            return $columns;
-        } catch (Exception $e) {
-            return [];
-        }
-    }
-}
+// ============================================
+// FIX: Use the correct table name
+// ============================================
+$table_name = 'admission_students';
 
 // Get filter parameters
 $search = isset($_GET['search']) ? trim($_GET['search']) : '';
 $program = isset($_GET['program']) ? (int)$_GET['program'] : 0;
 $status = isset($_GET['status']) ? $_GET['status'] : '';
 
-// Use global $conn
-global $conn;
-
-// Check which columns exist in users table
-$userColumns = getTableColumns($conn, 'users');
-$hasUserPhone = in_array('phone', $userColumns);
-$hasUserEmail = in_array('email', $userColumns);
-$hasUserFullName = in_array('full_name', $userColumns);
-
-// Check which columns exist in students table
-$studentColumns = getTableColumns($conn, 'students');
-$hasStudentRollNo = in_array('roll_no', $studentColumns);
-$hasStudentFatherName = in_array('father_name', $studentColumns);
-$hasStudentProgramId = in_array('program_id', $studentColumns);
-$hasStudentSemester = in_array('semester', $studentColumns);
-$hasStudentStatus = in_array('status', $studentColumns);
-$hasStudentUserId = in_array('user_id', $studentColumns);
-
-// Build query with all joins - only include columns that exist
-$query = "SELECT s.*";
-
-// Add program fields
-$query .= ", p.program_name, p.program_code";
-
-// Add user fields - only if they exist AND if students table has user_id column
-if ($hasStudentUserId) {
-    if ($hasUserFullName) {
-        $query .= ", u.full_name";
-    } else {
-        $query .= ", NULL as full_name";
-    }
-
-    if ($hasUserEmail) {
-        $query .= ", u.email";
-    } else {
-        $query .= ", NULL as email";
-    }
-
-    if ($hasUserPhone) {
-        $query .= ", u.phone";
-    } else {
-        $query .= ", NULL as phone";
-    }
-} else {
-    // If no user_id column, set user fields to NULL
-    $query .= ", NULL as full_name, NULL as email, NULL as phone";
-}
-
-$query .= " FROM students s
-          LEFT JOIN programs p ON s.program_id = p.program_id";
-
-// Only join users table if students table has user_id column
-if ($hasStudentUserId) {
-    $query .= " LEFT JOIN users u ON s.user_id = u.user_id";
-}
-
-$query .= " WHERE 1=1";
+// Build query
+$query = "SELECT s.*, p.program_name, p.program_code 
+          FROM $table_name s
+          LEFT JOIN programs p ON s.program_id = p.program_id
+          WHERE 1=1";
 
 $params = [];
 $types = "";
 
+// Search conditions
 if (!empty($search)) {
-    $searchConditions = [];
-    
-    if ($hasUserFullName && $hasStudentUserId) {
-        $searchConditions[] = "u.full_name LIKE ?";
-    }
-    if ($hasStudentRollNo) {
-        $searchConditions[] = "s.roll_no LIKE ?";
-    }
-    if ($hasUserEmail && $hasStudentUserId) {
-        $searchConditions[] = "u.email LIKE ?";
-    }
-    if ($hasStudentFatherName) {
-        $searchConditions[] = "s.father_name LIKE ?";
-    }
-    
-    // If no search conditions available, search by student_id
-    if (empty($searchConditions)) {
-        $searchConditions[] = "s.student_id LIKE ?";
-    }
-    
-    $query .= " AND (" . implode(" OR ", $searchConditions) . ")";
+    $query .= " AND (s.full_name LIKE ? OR s.student_name LIKE ? OR s.father_name LIKE ? OR s.student_id LIKE ?)";
     $searchParam = "%$search%";
-    
-    foreach ($searchConditions as $condition) {
-        $params[] = $searchParam;
-        $types .= "s";
-    }
+    $params[] = $searchParam;
+    $params[] = $searchParam;
+    $params[] = $searchParam;
+    $params[] = $searchParam;
+    $types .= "ssss";
 }
 
-if ($program > 0 && $hasStudentProgramId) {
+if ($program > 0) {
     $query .= " AND s.program_id = ?";
     $params[] = $program;
     $types .= "i";
 }
 
-if (!empty($status) && $hasStudentStatus) {
+if (!empty($status)) {
     $query .= " AND s.status = ?";
     $params[] = $status;
     $types .= "s";
 }
 
-$query .= " ORDER BY s.student_id DESC";
+$query .= " ORDER BY s.id DESC";
 
 // Prepare and execute
 $stmt = $conn->prepare($query);
@@ -277,7 +182,6 @@ include __DIR__ . '/../includes/sidebar.php';
         color: #495057;
     }
     
-    /* Page Header Styles */
     .page-header {
         display: flex;
         justify-content: space-between;
@@ -339,7 +243,7 @@ include __DIR__ . '/../includes/sidebar.php';
 
 <div class="main-content">
     <div class="container-fluid">
-        <!-- Page Header with Add Student Button -->
+        <!-- Page Header -->
         <div class="page-header">
             <h2><i class="fas fa-user-graduate"></i> Student Management</h2>
             <div class="btn-group">
@@ -352,12 +256,27 @@ include __DIR__ . '/../includes/sidebar.php';
             </div>
         </div>
 
+        <!-- Success/Error Messages -->
+        <?php if (isset($_GET['success'])): ?>
+            <div class="alert alert-success alert-dismissible fade show">
+                <i class="fas fa-check-circle"></i> <?php echo htmlspecialchars($_GET['success']); ?>
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        <?php endif; ?>
+
+        <?php if (isset($_GET['error'])): ?>
+            <div class="alert alert-danger alert-dismissible fade show">
+                <i class="fas fa-exclamation-circle"></i> <?php echo htmlspecialchars($_GET['error']); ?>
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        <?php endif; ?>
+
         <!-- Filter Section -->
         <div class="filter-section">
             <form method="GET" class="row g-3">
                 <div class="col-md-4">
                     <input type="text" name="search" class="form-control" 
-                           placeholder="Search by name, roll no, father name or email..." 
+                           placeholder="Search by name, student ID, father name..." 
                            value="<?php echo htmlspecialchars($search); ?>">
                 </div>
                 <div class="col-md-3">
@@ -406,11 +325,10 @@ include __DIR__ . '/../includes/sidebar.php';
                         <table class="table table-hover datatable">
                             <thead>
                                 <tr>
-                                    <th>Roll No</th>
+                                    <th>Student ID</th>
                                     <th>Student</th>
                                     <th>Father's Name</th>
                                     <th>Program</th>
-                                    <th>Semester</th>
                                     <th>Status</th>
                                     <th>Actions</th>
                                 </tr>
@@ -420,22 +338,25 @@ include __DIR__ . '/../includes/sidebar.php';
                                     <tr>
                                         <td>
                                             <span class="roll-badge">
-                                                <?php echo htmlspecialchars($student['roll_no'] ?? 'N/A'); ?>
+                                                <?php echo htmlspecialchars($student['student_id'] ?? 'N/A'); ?>
                                             </span>
                                         </td>
                                         <td>
                                             <div class="d-flex align-items-center">
                                                 <div class="student-avatar me-2">
-                                                    <?php echo strtoupper(substr($student['full_name'] ?? 'U', 0, 1)); ?>
+                                                    <?php 
+                                                    $name = $student['full_name'] ?? $student['student_name'] ?? 'U';
+                                                    echo strtoupper(substr($name, 0, 1)); 
+                                                    ?>
                                                 </div>
                                                 <div>
-                                                    <div><?php echo htmlspecialchars($student['full_name'] ?? 'N/A'); ?></div>
-                                                    <?php if (!empty($student['email']) && $student['email'] != 'N/A'): ?>
+                                                    <div><?php echo htmlspecialchars($student['full_name'] ?? $student['student_name'] ?? 'N/A'); ?></div>
+                                                    <?php if (!empty($student['email'])): ?>
                                                         <small class="text-muted"><?php echo htmlspecialchars($student['email']); ?></small>
                                                     <?php endif; ?>
-                                                    <?php if (!empty($student['phone']) && $student['phone'] != 'N/A'): ?>
+                                                    <?php if (!empty($student['contact_no'])): ?>
                                                         <br>
-                                                        <small class="text-muted"><i class="fas fa-phone"></i> <?php echo htmlspecialchars($student['phone']); ?></small>
+                                                        <small class="text-muted"><i class="fas fa-phone"></i> <?php echo htmlspecialchars($student['contact_no']); ?></small>
                                                     <?php endif; ?>
                                                 </div>
                                             </div>
@@ -447,17 +368,9 @@ include __DIR__ . '/../includes/sidebar.php';
                                             <?php echo htmlspecialchars($student['program_name'] ?? 'N/A'); ?>
                                         </td>
                                         <td>
-                                            <?php 
-                                            $semester_num = $student['semester'] ?? 1;
-                                            $ordinal = ['1st', '2nd', '3rd', '4th', '5th', '6th', '7th', '8th'];
-                                            echo ($semester_num >= 1 && $semester_num <= 8) 
-                                                ? $ordinal[$semester_num - 1] . ' Semester' 
-                                                : 'Semester ' . $semester_num;
-                                            ?>
-                                        </td>
-                                        <td>
                                             <?php
-                                            $status_class = match($student['status']) {
+                                            $status = $student['status'] ?? 'pending';
+                                            $status_class = match($status) {
                                                 'active' => 'active',
                                                 'confirmed' => 'confirmed',
                                                 'pending' => 'pending',
@@ -467,19 +380,19 @@ include __DIR__ . '/../includes/sidebar.php';
                                             };
                                             ?>
                                             <span class="status-badge status-<?php echo $status_class; ?>">
-                                                <?php echo ucfirst($student['status'] ?? 'N/A'); ?>
+                                                <?php echo ucfirst($status); ?>
                                             </span>
                                         </td>
                                         <td class="table-actions">
-                                            <a href="view.php?id=<?php echo $student['student_id']; ?>" 
+                                            <a href="view.php?id=<?php echo urlencode($student['student_id']); ?>" 
                                                class="btn btn-info btn-sm" title="View">
                                                 <i class="fas fa-eye"></i>
                                             </a>
-                                            <a href="edit.php?id=<?php echo $student['student_id']; ?>" 
+                                            <a href="edit.php?id=<?php echo urlencode($student['student_id']); ?>" 
                                                class="btn btn-primary btn-sm" title="Edit">
                                                 <i class="fas fa-edit"></i>
                                             </a>
-                                            <a href="delete.php?id=<?php echo $student['student_id']; ?>" 
+                                            <a href="delete.php?id=<?php echo urlencode($student['student_id']); ?>" 
                                                class="btn btn-danger btn-sm" title="Delete"
                                                onclick="return confirm('Are you sure you want to delete this student?')">
                                                 <i class="fas fa-trash"></i>

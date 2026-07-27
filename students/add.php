@@ -73,6 +73,36 @@ if ($sessions_result) {
     }
 }
 
+// ============================================
+// FIX: Use the correct table name - admission_students
+// ============================================
+$table_name = 'admission_students';
+
+// Check what columns exist in admission_students table
+$check_student_columns = "SHOW COLUMNS FROM $table_name";
+$student_cols_result = mysqli_query($conn, $check_student_columns);
+
+if (!$student_cols_result) {
+    die("Error: Table '$table_name' does not exist. Please check your database.");
+}
+
+$student_columns = [];
+if ($student_cols_result) {
+    while ($col = mysqli_fetch_assoc($student_cols_result)) {
+        $student_columns[] = $col['Field'];
+    }
+}
+
+// Check what columns exist in users table
+$check_user_columns = "SHOW COLUMNS FROM users";
+$user_cols_result = mysqli_query($conn, $check_user_columns);
+$user_columns = [];
+if ($user_cols_result) {
+    while ($col = mysqli_fetch_assoc($user_cols_result)) {
+        $user_columns[] = $col['Field'];
+    }
+}
+
 // Handle form submission
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // Get form data
@@ -82,13 +112,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $father_name = trim($_POST['father_name'] ?? '');
     $program_id = (int)($_POST['program_id'] ?? 0);
     $section = trim($_POST['section'] ?? '');
-    $batch_year = (int)($_POST['batch_year'] ?? date('Y'));
     $semester = (int)($_POST['semester'] ?? 1);
     $status = $_POST['status'] ?? 'active';
     $enrollment_date = $_POST['enrollment_date'] ?? date('Y-m-d');
     $session = trim($_POST['session'] ?? '');
     $password = trim($_POST['password'] ?? '');
     $roll_no = trim($_POST['roll_no'] ?? '');
+    $cnic = trim($_POST['cnic'] ?? '');
+    $dob = $_POST['dob'] ?? '';
+    $gender = $_POST['gender'] ?? '';
+    $address = trim($_POST['address'] ?? '');
 
     // Validation
     if (empty($full_name)) $errors[] = "Full name is required";
@@ -96,7 +129,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!filter_var($email, FILTER_VALIDATE_EMAIL)) $errors[] = "Invalid email format";
     if (empty($father_name)) $errors[] = "Father's name is required";
     if ($program_id <= 0) $errors[] = "Program is required";
-    if ($batch_year <= 0) $errors[] = "Batch year is required";
     if (empty($password)) $errors[] = "Password is required";
 
     // Check if email already exists
@@ -119,10 +151,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
             }
             
-            // 2. Count existing students for auto ID
-            $count_query = "SELECT COUNT(*) as count FROM students WHERE program_id = ? AND batch_year = ?";
+            // 2. Generate student ID (without batch_year since it doesn't exist)
+            // Use current year for the ID
+            $current_year = date('Y');
+            $count_query = "SELECT COUNT(*) as count FROM $table_name WHERE program_id = ?";
             $count_stmt = mysqli_prepare($conn, $count_query);
-            mysqli_stmt_bind_param($count_stmt, "ii", $program_id, $batch_year);
+            mysqli_stmt_bind_param($count_stmt, "i", $program_id);
             mysqli_stmt_execute($count_stmt);
             $count_result = mysqli_stmt_get_result($count_stmt);
             $count = mysqli_fetch_assoc($count_result);
@@ -130,7 +164,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             mysqli_stmt_close($count_stmt);
             
             // 3. Generate student ID
-            $student_id = $program_code . '-' . $batch_year . '-' . str_pad($student_number, 3, '0', STR_PAD_LEFT);
+            $student_id = $program_code . '-' . $current_year . '-' . str_pad($student_number, 3, '0', STR_PAD_LEFT);
             
             // If roll_no is empty, auto-generate
             if (empty($roll_no)) {
@@ -140,33 +174,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             // 4. Insert into users table
             $password_hash = password_hash($password, PASSWORD_DEFAULT);
             
-            // Check what columns exist in users table
-            $check_columns = "SHOW COLUMNS FROM users";
-            $columns_result = mysqli_query($conn, $check_columns);
-            $user_columns = [];
-            if ($columns_result) {
-                while ($col = mysqli_fetch_assoc($columns_result)) {
-                    $user_columns[] = $col['Field'];
-                }
-            }
-            
             // Build insert query based on existing columns
             $user_fields = ['email', 'password_hash', 'full_name', 'phone', 'role_id'];
             $user_values = ['?', '?', '?', '?', '4'];
             $bind_params = [$email, $password_hash, $full_name, $phone];
             
-            // Check if status column exists
+            // Check if status column exists in users
             if (in_array('status', $user_columns)) {
                 $user_fields[] = 'status';
                 $user_values[] = '?';
                 $bind_params[] = 'Active';
-            }
-            
-            // Check if is_active column exists
-            if (in_array('is_active', $user_columns)) {
-                $user_fields[] = 'is_active';
-                $user_values[] = '?';
-                $bind_params[] = 1;
             }
             
             // Check if created_at column exists
@@ -193,49 +210,129 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $user_id = mysqli_insert_id($conn);
             mysqli_stmt_close($stmt);
             
-            // 5. Insert into students table
-            // Check what columns exist in students table
-            $check_student_columns = "SHOW COLUMNS FROM students";
-            $student_cols_result = mysqli_query($conn, $check_student_columns);
-            $student_columns = [];
-            if ($student_cols_result) {
-                while ($col = mysqli_fetch_assoc($student_cols_result)) {
-                    $student_columns[] = $col['Field'];
-                }
+            // ============================================
+            // 5. Insert into admission_students table
+            // ============================================
+            
+            // Build the insert query based on existing columns
+            $student_fields = [];
+            $student_values = [];
+            $student_params = [];
+            
+            // Required fields
+            if (in_array('student_id', $student_columns)) {
+                $student_fields[] = 'student_id';
+                $student_values[] = '?';
+                $student_params[] = $student_id;
             }
             
-            $student_fields = ['student_id', 'roll_no', 'user_id', 'program_id', 'batch_year', 'semester', 'status', 'father_name'];
-            $student_values = ['?', '?', '?', '?', '?', '?', '?', '?'];
-            $student_params = [$student_id, $roll_no, $user_id, $program_id, $batch_year, $semester, $status, $father_name];
+            if (in_array('full_name', $student_columns)) {
+                $student_fields[] = 'full_name';
+                $student_values[] = '?';
+                $student_params[] = $full_name;
+            }
             
-            // Check if section exists
+            if (in_array('student_name', $student_columns)) {
+                $student_fields[] = 'student_name';
+                $student_values[] = '?';
+                $student_params[] = $full_name;
+            }
+            
+            if (in_array('father_name', $student_columns)) {
+                $student_fields[] = 'father_name';
+                $student_values[] = '?';
+                $student_params[] = $father_name;
+            }
+            
+            if (in_array('program_id', $student_columns)) {
+                $student_fields[] = 'program_id';
+                $student_values[] = '?';
+                $student_params[] = $program_id;
+            }
+            
+            // Optional fields
+            if (in_array('user_id', $student_columns)) {
+                $student_fields[] = 'user_id';
+                $student_values[] = '?';
+                $student_params[] = $user_id;
+            }
+            
+            if (in_array('roll_no', $student_columns)) {
+                $student_fields[] = 'roll_no';
+                $student_values[] = '?';
+                $student_params[] = $roll_no;
+            }
+            
+            if (in_array('email', $student_columns)) {
+                $student_fields[] = 'email';
+                $student_values[] = '?';
+                $student_params[] = $email;
+            }
+            
+            if (in_array('contact_no', $student_columns)) {
+                $student_fields[] = 'contact_no';
+                $student_values[] = '?';
+                $student_params[] = $phone;
+            }
+            
+            if (in_array('cnic_or_bform', $student_columns)) {
+                $student_fields[] = 'cnic_or_bform';
+                $student_values[] = '?';
+                $student_params[] = $cnic;
+            }
+            
+            if (in_array('dob', $student_columns)) {
+                $student_fields[] = 'dob';
+                $student_values[] = '?';
+                $student_params[] = $dob;
+            }
+            
+            if (in_array('gender', $student_columns)) {
+                $student_fields[] = 'gender';
+                $student_values[] = '?';
+                $student_params[] = $gender;
+            }
+            
+            if (in_array('address', $student_columns)) {
+                $student_fields[] = 'address';
+                $student_values[] = '?';
+                $student_params[] = $address;
+            }
+            
             if (in_array('section', $student_columns)) {
                 $student_fields[] = 'section';
                 $student_values[] = '?';
                 $student_params[] = $section;
             }
             
-            // Check if session exists
-            if (in_array('session', $student_columns)) {
-                $student_fields[] = 'session';
+            if (in_array('application_id', $student_columns)) {
+                $student_fields[] = 'application_id';
                 $student_values[] = '?';
-                $student_params[] = $session;
+                $student_params[] = null;
             }
             
-            // Check if enrollment_date exists
-            if (in_array('enrollment_date', $student_columns)) {
-                $student_fields[] = 'enrollment_date';
+            if (in_array('status', $student_columns)) {
+                $student_fields[] = 'status';
                 $student_values[] = '?';
-                $student_params[] = $enrollment_date;
+                $student_params[] = $status;
             }
             
-            // Check if created_at exists
             if (in_array('created_at', $student_columns)) {
                 $student_fields[] = 'created_at';
                 $student_values[] = 'NOW()';
             }
             
-            $insert_student = "INSERT INTO students (" . implode(', ', $student_fields) . ") 
+            if (in_array('updated_at', $student_columns)) {
+                $student_fields[] = 'updated_at';
+                $student_values[] = 'NOW()';
+            }
+            
+            // If no fields were added, throw an error
+            if (empty($student_fields)) {
+                throw new Exception("No columns found in $table_name table to insert.");
+            }
+            
+            $insert_student = "INSERT INTO $table_name (" . implode(', ', $student_fields) . ") 
                               VALUES (" . implode(', ', $student_values) . ")";
             
             $stmt = mysqli_prepare($conn, $insert_student);
@@ -248,12 +345,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             foreach ($student_params as $param) {
                 if (is_int($param)) {
                     $student_types .= 'i';
+                } elseif (is_null($param)) {
+                    $student_types .= 's';
                 } else {
                     $student_types .= 's';
                 }
             }
             
-            mysqli_stmt_bind_param($stmt, $student_types, ...$student_params);
+            if (!empty($student_params)) {
+                mysqli_stmt_bind_param($stmt, $student_types, ...$student_params);
+            }
             
             if (!mysqli_stmt_execute($stmt)) {
                 throw new Exception("Error creating student: " . mysqli_stmt_error($stmt));
@@ -369,6 +470,30 @@ include __DIR__ . '/../includes/sidebar.php';
                                placeholder="Leave blank to auto-generate">
                         <div class="field-hint">Auto-generated if left blank</div>
                     </div>
+                    <div class="col-md-6 mb-3">
+                        <label>CNIC/B-Form</label>
+                        <input type="text" name="cnic" class="form-control" 
+                               value="<?php echo htmlspecialchars($_POST['cnic'] ?? ''); ?>"
+                               placeholder="XXXXX-XXXXXXX-X">
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label>Date of Birth</label>
+                        <input type="date" name="dob" class="form-control" 
+                               value="<?php echo htmlspecialchars($_POST['dob'] ?? ''); ?>">
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label>Gender</label>
+                        <select name="gender" class="form-select">
+                            <option value="">Select Gender</option>
+                            <option value="Male" <?php echo ($_POST['gender'] ?? '') == 'Male' ? 'selected' : ''; ?>>Male</option>
+                            <option value="Female" <?php echo ($_POST['gender'] ?? '') == 'Female' ? 'selected' : ''; ?>>Female</option>
+                            <option value="Other" <?php echo ($_POST['gender'] ?? '') == 'Other' ? 'selected' : ''; ?>>Other</option>
+                        </select>
+                    </div>
+                    <div class="col-md-12 mb-3">
+                        <label>Address</label>
+                        <textarea name="address" class="form-control" rows="2"><?php echo htmlspecialchars($_POST['address'] ?? ''); ?></textarea>
+                    </div>
                 </div>
             </div>
 
@@ -397,8 +522,8 @@ include __DIR__ . '/../includes/sidebar.php';
                                placeholder="A, B, C">
                     </div>
                     <div class="col-md-4 mb-3">
-                        <label class="required-field">Semester</label>
-                        <select name="semester" class="form-select" required>
+                        <label>Semester</label>
+                        <select name="semester" class="form-select">
                             <option value="">Select</option>
                             <?php for ($i = 1; $i <= 8; $i++): ?>
                                 <option value="<?php echo $i; ?>" 
@@ -410,12 +535,6 @@ include __DIR__ . '/../includes/sidebar.php';
                                 </option>
                             <?php endfor; ?>
                         </select>
-                    </div>
-                    <div class="col-md-4 mb-3">
-                        <label class="required-field">Batch Year</label>
-                        <input type="number" name="batch_year" class="form-control" 
-                               value="<?php echo htmlspecialchars($_POST['batch_year'] ?? date('Y')); ?>" 
-                               min="2000" max="2030" required>
                     </div>
                     <div class="col-md-4 mb-3">
                         <label>Session</label>

@@ -19,11 +19,68 @@ if (empty($id)) {
     exit;
 }
 
+// First, let's check the actual column names in both tables
+$students_columns = $conn->query("SHOW COLUMNS FROM students");
+$users_columns = $conn->query("SHOW COLUMNS FROM users");
+
+$student_col_names = [];
+$user_col_names = [];
+
+while ($col = $students_columns->fetch_assoc()) {
+    $student_col_names[] = $col['Field'];
+}
+
+while ($col = $users_columns->fetch_assoc()) {
+    $user_col_names[] = $col['Field'];
+}
+
+// Determine the correct join condition
+$join_condition = '';
+$user_id_column = '';
+
+// Check if students table has user_id
+if (in_array('user_id', $student_col_names) && in_array('user_id', $user_col_names)) {
+    $join_condition = "s.user_id = u.user_id";
+    $user_id_column = "u.user_id";
+} 
+// Check if students table has student_id and users table has student_id
+else if (in_array('student_id', $student_col_names) && in_array('student_id', $user_col_names)) {
+    $join_condition = "s.student_id = u.student_id";
+    $user_id_column = "u.user_id";
+}
+// Check if students table has id and users table has student_id
+else if (in_array('id', $student_col_names) && in_array('student_id', $user_col_names)) {
+    $join_condition = "s.id = u.student_id";
+    $user_id_column = "u.user_id";
+}
+// Check if students table has student_id and users table has user_id (no direct link)
+else if (in_array('student_id', $student_col_names) && in_array('user_id', $user_col_names)) {
+    // If there's no direct link, we need to find another way
+    // Perhaps users table has a student_id column but named differently
+    $join_condition = "s.student_id = u.user_id";
+    $user_id_column = "u.user_id";
+}
+// Default fallback - try to join on user_id if exists
+else if (in_array('user_id', $user_col_names)) {
+    // If only users table has user_id, we might need to link differently
+    // Let's just get student data without joining
+    $join_condition = "1=0"; // This will prevent the join from matching
+    $user_id_column = "NULL as user_id";
+}
+
 // Get student data with user info
-$query = "SELECT s.*, u.user_id, u.full_name, u.email, u.phone 
-          FROM students s
-          LEFT JOIN users u ON s.user_id = u.user_id
-          WHERE s.student_id = ?";
+if ($join_condition && $join_condition != "1=0") {
+    $query = "SELECT s.*, $user_id_column as user_id, u.full_name, u.email, u.phone 
+              FROM students s
+              LEFT JOIN users u ON $join_condition
+              WHERE s.student_id = ?";
+} else {
+    // If no join condition found, just get student data
+    $query = "SELECT s.*, NULL as user_id, '' as full_name, '' as email, '' as phone 
+              FROM students s
+              WHERE s.student_id = ?";
+}
+
 $stmt = $conn->prepare($query);
 $stmt->bind_param("s", $id);
 $stmt->execute();
@@ -72,20 +129,43 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $conn->begin_transaction();
         
         try {
-            // 1. Update users table
-            $update_user = "UPDATE users SET 
-                full_name = ?, 
-                email = ?, 
-                phone = ? 
-                WHERE user_id = ?";
+            // Check if user exists for this student
+            $user_id = $student['user_id'] ?? null;
             
-            $stmt = $conn->prepare($update_user);
-            $stmt->bind_param("sssi", $full_name, $email, $phone, $student['user_id']);
-            
-            if (!$stmt->execute()) {
-                throw new Exception("Error updating user: " . $stmt->error);
+            if ($user_id && in_array('user_id', $user_col_names)) {
+                // 1. Update users table
+                $update_user = "UPDATE users SET 
+                    full_name = ?, 
+                    email = ?, 
+                    phone = ? 
+                    WHERE user_id = ?";
+                
+                $stmt = $conn->prepare($update_user);
+                $stmt->bind_param("sssi", $full_name, $email, $phone, $user_id);
+                
+                if (!$stmt->execute()) {
+                    throw new Exception("Error updating user: " . $stmt->error);
+                }
+                $stmt->close();
+            } else {
+                // Try to find user by student_id if it exists in users table
+                if (in_array('student_id', $user_col_names)) {
+                    $update_user = "UPDATE users SET 
+                        full_name = ?, 
+                        email = ?, 
+                        phone = ? 
+                        WHERE student_id = ?";
+                    
+                    $stmt = $conn->prepare($update_user);
+                    $stmt->bind_param("ssss", $full_name, $email, $phone, $id);
+                    
+                    if (!$stmt->execute()) {
+                        throw new Exception("Error updating user: " . $stmt->error);
+                    }
+                    $stmt->close();
+                }
+                // If no user link exists, we might need to create a user or skip
             }
-            $stmt->close();
             
             // 2. Update students table
             $update_student = "UPDATE students SET 
@@ -124,10 +204,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $conn->commit();
             
             // Refresh student data
-            $query = "SELECT s.*, u.user_id, u.full_name, u.email, u.phone 
-                      FROM students s
-                      LEFT JOIN users u ON s.user_id = u.user_id
-                      WHERE s.student_id = ?";
+            if ($join_condition && $join_condition != "1=0") {
+                $query = "SELECT s.*, $user_id_column as user_id, u.full_name, u.email, u.phone 
+                          FROM students s
+                          LEFT JOIN users u ON $join_condition
+                          WHERE s.student_id = ?";
+            } else {
+                $query = "SELECT s.*, NULL as user_id, '' as full_name, '' as email, '' as phone 
+                          FROM students s
+                          WHERE s.student_id = ?";
+            }
             $stmt = $conn->prepare($query);
             $stmt->bind_param("s", $id);
             $stmt->execute();

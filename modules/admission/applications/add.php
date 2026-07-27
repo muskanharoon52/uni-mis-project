@@ -9,8 +9,11 @@ $departments = $pdo->query("SELECT * FROM departments WHERE status='active' ORDE
 // Get sessions
 $sessions = $pdo->query("SELECT * FROM sessions ORDER BY session_id DESC")->fetchAll();
 
-// Get semesters
-$semesters = $pdo->query("SELECT * FROM semesters ORDER BY semester_id")->fetchAll();
+// Get semesters - FIXED: Using DISTINCT to remove duplicates
+$semesters = $pdo->query("SELECT DISTINCT semester_id, semester_name FROM semesters ORDER BY CAST(SUBSTRING(semester_name, 10) AS UNSIGNED)")->fetchAll();
+
+// Alternative if semester_name is like "Semester 1", "Semester 2", etc.
+// $semesters = $pdo->query("SELECT DISTINCT semester_id, semester_name FROM semesters ORDER BY semester_id")->fetchAll();
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     try {
@@ -151,7 +154,14 @@ if ($flash): ?>
         <label class="form-label">Semester *</label>
         <select name="semester_id" class="form-select" required>
             <option value="">-- Select Semester --</option>
-            <?php foreach($semesters as $sem): ?>
+            <?php 
+            // FIXED: Using array to track seen semester names
+            $seen_semesters = [];
+            foreach($semesters as $sem): 
+                // Skip if we've already seen this semester name
+                if (in_array($sem['semester_name'], $seen_semesters)) continue;
+                $seen_semesters[] = $sem['semester_name'];
+            ?>
             <option value="<?= $sem['semester_id'] ?>">
                 <?= $sem['semester_name'] ?? $sem['semester_id'] ?>
             </option>
