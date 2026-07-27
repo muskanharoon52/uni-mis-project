@@ -17,7 +17,10 @@ if ($id <= 0) {
 }
 
 // Get course data
-$query = "SELECT * FROM courses WHERE course_id = ?";
+$query = "SELECT c.*, p.program_name 
+          FROM courses c
+          LEFT JOIN programs p ON c.program_id = p.program_id
+          WHERE c.course_id = ?";
 $stmt = $conn->prepare($query);
 
 if ($stmt === false) {
@@ -40,13 +43,31 @@ $program_query = "SELECT program_id as id, program_name as name FROM programs OR
 $program_result = $conn->query($program_query);
 $programs = $program_result ? $program_result->fetch_all(MYSQLI_ASSOC) : [];
 
+// ============================================
+// FIX: Get semesters from database
+// ============================================
+$semesters_query = "SELECT DISTINCT semester_id, semester_name, semester_number 
+                    FROM semesters 
+                    ORDER BY CAST(semester_number AS UNSIGNED)";
+$semesters_result = $conn->query($semesters_query);
+$semesters = [];
+if ($semesters_result) {
+    $seen_semesters = array();
+    while ($row = $semesters_result->fetch_assoc()) {
+        if (!in_array($row['semester_name'], $seen_semesters)) {
+            $seen_semesters[] = $row['semester_name'];
+            $semesters[] = $row;
+        }
+    }
+}
+
 // Handle form submission
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $course_code = strtoupper(trim($_POST['course_code'] ?? ''));
     $course_name = trim($_POST['course_name'] ?? '');
     $credit_hours = (int)($_POST['credit_hours'] ?? 3);
     $program_id = (int)($_POST['program_id'] ?? 0);
-    $semester = (int)($_POST['semester'] ?? 0);
+    $semester_id = (int)($_POST['semester_id'] ?? 0);
     $description = trim($_POST['description'] ?? '');
 
     // Validation
@@ -54,7 +75,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (empty($course_name)) $errors[] = "Course title is required";
     if ($credit_hours < 1 || $credit_hours > 6) $errors[] = "Credit hours must be between 1 and 6";
     if (empty($program_id) || $program_id == 0) $errors[] = "Program is required";
-    if (empty($semester) || $semester == 0) $errors[] = "Semester is required";
+    if (empty($semester_id) || $semester_id == 0) $errors[] = "Semester is required";
 
     // Check if course code already exists for other course
     if (empty($errors)) {
@@ -76,7 +97,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             course_name = ?,
             credit_hours = ?,
             program_id = ?,
-            semester = ?,
+            semester_id = ?,
             description = ?
             WHERE course_id = ?";
 
@@ -87,12 +108,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
 
         $stmt->bind_param(
-            "ssiissi",
+            "ssiiisi",
             $course_code,
             $course_name,
             $credit_hours,
             $program_id,
-            $semester,
+            $semester_id,
             $description,
             $id
         );
@@ -144,12 +165,21 @@ include __DIR__ . '/../includes/sidebar.php';
         margin-left: 4px;
     }
     
-    /* FIX: Content container with margin-left to push content right */
     .courses-content {
         margin-left: 250px;
         padding: 20px;
         min-height: 100vh;
         background: #f5f6fa;
+    }
+    
+    .current-value {
+        font-size: 12px;
+        color: #6c757d;
+        margin-top: 4px;
+    }
+    
+    .current-value strong {
+        color: #2c3e50;
     }
     
     @media (max-width: 768px) {
@@ -160,11 +190,8 @@ include __DIR__ . '/../includes/sidebar.php';
     }
 </style>
 
-<!-- ============================================ -->
-<!-- CONTENT WITH MARGIN-LEFT TO PUSH RIGHT -->
-<!-- ============================================ -->
 <div class="courses-content">
-    <div class="container-fluid" style="padding: 0 !important;">
+    <div class="container-fluid">
         
         <!-- Page Header -->
         <div class="d-flex justify-content-between align-items-center mb-4">
@@ -198,7 +225,7 @@ include __DIR__ . '/../includes/sidebar.php';
                                placeholder="e.g., CS101" 
                                value="<?php echo htmlspecialchars($course['course_code']); ?>" 
                                required>
-                        <small class="text-muted">Current: <strong><?php echo htmlspecialchars($course['course_code']); ?></strong></small>
+                        <div class="current-value">Current: <strong><?php echo htmlspecialchars($course['course_code']); ?></strong></div>
                     </div>
                     <div class="col-md-8 mb-3">
                         <label class="required-field">Course Title</label>
@@ -217,6 +244,7 @@ include __DIR__ . '/../includes/sidebar.php';
                             <option value="5" <?php echo $course['credit_hours'] == 5 ? 'selected' : ''; ?>>5 Credits</option>
                             <option value="6" <?php echo $course['credit_hours'] == 6 ? 'selected' : ''; ?>>6 Credits</option>
                         </select>
+                        <div class="current-value">Current: <strong><?php echo $course['credit_hours']; ?> Credits</strong></div>
                     </div>
                     <div class="col-12 mb-3">
                         <label>Description</label>
@@ -235,7 +263,7 @@ include __DIR__ . '/../includes/sidebar.php';
                     <div class="col-md-6 mb-3">
                         <label class="required-field">Program</label>
                         <select name="program_id" class="form-select" required>
-                            <option value="0">Select Program</option>
+                            <option value="0">-- Select Program --</option>
                             <?php foreach ($programs as $prog): ?>
                                 <option value="<?php echo $prog['id']; ?>" 
                                     <?php echo $course['program_id'] == $prog['id'] ? 'selected' : ''; ?>>
@@ -243,20 +271,30 @@ include __DIR__ . '/../includes/sidebar.php';
                                 </option>
                             <?php endforeach; ?>
                         </select>
+                        <div class="current-value">Current: <strong><?php echo htmlspecialchars($course['program_name'] ?? 'N/A'); ?></strong></div>
                     </div>
                     <div class="col-md-6 mb-3">
                         <label class="required-field">Semester</label>
-                        <select name="semester" class="form-select" required>
-                            <option value="0">Select Semester</option>
-                            <option value="1" <?php echo $course['semester'] == 1 ? 'selected' : ''; ?>>Semester 1</option>
-                            <option value="2" <?php echo $course['semester'] == 2 ? 'selected' : ''; ?>>Semester 2</option>
-                            <option value="3" <?php echo $course['semester'] == 3 ? 'selected' : ''; ?>>Semester 3</option>
-                            <option value="4" <?php echo $course['semester'] == 4 ? 'selected' : ''; ?>>Semester 4</option>
-                            <option value="5" <?php echo $course['semester'] == 5 ? 'selected' : ''; ?>>Semester 5</option>
-                            <option value="6" <?php echo $course['semester'] == 6 ? 'selected' : ''; ?>>Semester 6</option>
-                            <option value="7" <?php echo $course['semester'] == 7 ? 'selected' : ''; ?>>Semester 7</option>
-                            <option value="8" <?php echo $course['semester'] == 8 ? 'selected' : ''; ?>>Semester 8</option>
+                        <select name="semester_id" class="form-select" required>
+                            <option value="0">-- Select Semester --</option>
+                            <?php foreach ($semesters as $sem): ?>
+                                <option value="<?php echo $sem['semester_id']; ?>" 
+                                    <?php echo ($course['semester_id'] ?? 0) == $sem['semester_id'] ? 'selected' : ''; ?>>
+                                    <?php echo htmlspecialchars($sem['semester_name']); ?>
+                                </option>
+                            <?php endforeach; ?>
                         </select>
+                        <?php 
+                        // Get current semester name
+                        $current_semester_name = 'N/A';
+                        foreach ($semesters as $sem) {
+                            if (($course['semester_id'] ?? 0) == $sem['semester_id']) {
+                                $current_semester_name = $sem['semester_name'];
+                                break;
+                            }
+                        }
+                        ?>
+                        <div class="current-value">Current: <strong><?php echo htmlspecialchars($current_semester_name); ?></strong></div>
                     </div>
                 </div>
             </div>

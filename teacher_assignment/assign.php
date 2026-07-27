@@ -11,6 +11,60 @@ $error = '';
 $success = '';
 
 // ============================================
+// FIX: Check what columns exist in teachers table
+// ============================================
+$check_columns = "SHOW COLUMNS FROM teachers";
+$cols_result = mysqli_query($conn, $check_columns);
+$teacher_columns = [];
+if ($cols_result) {
+    while ($col = mysqli_fetch_assoc($cols_result)) {
+        $teacher_columns[] = $col['Field'];
+    }
+}
+
+// Determine available columns in teachers
+$has_teacher_code = in_array('teacher_code', $teacher_columns);
+$has_teacher_name = in_array('teacher_name', $teacher_columns) || in_array('full_name', $teacher_columns) || in_array('name', $teacher_columns);
+$has_employee_id = in_array('employee_id', $teacher_columns);
+
+// Get the correct name column
+$name_column = 'teacher_name';
+if (in_array('full_name', $teacher_columns)) {
+    $name_column = 'full_name';
+} elseif (in_array('name', $teacher_columns)) {
+    $name_column = 'name';
+}
+
+// Build teacher query based on existing columns
+$teacher_select = "teacher_id, " . $name_column . " as teacher_name";
+if ($has_teacher_code) {
+    $teacher_select .= ", teacher_code";
+} elseif ($has_employee_id) {
+    $teacher_select .= ", employee_id as teacher_code";
+}
+
+// ============================================
+// FIX: Check what columns exist in teacher_courses table
+// ============================================
+$check_tc_columns = "SHOW COLUMNS FROM teacher_courses";
+$tc_cols_result = mysqli_query($conn, $check_tc_columns);
+$tc_columns = [];
+if ($tc_cols_result) {
+    while ($col = mysqli_fetch_assoc($tc_cols_result)) {
+        $tc_columns[] = $col['Field'];
+    }
+}
+
+// Determine available columns in teacher_courses
+$tc_has_is_primary = in_array('is_primary', $tc_columns);
+$tc_has_section = in_array('section', $tc_columns);
+$tc_has_status = in_array('status', $tc_columns);
+$tc_has_semester_id = in_array('semester_id', $tc_columns);
+$tc_has_session_id = in_array('session_id', $tc_columns);
+$tc_has_course_id = in_array('course_id', $tc_columns);
+$tc_has_teacher_id = in_array('teacher_id', $tc_columns);
+
+// ============================================
 // CHECK AND CREATE SESSIONS IF EMPTY
 // ============================================
 $check_sessions = $conn->query("SELECT COUNT(*) as count FROM sessions");
@@ -32,18 +86,13 @@ if ($check_sessions) {
             $insert_session->execute();
             $insert_session->close();
         }
-        
-        // Show success message
-        echo '<div class="alert alert-success alert-dismissible fade show" style="margin-left:250px; margin-top:10px;">
-                <i class="fas fa-check-circle"></i> 
-                Default sessions have been created automatically!
-                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-              </div>';
     }
 }
 
-// Fetch all required data for dropdowns
-$teachers_query = "SELECT teacher_id, teacher_name, teacher_code FROM teachers WHERE status = 'Active' ORDER BY teacher_name";
+// ============================================
+// Fetch teachers with dynamic columns
+// ============================================
+$teachers_query = "SELECT " . $teacher_select . " FROM teachers WHERE status = 'Active' ORDER BY " . $name_column;
 $teachers_result = $conn->query($teachers_query);
 $teachers = $teachers_result ? $teachers_result->fetch_all(MYSQLI_ASSOC) : [];
 
@@ -51,22 +100,26 @@ $courses_query = "SELECT course_id, course_code, course_name, credit_hours FROM 
 $courses_result = $conn->query($courses_query);
 $courses = $courses_result ? $courses_result->fetch_all(MYSQLI_ASSOC) : [];
 
-$semesters_query = "SELECT semester_id, semester_name FROM semesters ORDER BY semester_name";
+// Fetch semesters with DISTINCT to remove duplicates
+$semesters_query = "SELECT DISTINCT semester_id, semester_name, semester_number 
+                    FROM semesters 
+                    ORDER BY CAST(semester_number AS UNSIGNED)";
 $semesters_result = $conn->query($semesters_query);
-$semesters = $semesters_result ? $semesters_result->fetch_all(MYSQLI_ASSOC) : [];
+$semesters = [];
+if ($semesters_result) {
+    $seen_semesters = array();
+    while ($row = $semesters_result->fetch_assoc()) {
+        if (!in_array($row['semester_name'], $seen_semesters)) {
+            $seen_semesters[] = $row['semester_name'];
+            $semesters[] = $row;
+        }
+    }
+}
 
-// Fetch sessions - show all sessions
+// Fetch sessions
 $sessions_query = "SELECT session_id, session_name, status FROM sessions ORDER BY session_name DESC";
 $sessions_result = $conn->query($sessions_query);
 $sessions = $sessions_result ? $sessions_result->fetch_all(MYSQLI_ASSOC) : [];
-
-// Debug: Check if sessions are fetched
-if (empty($sessions)) {
-    // Try without status filter
-    $sessions_query = "SELECT session_id, session_name, status FROM sessions ORDER BY session_name DESC";
-    $sessions_result = $conn->query($sessions_query);
-    $sessions = $sessions_result ? $sessions_result->fetch_all(MYSQLI_ASSOC) : [];
-}
 
 // Handle form submission
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -82,23 +135,64 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($teacher_id <= 0 || $course_id <= 0 || $semester_id <= 0 || $session_id <= 0) {
         $error = 'Please select teacher, course, semester, and session.';
     } else {
-        // Check if assignment already exists
-        $check_sql = "SELECT id FROM teacher_courses 
-                      WHERE teacher_id = ? AND course_id = ? AND semester_id = ? AND session_id = ? AND section = ?";
+        // Build check query based on existing columns
+        $check_fields = ['teacher_id', 'course_id', 'semester_id', 'session_id'];
+        $check_values = [$teacher_id, $course_id, $semester_id, $session_id];
+        $check_types = "iiii";
+        
+        if ($tc_has_section) {
+            $check_fields[] = 'section';
+            $check_values[] = $section;
+            $check_types .= "s";
+        }
+        
+        $check_sql = "SELECT id FROM teacher_courses WHERE ";
+        $check_conditions = [];
+        for ($i = 0; $i < count($check_fields); $i++) {
+            $check_conditions[] = $check_fields[$i] . " = ?";
+        }
+        $check_sql .= implode(" AND ", $check_conditions);
+        
         $check_stmt = $conn->prepare($check_sql);
-        $check_stmt->bind_param("iiiis", $teacher_id, $course_id, $semester_id, $session_id, $section);
+        $check_stmt->bind_param($check_types, ...$check_values);
         $check_stmt->execute();
         $check_result = $check_stmt->get_result();
         
         if ($check_result->num_rows > 0) {
             $error = 'This assignment already exists for the same teacher, course, semester, session, and section.';
         } else {
-            // Insert assignment using teacher_courses table
-            $insert_sql = "INSERT INTO teacher_courses 
-                          (teacher_id, course_id, semester_id, session_id, section, is_primary, status) 
-                          VALUES (?, ?, ?, ?, ?, ?, ?)";
+            // Build insert query based on existing columns
+            $insert_fields = ['teacher_id', 'course_id', 'semester_id', 'session_id'];
+            $insert_values = [$teacher_id, $course_id, $semester_id, $session_id];
+            $insert_types = "iiii";
+            $insert_placeholders = ['?', '?', '?', '?'];
+            
+            if ($tc_has_section) {
+                $insert_fields[] = 'section';
+                $insert_values[] = $section;
+                $insert_types .= "s";
+                $insert_placeholders[] = '?';
+            }
+            
+            if ($tc_has_is_primary) {
+                $insert_fields[] = 'is_primary';
+                $insert_values[] = $is_primary;
+                $insert_types .= "i";
+                $insert_placeholders[] = '?';
+            }
+            
+            if ($tc_has_status) {
+                $insert_fields[] = 'status';
+                $insert_values[] = $status;
+                $insert_types .= "s";
+                $insert_placeholders[] = '?';
+            }
+            
+            $insert_sql = "INSERT INTO teacher_courses (" . implode(', ', $insert_fields) . ") 
+                          VALUES (" . implode(', ', $insert_placeholders) . ")";
+            
             $insert_stmt = $conn->prepare($insert_sql);
-            $insert_stmt->bind_param("iiiisis", $teacher_id, $course_id, $semester_id, $session_id, $section, $is_primary, $status);
+            $insert_stmt->bind_param($insert_types, ...$insert_values);
             
             if ($insert_stmt->execute()) {
                 header("Location: index.php?success=Assignment created successfully!");
@@ -220,7 +314,6 @@ include __DIR__ . '/../includes/sidebar.php';
             </div>
         <?php endif; ?>
 
-        <!-- Debug: Show session count -->
         <?php if (empty($sessions)): ?>
             <div class="alert alert-warning alert-dismissible fade show">
                 <i class="fas fa-exclamation-triangle"></i> 
@@ -244,7 +337,10 @@ include __DIR__ . '/../includes/sidebar.php';
                                 <?php foreach($teachers as $teacher): ?>
                                     <option value="<?= $teacher['teacher_id'] ?>" 
                                         <?php echo (isset($_POST['teacher_id']) && $_POST['teacher_id'] == $teacher['teacher_id']) ? 'selected' : ''; ?>>
-                                        <?= htmlspecialchars($teacher['teacher_name']) ?> (<?= htmlspecialchars($teacher['teacher_code']) ?>)
+                                        <?= htmlspecialchars($teacher['teacher_name']) ?>
+                                        <?php if (isset($teacher['teacher_code']) && !empty($teacher['teacher_code'])): ?>
+                                            (<?= htmlspecialchars($teacher['teacher_code']) ?>)
+                                        <?php endif; ?>
                                     </option>
                                 <?php endforeach; ?>
                             <?php else: ?>
@@ -326,7 +422,7 @@ include __DIR__ . '/../includes/sidebar.php';
                         <?php if(empty($sessions)): ?>
                             <small class="text-danger">
                                 <i class="fas fa-exclamation-triangle"></i> 
-                                No sessions available. Please run the SQL to add sessions.
+                                No sessions available.
                             </small>
                         <?php endif; ?>
                     </div>
@@ -350,7 +446,8 @@ include __DIR__ . '/../includes/sidebar.php';
                         </small>
                     </div>
                     
-                    <!-- Primary Instructor -->
+                    <!-- Primary Instructor - Only show if column exists -->
+                    <?php if ($tc_has_is_primary): ?>
                     <div class="col-md-6 mb-3">
                         <label class="form-label">Assignment Type</label>
                         <div class="form-check mt-2">
@@ -366,9 +463,11 @@ include __DIR__ . '/../includes/sidebar.php';
                             </small>
                         </div>
                     </div>
+                    <?php endif; ?>
                 </div>
 
-                <!-- Status -->
+                <!-- Status - Only show if column exists -->
+                <?php if ($tc_has_status): ?>
                 <div class="mb-3">
                     <label for="status" class="form-label">Status</label>
                     <select class="form-select" id="status" name="status">
@@ -379,6 +478,7 @@ include __DIR__ . '/../includes/sidebar.php';
                         <i class="fas fa-info-circle"></i> Active assignments will be visible in the system
                     </small>
                 </div>
+                <?php endif; ?>
 
                 <!-- Form Actions -->
                 <div class="d-flex gap-2 mt-4">

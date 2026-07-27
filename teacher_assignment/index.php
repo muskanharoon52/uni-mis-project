@@ -1,5 +1,5 @@
 <?php
-// teacher_assignment/index.php - Teacher Assignment Management
+// teacher_assignment/index.php - Teacher Management
 
 error_reporting(E_ALL);
 ini_set('display_errors', 1);
@@ -17,16 +17,48 @@ $role = $user['role_name'] ?? 'User';
 
 $conn = getConnection();
 
+// ============================================
+// FIX: Check what columns exist in teachers table
+// ============================================
+$check_columns = "SHOW COLUMNS FROM teachers";
+$cols_result = mysqli_query($conn, $check_columns);
+$teacher_columns = [];
+if ($cols_result) {
+    while ($col = mysqli_fetch_assoc($cols_result)) {
+        $teacher_columns[] = $col['Field'];
+    }
+}
+
+// Get the correct name column
+$name_column = 'teacher_name';
+if (in_array('full_name', $teacher_columns)) {
+    $name_column = 'full_name';
+} elseif (in_array('name', $teacher_columns)) {
+    $name_column = 'name';
+}
+
 // Get filter parameters
 $search = isset($_GET['search']) ? trim($_GET['search']) : '';
 
 // ============================================
-// GET ALL TEACHERS
+// GET ALL TEACHERS WITH DYNAMIC COLUMNS
 // ============================================
 $teachers_query = "SELECT t.*, d.department_name 
                    FROM teachers t
                    LEFT JOIN departments d ON t.department_id = d.department_id
-                   ORDER BY t.teacher_name";
+                   ORDER BY t." . $name_column;
+
+// Add search filter if provided
+if (!empty($search)) {
+    $teachers_query = "SELECT t.*, d.department_name 
+                       FROM teachers t
+                       LEFT JOIN departments d ON t.department_id = d.department_id
+                       WHERE t." . $name_column . " LIKE '%$search%' 
+                       OR t.email LIKE '%$search%' 
+                       OR t.specialization LIKE '%$search%'
+                       ORDER BY t." . $name_column;
+}
+
 $teachers_result = mysqli_query($conn, $teachers_query);
 $all_teachers = [];
 if ($teachers_result) {
@@ -135,6 +167,12 @@ include __DIR__ . '/../includes/sidebar.php';
         box-shadow: 0 2px 4px rgba(0,0,0,0.1);
     }
     
+    .btn-group-actions {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+    }
+    
     @media (max-width: 768px) {
         .teacher-content {
             margin-left: 0;
@@ -149,12 +187,15 @@ include __DIR__ . '/../includes/sidebar.php';
         <!-- Page Header -->
         <div class="d-flex justify-content-between align-items-center mb-4">
             <h4><i class="fas fa-chalkboard-teacher"></i> Teacher Management</h4>
-            <div>
+            <div class="btn-group-actions">
                 <a href="add_teacher.php" class="btn btn-success">
                     <i class="fas fa-user-plus"></i> Add Teacher
                 </a>
                 <a href="assign.php" class="btn btn-primary">
                     <i class="fas fa-plus-circle"></i> Assign Course
+                </a>
+                <a href="assignments.php" class="btn btn-info">
+                    <i class="fas fa-list"></i> View Assignments
                 </a>
             </div>
         </div>
@@ -179,7 +220,7 @@ include __DIR__ . '/../includes/sidebar.php';
             <form method="GET" class="row g-3">
                 <div class="col-md-4">
                     <input type="text" name="search" class="form-control" 
-                           placeholder="Search teachers..." 
+                           placeholder="Search teachers by name, email, specialization..." 
                            value="<?= htmlspecialchars($search) ?>">
                 </div>
                 <div class="col-md-2">
@@ -202,21 +243,27 @@ include __DIR__ . '/../includes/sidebar.php';
                             <div class="d-flex justify-content-between align-items-start">
                                 <div>
                                     <div class="teacher-name">
-                                        <?= htmlspecialchars($teacher['teacher_name'] ?? 'N/A') ?>
+                                        <?= htmlspecialchars($teacher[$name_column] ?? 'N/A') ?>
                                     </div>
+                                    <?php if (isset($teacher['teacher_code']) && !empty($teacher['teacher_code'])): ?>
                                     <div class="teacher-code">
-                                        <i class="fas fa-id-badge"></i> <?= htmlspecialchars($teacher['teacher_code'] ?? 'N/A') ?>
+                                        <i class="fas fa-id-badge"></i> <?= htmlspecialchars($teacher['teacher_code']) ?>
                                     </div>
+                                    <?php endif; ?>
                                     <div class="teacher-dept">
                                         <i class="fas fa-building"></i> <?= htmlspecialchars($teacher['department_name'] ?? 'N/A') ?>
                                     </div>
+                                    <?php if (isset($teacher['email']) && !empty($teacher['email'])): ?>
                                     <div class="teacher-info">
-                                        <i class="fas fa-envelope"></i> <?= htmlspecialchars($teacher['email'] ?? 'N/A') ?>
+                                        <i class="fas fa-envelope"></i> <?= htmlspecialchars($teacher['email']) ?>
                                     </div>
+                                    <?php endif; ?>
+                                    <?php if (isset($teacher['phone']) && !empty($teacher['phone'])): ?>
                                     <div class="teacher-info">
-                                        <i class="fas fa-phone"></i> <?= htmlspecialchars($teacher['phone'] ?? 'N/A') ?>
+                                        <i class="fas fa-phone"></i> <?= htmlspecialchars($teacher['phone']) ?>
                                     </div>
-                                    <?php if (!empty($teacher['specialization'])): ?>
+                                    <?php endif; ?>
+                                    <?php if (isset($teacher['specialization']) && !empty($teacher['specialization'])): ?>
                                         <div class="teacher-info">
                                             <i class="fas fa-graduation-cap"></i> <?= htmlspecialchars($teacher['specialization']) ?>
                                         </div>
@@ -233,9 +280,10 @@ include __DIR__ . '/../includes/sidebar.php';
                                 <a href="assign.php?teacher_id=<?= $teacher['teacher_id'] ?>" class="btn btn-primary btn-sm">
                                     <i class="fas fa-plus"></i> Assign
                                 </a>
-                                <a href="delete.php?id=<?= $teacher['teacher_id'] ?>" 
+                                <!-- FIXED: This now deletes the teacher, not an assignment -->
+                                <a href="delete_teacher.php?id=<?= $teacher['teacher_id'] ?>" 
                                    class="btn btn-danger btn-sm" 
-                                   onclick="return confirm('Are you sure you want to delete this teacher?')">
+                                   onclick="return confirm('Are you sure you want to delete this teacher? This will also remove all their assignments.')">
                                     <i class="fas fa-trash"></i> Delete
                                 </a>
                             </div>

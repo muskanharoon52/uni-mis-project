@@ -1,61 +1,101 @@
 <?php
+// teacher_assignment/delete_teacher.php - Delete Teacher
+
 require_once __DIR__ . '/../config/db_connect.php';
 require_once __DIR__ . '/../modules/sso/includes/auth.php';
 requireLogin();
 
 $conn = getConnection();
 
-// Get ID from URL - supports both 'id' and 'assignment_id'
 $id = isset($_GET['id']) ? (int)$_GET['id'] : 0;
-if ($id <= 0 && isset($_GET['assignment_id'])) {
-    $id = (int)$_GET['assignment_id'];
-}
 
 if ($id <= 0) {
-    header("Location: index.php?error=Invalid assignment ID");
+    header("Location: index.php?error=Invalid teacher ID");
     exit;
 }
 
-// Get assignment data to display confirmation
-$query = "SELECT tc.*, 
-          t.teacher_name, 
-          t.teacher_code,
-          c.course_code, 
-          c.course_name,
-          s.semester_name,
-          sess.session_name
-          FROM teacher_courses tc
-          LEFT JOIN teachers t ON tc.teacher_id = t.teacher_id
-          LEFT JOIN courses c ON tc.course_id = c.course_id
-          LEFT JOIN semesters s ON tc.semester_id = s.semester_id
-          LEFT JOIN sessions sess ON tc.session_id = sess.session_id
-          WHERE tc.id = ?";
-
+// Get teacher data
+$query = "SELECT t.*, d.department_name 
+          FROM teachers t
+          LEFT JOIN departments d ON t.department_id = d.department_id
+          WHERE t.teacher_id = ?";
 $stmt = $conn->prepare($query);
 $stmt->bind_param("i", $id);
 $stmt->execute();
 $result = $stmt->get_result();
-$assignment = $result->fetch_assoc();
+$teacher = $result->fetch_assoc();
 $stmt->close();
 
-if (!$assignment) {
-    header("Location: index.php?error=Assignment not found");
+if (!$teacher) {
+    header("Location: index.php?error=Teacher not found");
     exit;
 }
 
 // Handle deletion confirmation
 if (isset($_POST['confirm_delete']) && $_POST['confirm_delete'] === 'yes') {
-    $delete_query = "DELETE FROM teacher_courses WHERE id = ?";
-    $delete_stmt = $conn->prepare($delete_query);
-    $delete_stmt->bind_param("i", $id);
     
-    if ($delete_stmt->execute()) {
+    // Start transaction
+    mysqli_begin_transaction($conn);
+    
+    try {
+        // First, delete from question_papers
+        $check_table = "SHOW TABLES LIKE 'question_papers'";
+        $table_exists = mysqli_query($conn, $check_table);
+        if (mysqli_num_rows($table_exists) > 0) {
+            $delete_qp = "DELETE FROM question_papers WHERE teacher_id = ?";
+            $stmt = $conn->prepare($delete_qp);
+            $stmt->bind_param("i", $id);
+            $stmt->execute();
+            $stmt->close();
+        }
+        
+        // Delete from sbe_question_bank
+        $check_table = "SHOW TABLES LIKE 'sbe_question_bank'";
+        $table_exists = mysqli_query($conn, $check_table);
+        if (mysqli_num_rows($table_exists) > 0) {
+            $delete_qb = "DELETE FROM sbe_question_bank WHERE teacher_id = ?";
+            $stmt = $conn->prepare($delete_qb);
+            $stmt->bind_param("i", $id);
+            $stmt->execute();
+            $stmt->close();
+        }
+        
+        // Delete from teacher_courses
+        $delete_assignments = "DELETE FROM teacher_courses WHERE teacher_id = ?";
+        $stmt = $conn->prepare($delete_assignments);
+        $stmt->bind_param("i", $id);
+        $stmt->execute();
+        $stmt->close();
+        
+        // Delete from exam_schedules
+        $check_table = "SHOW TABLES LIKE 'exam_schedules'";
+        if (mysqli_num_rows(mysqli_query($conn, $check_table)) > 0) {
+            $check_column = "SHOW COLUMNS FROM exam_schedules LIKE 'teacher_id'";
+            if (mysqli_num_rows(mysqli_query($conn, $check_column)) > 0) {
+                $delete_exam = "DELETE FROM exam_schedules WHERE teacher_id = ?";
+                $stmt = $conn->prepare($delete_exam);
+                $stmt->bind_param("i", $id);
+                $stmt->execute();
+                $stmt->close();
+            }
+        }
+        
+        // Now delete the teacher
+        $delete_query = "DELETE FROM teachers WHERE teacher_id = ?";
+        $delete_stmt = $conn->prepare($delete_query);
+        $delete_stmt->bind_param("i", $id);
+        $delete_stmt->execute();
         $delete_stmt->close();
-        header("Location: index.php?success=Assignment deleted successfully");
+        
+        mysqli_commit($conn);
+        
+        header("Location: index.php?success=Teacher deleted successfully");
         exit;
-    } else {
-        $error = "Error deleting assignment: " . $delete_stmt->error;
-        $delete_stmt->close();
+        
+    } catch (Exception $e) {
+        mysqli_rollback($conn);
+        header("Location: index.php?error=" . urlencode($e->getMessage()));
+        exit;
     }
 }
 
@@ -69,7 +109,7 @@ if (isset($_POST['cancel'])) {
 // HEADER INCLUDE
 // ============================================
 require_once __DIR__ . '/../includes/header.php';
-$page_title = 'Delete Teacher Assignment';
+$page_title = 'Delete Teacher';
 include __DIR__ . '/../includes/sidebar.php';
 ?>
 
@@ -107,7 +147,7 @@ include __DIR__ . '/../includes/sidebar.php';
         margin-bottom: 20px;
     }
     
-    .assignment-details {
+    .teacher-details {
         background: #f8f9fa;
         padding: 15px;
         border-radius: 8px;
@@ -115,23 +155,23 @@ include __DIR__ . '/../includes/sidebar.php';
         text-align: left;
     }
     
-    .assignment-details .detail-row {
+    .teacher-details .detail-row {
         padding: 8px 0;
         border-bottom: 1px solid #e9ecef;
     }
     
-    .assignment-details .detail-row:last-child {
+    .teacher-details .detail-row:last-child {
         border-bottom: none;
     }
     
-    .assignment-details .label {
+    .teacher-details .label {
         font-weight: 600;
         color: #495057;
         display: inline-block;
         min-width: 120px;
     }
     
-    .assignment-details .value {
+    .teacher-details .value {
         color: #2c3e50;
     }
     
@@ -175,88 +215,57 @@ include __DIR__ . '/../includes/sidebar.php';
             padding: 20px;
             margin: 10px;
         }
-        
-        .assignment-details .label {
-            min-width: 100px;
-        }
-        
-        .btn-group-delete {
-            flex-direction: column;
-            align-items: center;
-        }
-        
-        .btn-group-delete .btn {
-            width: 100%;
-            max-width: 300px;
-        }
     }
 </style>
 
 <div class="delete-content">
     <div class="container-fluid">
         
-        <!-- Page Header -->
         <div class="d-flex justify-content-between align-items-center mb-4">
-            <h4><i class="fas fa-trash-alt text-danger"></i> Delete Teacher Assignment</h4>
+            <h4><i class="fas fa-trash-alt text-danger"></i> Delete Teacher</h4>
             <a href="index.php" class="btn btn-secondary">
                 <i class="fas fa-arrow-left"></i> Back to List
             </a>
         </div>
-
-        <?php if (isset($error)): ?>
-            <div class="alert alert-danger alert-dismissible fade show">
-                <i class="fas fa-exclamation-circle"></i> 
-                <?php echo htmlspecialchars($error); ?>
-                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-            </div>
-        <?php endif; ?>
 
         <div class="delete-container">
             <div class="delete-icon">
                 <i class="fas fa-exclamation-triangle"></i>
             </div>
             
-            <h4 class="delete-title">Are you sure you want to delete this assignment?</h4>
-            <p class="delete-message">This action cannot be undone. Please confirm before proceeding.</p>
+            <h4 class="delete-title">Are you sure you want to delete this teacher?</h4>
+            <p class="delete-message">This action cannot be undone. All related records will also be removed.</p>
             
-            <div class="assignment-details">
+            <div class="teacher-details">
                 <div class="detail-row">
-                    <span class="label">Teacher:</span>
-                    <span class="value">
-                        <?php echo htmlspecialchars($assignment['teacher_name'] ?? 'N/A'); ?>
-                        (<?php echo htmlspecialchars($assignment['teacher_code'] ?? 'N/A'); ?>)
-                    </span>
+                    <span class="label">Name:</span>
+                    <span class="value"><?php echo htmlspecialchars($teacher['teacher_name'] ?? $teacher['full_name'] ?? 'N/A'); ?></span>
                 </div>
                 <div class="detail-row">
-                    <span class="label">Course:</span>
-                    <span class="value">
-                        <?php echo htmlspecialchars($assignment['course_code'] ?? 'N/A'); ?>
-                        - <?php echo htmlspecialchars($assignment['course_name'] ?? 'N/A'); ?>
-                    </span>
+                    <span class="label">Department:</span>
+                    <span class="value"><?php echo htmlspecialchars($teacher['department_name'] ?? 'N/A'); ?></span>
                 </div>
+                <?php if (isset($teacher['email']) && !empty($teacher['email'])): ?>
                 <div class="detail-row">
-                    <span class="label">Semester:</span>
-                    <span class="value"><?php echo htmlspecialchars($assignment['semester_name'] ?? 'N/A'); ?></span>
+                    <span class="label">Email:</span>
+                    <span class="value"><?php echo htmlspecialchars($teacher['email']); ?></span>
                 </div>
+                <?php endif; ?>
                 <div class="detail-row">
-                    <span class="label">Session:</span>
-                    <span class="value"><?php echo htmlspecialchars($assignment['session_name'] ?? 'N/A'); ?></span>
-                </div>
-                <div class="detail-row">
-                    <span class="label">Section:</span>
-                    <span class="value"><?php echo htmlspecialchars($assignment['section'] ?? 'N/A'); ?></span>
+                    <span class="label">Status:</span>
+                    <span class="value"><?php echo htmlspecialchars($teacher['status'] ?? 'Active'); ?></span>
                 </div>
             </div>
             
             <p class="warning-text">
                 <i class="fas fa-exclamation-circle"></i> 
-                This will permanently remove this teacher-course assignment from the system.
+                This will permanently remove this teacher and all associated records.
             </p>
             
             <form method="POST" action="" class="mt-4">
                 <div class="btn-group-delete">
                     <button type="submit" name="confirm_delete" value="yes" class="btn btn-danger">
-                        <i class="fas fa-trash-alt"></i> Yes, Delete Assignment
+                        <i class="fas fa-trash-alt"></i> Yes, Delete Teacher
                     </button>
                     <button type="submit" name="cancel" class="btn btn-secondary">
                         <i class="fas fa-times"></i> Cancel

@@ -9,6 +9,42 @@ $conn = getConnection();
 $error = '';
 $success = '';
 
+// ============================================
+// FIX: Check what columns exist in teachers table
+// ============================================
+$check_columns = "SHOW COLUMNS FROM teachers";
+$cols_result = mysqli_query($conn, $check_columns);
+$teacher_columns = [];
+if ($cols_result) {
+    while ($col = mysqli_fetch_assoc($cols_result)) {
+        $teacher_columns[] = $col['Field'];
+    }
+}
+
+// Determine available columns
+$has_teacher_code = in_array('teacher_code', $teacher_columns);
+$has_teacher_name = in_array('teacher_name', $teacher_columns) || in_array('full_name', $teacher_columns) || in_array('name', $teacher_columns);
+$has_email = in_array('email', $teacher_columns);
+$has_phone = in_array('phone', $teacher_columns) || in_array('contact_no', $teacher_columns);
+$has_department_id = in_array('department_id', $teacher_columns);
+$has_specialization = in_array('specialization', $teacher_columns);
+$has_status = in_array('status', $teacher_columns);
+$has_employee_id = in_array('employee_id', $teacher_columns);
+
+// Get the correct name column
+$name_column = 'teacher_name';
+if (in_array('full_name', $teacher_columns)) {
+    $name_column = 'full_name';
+} elseif (in_array('name', $teacher_columns)) {
+    $name_column = 'name';
+}
+
+// Get the correct phone column
+$phone_column = 'phone';
+if (in_array('contact_no', $teacher_columns)) {
+    $phone_column = 'contact_no';
+}
+
 // Fetch departments for dropdown
 $dept_query = "SELECT department_id, department_name FROM departments ORDER BY department_name";
 $dept_result = $conn->query($dept_query);
@@ -25,23 +61,52 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $status = $_POST['status'] ?? 'Active';
 
     // Validation
-    if (empty($teacher_code) || empty($teacher_name)) {
-        $error = 'Teacher code and name are required.';
-    } elseif ($department_id <= 0) {
+    if (empty($teacher_code) && $has_teacher_code) {
+        $error = 'Teacher code is required.';
+    } elseif (empty($teacher_name)) {
+        $error = 'Teacher name is required.';
+    } elseif ($department_id <= 0 && $has_department_id) {
         $error = 'Please select a department.';
     } else {
-        // Check if teacher code already exists
-        $check_sql = "SELECT teacher_id FROM teachers WHERE teacher_code = ?";
-        $check_stmt = $conn->prepare($check_sql);
-        $check_stmt->bind_param("s", $teacher_code);
-        $check_stmt->execute();
-        $check_result = $check_stmt->get_result();
-        
-        if ($check_result->num_rows > 0) {
-            $error = 'Teacher code already exists. Please use a unique code.';
-        } else {
-            // Check if email already exists (if provided)
-            if (!empty($email)) {
+        // Build insert query based on existing columns
+        $insert_fields = [];
+        $insert_values = [];
+        $bind_types = "";
+        $bind_params = [];
+
+        if ($has_teacher_code && !empty($teacher_code)) {
+            // Check if teacher code already exists
+            $check_sql = "SELECT teacher_id FROM teachers WHERE teacher_code = ?";
+            $check_stmt = $conn->prepare($check_sql);
+            $check_stmt->bind_param("s", $teacher_code);
+            $check_stmt->execute();
+            $check_result = $check_stmt->get_result();
+            
+            if ($check_result->num_rows > 0) {
+                $error = 'Teacher code already exists. Please use a unique code.';
+            }
+            $check_stmt->close();
+            
+            if (empty($error)) {
+                $insert_fields[] = 'teacher_code';
+                $insert_values[] = '?';
+                $bind_params[] = $teacher_code;
+                $bind_types .= "s";
+            }
+        }
+
+        if (empty($error)) {
+            // Teacher name
+            if ($has_teacher_name) {
+                $insert_fields[] = $name_column;
+                $insert_values[] = '?';
+                $bind_params[] = $teacher_name;
+                $bind_types .= "s";
+            }
+
+            // Email
+            if ($has_email && !empty($email)) {
+                // Check if email already exists
                 $email_check_sql = "SELECT teacher_id FROM teachers WHERE email = ?";
                 $email_check_stmt = $conn->prepare($email_check_sql);
                 $email_check_stmt->bind_param("s", $email);
@@ -52,25 +117,75 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $error = 'Email already exists. Please use a unique email.';
                 }
                 $email_check_stmt->close();
-            }
-            
-            if (empty($error)) {
-                // Insert teacher
-                $insert_sql = "INSERT INTO teachers (teacher_code, teacher_name, email, phone, department_id, specialization, status) 
-                               VALUES (?, ?, ?, ?, ?, ?, ?)";
-                $insert_stmt = $conn->prepare($insert_sql);
-                $insert_stmt->bind_param("ssssiss", $teacher_code, $teacher_name, $email, $phone, $department_id, $specialization, $status);
                 
-                if ($insert_stmt->execute()) {
-                    header("Location: index.php?success=Teacher added successfully!");
-                    exit();
-                } else {
-                    $error = "Error adding teacher: " . $conn->error;
+                if (empty($error)) {
+                    $insert_fields[] = 'email';
+                    $insert_values[] = '?';
+                    $bind_params[] = $email;
+                    $bind_types .= "s";
                 }
-                $insert_stmt->close();
+            }
+
+            // Phone
+            if ($has_phone && !empty($phone)) {
+                $insert_fields[] = $phone_column;
+                $insert_values[] = '?';
+                $bind_params[] = $phone;
+                $bind_types .= "s";
+            }
+
+            // Department
+            if ($has_department_id && $department_id > 0) {
+                $insert_fields[] = 'department_id';
+                $insert_values[] = '?';
+                $bind_params[] = $department_id;
+                $bind_types .= "i";
+            }
+
+            // Specialization
+            if ($has_specialization && !empty($specialization)) {
+                $insert_fields[] = 'specialization';
+                $insert_values[] = '?';
+                $bind_params[] = $specialization;
+                $bind_types .= "s";
+            }
+
+            // Status
+            if ($has_status) {
+                $insert_fields[] = 'status';
+                $insert_values[] = '?';
+                $bind_params[] = $status;
+                $bind_types .= "s";
+            }
+
+            // Created at (if exists)
+            if (in_array('created_at', $teacher_columns)) {
+                $insert_fields[] = 'created_at';
+                $insert_values[] = 'NOW()';
+            }
+
+            if (empty($error) && !empty($insert_fields)) {
+                $insert_sql = "INSERT INTO teachers (" . implode(', ', $insert_fields) . ") 
+                               VALUES (" . implode(', ', $insert_values) . ")";
+                $insert_stmt = $conn->prepare($insert_sql);
+                
+                if ($insert_stmt === false) {
+                    $error = "Error preparing insert: " . $conn->error;
+                } else {
+                    if (!empty($bind_params)) {
+                        $insert_stmt->bind_param($bind_types, ...$bind_params);
+                    }
+                    
+                    if ($insert_stmt->execute()) {
+                        header("Location: index.php?success=Teacher added successfully!");
+                        exit();
+                    } else {
+                        $error = "Error adding teacher: " . $insert_stmt->error;
+                    }
+                    $insert_stmt->close();
+                }
             }
         }
-        $check_stmt->close();
     }
 }
 
@@ -171,6 +286,7 @@ include __DIR__ . '/../includes/sidebar.php';
             <form method="POST" action="" id="teacherForm">
                 <div class="row">
                     <!-- Teacher Code -->
+                    <?php if ($has_teacher_code): ?>
                     <div class="col-md-6 mb-3">
                         <label for="teacher_code" class="form-label">
                             Teacher Code <span class="required-star">*</span>
@@ -186,6 +302,7 @@ include __DIR__ . '/../includes/sidebar.php';
                             <i class="fas fa-info-circle"></i> Unique code for the teacher
                         </small>
                     </div>
+                    <?php endif; ?>
                     
                     <!-- Teacher Name -->
                     <div class="col-md-6 mb-3">
@@ -204,6 +321,7 @@ include __DIR__ . '/../includes/sidebar.php';
 
                 <div class="row">
                     <!-- Email -->
+                    <?php if ($has_email): ?>
                     <div class="col-md-6 mb-3">
                         <label for="email" class="form-label">Email</label>
                         <input type="email" 
@@ -216,8 +334,10 @@ include __DIR__ . '/../includes/sidebar.php';
                             <i class="fas fa-info-circle"></i> Must be unique
                         </small>
                     </div>
+                    <?php endif; ?>
                     
                     <!-- Phone -->
+                    <?php if ($has_phone): ?>
                     <div class="col-md-6 mb-3">
                         <label for="phone" class="form-label">Phone</label>
                         <input type="text" 
@@ -227,10 +347,12 @@ include __DIR__ . '/../includes/sidebar.php';
                                placeholder="e.g., 0300-1234567"
                                value="<?= htmlspecialchars($_POST['phone'] ?? '') ?>">
                     </div>
+                    <?php endif; ?>
                 </div>
 
                 <div class="row">
                     <!-- Department -->
+                    <?php if ($has_department_id): ?>
                     <div class="col-md-6 mb-3">
                         <label for="department_id" class="form-label">
                             Department <span class="required-star">*</span>
@@ -255,8 +377,10 @@ include __DIR__ . '/../includes/sidebar.php';
                             </small>
                         <?php endif; ?>
                     </div>
+                    <?php endif; ?>
                     
                     <!-- Specialization -->
+                    <?php if ($has_specialization): ?>
                     <div class="col-md-6 mb-3">
                         <label for="specialization" class="form-label">Specialization</label>
                         <input type="text" 
@@ -269,9 +393,11 @@ include __DIR__ . '/../includes/sidebar.php';
                             <i class="fas fa-info-circle"></i> Area of expertise
                         </small>
                     </div>
+                    <?php endif; ?>
                 </div>
 
                 <!-- Status -->
+                <?php if ($has_status): ?>
                 <div class="mb-3">
                     <label for="status" class="form-label">Status</label>
                     <select class="form-select" id="status" name="status">
@@ -282,6 +408,7 @@ include __DIR__ . '/../includes/sidebar.php';
                         <i class="fas fa-info-circle"></i> Active teachers can be assigned to courses
                     </small>
                 </div>
+                <?php endif; ?>
 
                 <!-- Form Actions -->
                 <div class="d-flex gap-2 mt-4">

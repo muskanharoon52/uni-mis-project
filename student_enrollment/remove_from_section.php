@@ -1,5 +1,5 @@
 <?php
-// student_enrollment/remove_from_section.php - Remove Single Student from Section
+// student_enrollment/remove_from_section.php - Remove Student from Section
 
 require_once __DIR__ . '/../config/db_connect.php';
 require_once __DIR__ . '/../modules/sso/includes/auth.php';
@@ -18,30 +18,55 @@ if (!in_array($role, ['sso', 'admin'])) {
 }
 
 $conn = getConnection();
-
-// Get parameters
-$student_id = isset($_GET['student_id']) ? mysqli_real_escape_string($conn, $_GET['student_id']) : '';
+$student_id = isset($_GET['student_id']) ? $_GET['student_id'] : '';
 $section_id = isset($_GET['section_id']) ? (int)$_GET['section_id'] : 0;
 
-if (empty($student_id) || $section_id == 0) {
-    header('Location: student_list.php?section=' . $section_id . '&error=Invalid request');
+if (empty($student_id) || $section_id <= 0) {
+    header("Location: index.php?error=Invalid parameters");
     exit;
 }
 
-// ✅ Remove student from section - set section_id to NULL
-$update_query = "UPDATE students SET section_id = NULL, section = NULL WHERE student_id = '$student_id'";
-$result = mysqli_query($conn, $update_query);
+// Start transaction
+mysqli_begin_transaction($conn);
 
-if ($result) {
-    // ✅ Update enrolled count in sections table
-    $update_count = "UPDATE sections SET enrolled_count = enrolled_count - 1 WHERE section_id = $section_id";
-    mysqli_query($conn, $update_count);
-    
-    header('Location: student_list.php?section=' . $section_id . '&success=Student removed from section successfully');
+try {
+    // Check if student is enrolled
+    $check_query = "SELECT enrollment_id FROM student_enrollments 
+                    WHERE student_id = ? AND section_id = ?";
+    $check_stmt = $conn->prepare($check_query);
+    $check_stmt->bind_param("si", $student_id, $section_id);
+    $check_stmt->execute();
+    $check_result = $check_stmt->get_result();
+
+    if ($check_result->num_rows == 0) {
+        throw new Exception("Student is not enrolled in this section");
+    }
+    $check_stmt->close();
+
+    // Delete from student_enrollments
+    $delete_query = "DELETE FROM student_enrollments 
+                     WHERE student_id = ? AND section_id = ?";
+    $delete_stmt = $conn->prepare($delete_query);
+    $delete_stmt->bind_param("si", $student_id, $section_id);
+    $delete_stmt->execute();
+    $delete_stmt->close();
+
+    // Update section enrolled count
+    $update_query = "UPDATE sections SET enrolled_count = enrolled_count - 1 
+                     WHERE section_id = ? AND enrolled_count > 0";
+    $update_stmt = $conn->prepare($update_query);
+    $update_stmt->bind_param("i", $section_id);
+    $update_stmt->execute();
+    $update_stmt->close();
+
+    mysqli_commit($conn);
+
+    header("Location: student_list.php?section=$section_id&success=Student removed from section successfully");
     exit;
-} else {
-    $error = mysqli_error($conn);
-    header('Location: student_list.php?section=' . $section_id . '&error=Failed to remove: ' . urlencode($error));
+
+} catch (Exception $e) {
+    mysqli_rollback($conn);
+    header("Location: student_list.php?section=$section_id&error=" . urlencode($e->getMessage()));
     exit;
 }
 ?>

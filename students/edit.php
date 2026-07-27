@@ -19,68 +19,24 @@ if (empty($id)) {
     exit;
 }
 
-// First, let's check the actual column names in both tables
-$students_columns = $conn->query("SHOW COLUMNS FROM students");
-$users_columns = $conn->query("SHOW COLUMNS FROM users");
+// Use the correct table name
+$table_name = 'admission_students';
 
-$student_col_names = [];
-$user_col_names = [];
-
-while ($col = $students_columns->fetch_assoc()) {
-    $student_col_names[] = $col['Field'];
+// Check what columns exist in admission_students table
+$check_columns = "SHOW COLUMNS FROM $table_name";
+$cols_result = mysqli_query($conn, $check_columns);
+$student_columns = [];
+if ($cols_result) {
+    while ($col = mysqli_fetch_assoc($cols_result)) {
+        $student_columns[] = $col['Field'];
+    }
 }
 
-while ($col = $users_columns->fetch_assoc()) {
-    $user_col_names[] = $col['Field'];
-}
-
-// Determine the correct join condition
-$join_condition = '';
-$user_id_column = '';
-
-// Check if students table has user_id
-if (in_array('user_id', $student_col_names) && in_array('user_id', $user_col_names)) {
-    $join_condition = "s.user_id = u.user_id";
-    $user_id_column = "u.user_id";
-} 
-// Check if students table has student_id and users table has student_id
-else if (in_array('student_id', $student_col_names) && in_array('student_id', $user_col_names)) {
-    $join_condition = "s.student_id = u.student_id";
-    $user_id_column = "u.user_id";
-}
-// Check if students table has id and users table has student_id
-else if (in_array('id', $student_col_names) && in_array('student_id', $user_col_names)) {
-    $join_condition = "s.id = u.student_id";
-    $user_id_column = "u.user_id";
-}
-// Check if students table has student_id and users table has user_id (no direct link)
-else if (in_array('student_id', $student_col_names) && in_array('user_id', $user_col_names)) {
-    // If there's no direct link, we need to find another way
-    // Perhaps users table has a student_id column but named differently
-    $join_condition = "s.student_id = u.user_id";
-    $user_id_column = "u.user_id";
-}
-// Default fallback - try to join on user_id if exists
-else if (in_array('user_id', $user_col_names)) {
-    // If only users table has user_id, we might need to link differently
-    // Let's just get student data without joining
-    $join_condition = "1=0"; // This will prevent the join from matching
-    $user_id_column = "NULL as user_id";
-}
-
-// Get student data with user info
-if ($join_condition && $join_condition != "1=0") {
-    $query = "SELECT s.*, $user_id_column as user_id, u.full_name, u.email, u.phone 
-              FROM students s
-              LEFT JOIN users u ON $join_condition
-              WHERE s.student_id = ?";
-} else {
-    // If no join condition found, just get student data
-    $query = "SELECT s.*, NULL as user_id, '' as full_name, '' as email, '' as phone 
-              FROM students s
-              WHERE s.student_id = ?";
-}
-
+// Get student data
+$query = "SELECT s.*, p.program_name, p.program_code 
+          FROM $table_name s
+          LEFT JOIN programs p ON s.program_id = p.program_id
+          WHERE s.student_id = ?";
 $stmt = $conn->prepare($query);
 $stmt->bind_param("s", $id);
 $stmt->execute();
@@ -103,17 +59,16 @@ $programs = $program_result ? $program_result->fetch_all(MYSQLI_ASSOC) : [];
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     // Get form data
     $full_name = trim($_POST['full_name'] ?? '');
+    $student_name = trim($_POST['student_name'] ?? '');
     $email = trim($_POST['email'] ?? '');
     $phone = trim($_POST['phone'] ?? '');
     $father_name = trim($_POST['father_name'] ?? '');
     $program_id = (int)($_POST['program_id'] ?? 0);
-    $section = trim($_POST['section'] ?? '');
-    $batch_year = (int)($_POST['batch_year'] ?? 0);
-    $semester = (int)($_POST['semester'] ?? 0);
     $status = $_POST['status'] ?? 'active';
-    $enrollment_date = $_POST['enrollment_date'] ?? date('Y-m-d');
-    $roll_no = trim($_POST['roll_no'] ?? '');
-    $session = trim($_POST['session'] ?? '');
+    $cnic = trim($_POST['cnic'] ?? '');
+    $dob = $_POST['dob'] ?? '';
+    $gender = $_POST['gender'] ?? '';
+    $address = trim($_POST['address'] ?? '');
 
     // Validation
     if (empty($full_name)) $errors[] = "Full name is required";
@@ -121,112 +76,108 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (empty($email)) $errors[] = "Email is required";
     if (!filter_var($email, FILTER_VALIDATE_EMAIL)) $errors[] = "Invalid email format";
     if ($program_id <= 0) $errors[] = "Program is required";
-    if ($batch_year <= 0) $errors[] = "Batch year is required";
 
-    // Update student and user
+    // Update student
     if (empty($errors)) {
-        // Start transaction
-        $conn->begin_transaction();
-        
         try {
-            // Check if user exists for this student
-            $user_id = $student['user_id'] ?? null;
+            // Build update query based on existing columns
+            $update_fields = [];
+            $update_params = [];
+            $types = "";
             
-            if ($user_id && in_array('user_id', $user_col_names)) {
-                // 1. Update users table
-                $update_user = "UPDATE users SET 
-                    full_name = ?, 
-                    email = ?, 
-                    phone = ? 
-                    WHERE user_id = ?";
-                
-                $stmt = $conn->prepare($update_user);
-                $stmt->bind_param("sssi", $full_name, $email, $phone, $user_id);
-                
-                if (!$stmt->execute()) {
-                    throw new Exception("Error updating user: " . $stmt->error);
-                }
-                $stmt->close();
-            } else {
-                // Try to find user by student_id if it exists in users table
-                if (in_array('student_id', $user_col_names)) {
-                    $update_user = "UPDATE users SET 
-                        full_name = ?, 
-                        email = ?, 
-                        phone = ? 
-                        WHERE student_id = ?";
-                    
-                    $stmt = $conn->prepare($update_user);
-                    $stmt->bind_param("ssss", $full_name, $email, $phone, $id);
-                    
-                    if (!$stmt->execute()) {
-                        throw new Exception("Error updating user: " . $stmt->error);
-                    }
-                    $stmt->close();
-                }
-                // If no user link exists, we might need to create a user or skip
+            if (in_array('full_name', $student_columns)) {
+                $update_fields[] = "full_name = ?";
+                $update_params[] = $full_name;
+                $types .= "s";
             }
             
-            // 2. Update students table
-            $update_student = "UPDATE students SET 
-                father_name = ?, 
-                program_id = ?, 
-                section = ?, 
-                batch_year = ?, 
-                semester = ?, 
-                status = ?, 
-                enrollment_date = ?, 
-                roll_no = ?,
-                session = ?
-                WHERE student_id = ?";
-
+            if (in_array('student_name', $student_columns)) {
+                $update_fields[] = "student_name = ?";
+                $update_params[] = !empty($student_name) ? $student_name : $full_name;
+                $types .= "s";
+            }
+            
+            if (in_array('email', $student_columns)) {
+                $update_fields[] = "email = ?";
+                $update_params[] = $email;
+                $types .= "s";
+            }
+            
+            if (in_array('contact_no', $student_columns)) {
+                $update_fields[] = "contact_no = ?";
+                $update_params[] = $phone;
+                $types .= "s";
+            }
+            
+            if (in_array('father_name', $student_columns)) {
+                $update_fields[] = "father_name = ?";
+                $update_params[] = $father_name;
+                $types .= "s";
+            }
+            
+            if (in_array('program_id', $student_columns)) {
+                $update_fields[] = "program_id = ?";
+                $update_params[] = $program_id;
+                $types .= "i";
+            }
+            
+            if (in_array('status', $student_columns)) {
+                $update_fields[] = "status = ?";
+                $update_params[] = $status;
+                $types .= "s";
+            }
+            
+            if (in_array('cnic_or_bform', $student_columns)) {
+                $update_fields[] = "cnic_or_bform = ?";
+                $update_params[] = $cnic;
+                $types .= "s";
+            }
+            
+            if (in_array('dob', $student_columns)) {
+                $update_fields[] = "dob = ?";
+                $update_params[] = $dob;
+                $types .= "s";
+            }
+            
+            if (in_array('gender', $student_columns)) {
+                $update_fields[] = "gender = ?";
+                $update_params[] = $gender;
+                $types .= "s";
+            }
+            
+            if (in_array('address', $student_columns)) {
+                $update_fields[] = "address = ?";
+                $update_params[] = $address;
+                $types .= "s";
+            }
+            
+            if (in_array('updated_at', $student_columns)) {
+                $update_fields[] = "updated_at = NOW()";
+            }
+            
+            // Add student_id to params
+            $update_params[] = $id;
+            $types .= "s";
+            
+            $update_student = "UPDATE $table_name SET " . implode(", ", $update_fields) . " WHERE student_id = ?";
+            
             $stmt = $conn->prepare($update_student);
-            $stmt->bind_param(
-                "sisiisssss",
-                $father_name,
-                $program_id,
-                $section,
-                $batch_year,
-                $semester,
-                $status,
-                $enrollment_date,
-                $roll_no,
-                $session,
-                $id
-            );
+            if ($stmt === false) {
+                throw new Exception("Error preparing update: " . $conn->error);
+            }
+            
+            $stmt->bind_param($types, ...$update_params);
             
             if (!$stmt->execute()) {
                 throw new Exception("Error updating student: " . $stmt->error);
             }
             $stmt->close();
             
-            // Commit transaction
-            $conn->commit();
-            
-            // Refresh student data
-            if ($join_condition && $join_condition != "1=0") {
-                $query = "SELECT s.*, $user_id_column as user_id, u.full_name, u.email, u.phone 
-                          FROM students s
-                          LEFT JOIN users u ON $join_condition
-                          WHERE s.student_id = ?";
-            } else {
-                $query = "SELECT s.*, NULL as user_id, '' as full_name, '' as email, '' as phone 
-                          FROM students s
-                          WHERE s.student_id = ?";
-            }
-            $stmt = $conn->prepare($query);
-            $stmt->bind_param("s", $id);
-            $stmt->execute();
-            $result = $stmt->get_result();
-            $student = $result->fetch_assoc();
-            $stmt->close();
-            
             // Redirect with success
-            header("Location: view.php?id=$id&success=updated");
+            header("Location: view.php?id=" . urlencode($id) . "&success=updated");
             exit;
             
         } catch (Exception $e) {
-            $conn->rollback();
             $errors[] = $e->getMessage();
         }
     }
@@ -240,6 +191,7 @@ include __DIR__ . '/../includes/sidebar.php';
 ?>
 
 <style>
+    .main-content { margin-left: 250px; padding: 20px; }
     .form-section {
         background: white;
         padding: 25px;
@@ -281,6 +233,7 @@ include __DIR__ . '/../includes/sidebar.php';
         color: #6c757d;
         margin-top: 4px;
     }
+    @media (max-width: 768px) { .main-content { margin-left: 0; } }
 </style>
 
 <div class="main-content">
@@ -297,12 +250,6 @@ include __DIR__ . '/../includes/sidebar.php';
                 </a>
             </div>
         </div>
-
-        <?php if (!empty($success)): ?>
-            <div class="alert alert-success">
-                <i class="fas fa-check-circle"></i> <?php echo $success; ?>
-            </div>
-        <?php endif; ?>
 
         <?php if (!empty($errors)): ?>
             <div class="alert alert-danger">
@@ -325,19 +272,25 @@ include __DIR__ . '/../includes/sidebar.php';
                     <div class="col-md-6 mb-3">
                         <label class="required-field">Full Name</label>
                         <input type="text" name="full_name" class="form-control" 
-                               value="<?php echo htmlspecialchars($student['full_name'] ?? ''); ?>" required>
+                               value="<?php echo htmlspecialchars($student['full_name'] ?? $student['student_name'] ?? ''); ?>" required>
                         <div class="field-note">Student's full name</div>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label>Student Name (Alternate)</label>
+                        <input type="text" name="student_name" class="form-control" 
+                               value="<?php echo htmlspecialchars($student['student_name'] ?? ''); ?>">
+                        <div class="field-note">Alternate name if different from full name</div>
                     </div>
                     <div class="col-md-6 mb-3">
                         <label class="required-field">Email</label>
                         <input type="email" name="email" class="form-control" 
                                value="<?php echo htmlspecialchars($student['email'] ?? ''); ?>" required>
-                        <div class="field-note">Valid email address for login</div>
+                        <div class="field-note">Valid email address</div>
                     </div>
                     <div class="col-md-6 mb-3">
                         <label>Phone</label>
                         <input type="text" name="phone" class="form-control" 
-                               value="<?php echo htmlspecialchars($student['phone'] ?? ''); ?>">
+                               value="<?php echo htmlspecialchars($student['contact_no'] ?? ''); ?>">
                         <div class="field-note">Contact number</div>
                     </div>
                     <div class="col-md-6 mb-3">
@@ -347,11 +300,29 @@ include __DIR__ . '/../includes/sidebar.php';
                         <div class="field-note">Student's father/guardian name</div>
                     </div>
                     <div class="col-md-6 mb-3">
-                        <label>Roll Number</label>
-                        <input type="text" name="roll_no" class="form-control" 
-                               value="<?php echo htmlspecialchars($student['roll_no'] ?? ''); ?>"
-                               placeholder="e.g., CS-2026-001">
-                        <div class="field-note">Format: Program-Batch-Year-Sequence</div>
+                        <label>CNIC/B-Form</label>
+                        <input type="text" name="cnic" class="form-control" 
+                               value="<?php echo htmlspecialchars($student['cnic_or_bform'] ?? ''); ?>"
+                               placeholder="XXXXX-XXXXXXX-X">
+                        <div class="field-note">CNIC or B-Form number</div>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label>Date of Birth</label>
+                        <input type="date" name="dob" class="form-control" 
+                               value="<?php echo htmlspecialchars($student['dob'] ?? ''); ?>">
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label>Gender</label>
+                        <select name="gender" class="form-select">
+                            <option value="">Select Gender</option>
+                            <option value="Male" <?php echo ($student['gender'] ?? '') == 'Male' ? 'selected' : ''; ?>>Male</option>
+                            <option value="Female" <?php echo ($student['gender'] ?? '') == 'Female' ? 'selected' : ''; ?>>Female</option>
+                            <option value="Other" <?php echo ($student['gender'] ?? '') == 'Other' ? 'selected' : ''; ?>>Other</option>
+                        </select>
+                    </div>
+                    <div class="col-md-12 mb-3">
+                        <label>Address</label>
+                        <textarea name="address" class="form-control" rows="2"><?php echo htmlspecialchars($student['address'] ?? ''); ?></textarea>
                     </div>
                     <div class="col-md-6 mb-3">
                         <label>Student ID</label>
@@ -381,42 +352,9 @@ include __DIR__ . '/../includes/sidebar.php';
                         </select>
                     </div>
                     <div class="col-md-6 mb-3">
-                        <label>Section</label>
-                        <input type="text" name="section" class="form-control" 
-                               value="<?php echo htmlspecialchars($student['section'] ?? ''); ?>" 
-                               placeholder="e.g., A, B, C">
-                    </div>
-                    <div class="col-md-6 mb-3">
-                        <label class="required-field">Semester</label>
-                        <select name="semester" class="form-select" required>
-                            <option value="">Select Semester</option>
-                            <?php for ($i = 1; $i <= 8; $i++): ?>
-                                <option value="<?php echo $i; ?>" 
-                                    <?php echo ($student['semester'] ?? '') == $i ? 'selected' : ''; ?>>
-                                    <?php 
-                                    $ordinal = ['1st', '2nd', '3rd', '4th', '5th', '6th', '7th', '8th'];
-                                    echo $ordinal[$i-1] . ' Semester'; 
-                                    ?>
-                                </option>
-                            <?php endfor; ?>
-                        </select>
-                    </div>
-                    <div class="col-md-6 mb-3">
-                        <label class="required-field">Batch Year</label>
-                        <input type="number" name="batch_year" class="form-control" 
-                               value="<?php echo htmlspecialchars($student['batch_year'] ?? date('Y')); ?>" 
-                               min="2000" max="2030" required>
-                    </div>
-                    <div class="col-md-6 mb-3">
-                        <label>Session</label>
-                        <input type="text" name="session" class="form-control" 
-                               value="<?php echo htmlspecialchars($student['session'] ?? ''); ?>" 
-                               placeholder="e.g., Fall 2024">
-                    </div>
-                    <div class="col-md-6 mb-3">
-                        <label>Enrollment Date</label>
-                        <input type="date" name="enrollment_date" class="form-control" 
-                               value="<?php echo htmlspecialchars($student['enrollment_date'] ?? date('Y-m-d')); ?>">
+                        <label>Program Code</label>
+                        <input type="text" class="form-control" 
+                               value="<?php echo htmlspecialchars($student['program_code'] ?? 'N/A'); ?>" disabled>
                     </div>
                     <div class="col-md-6 mb-3">
                         <label>Status</label>
