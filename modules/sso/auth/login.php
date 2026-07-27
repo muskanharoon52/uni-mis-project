@@ -80,36 +80,9 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 <body class="login-page">
 
 <div class="login-container">
-    <section class="login-hero">
-        <div class="login-brand">
-            <div class="brand-mark">SSO</div>
-        </div>
-        <div class="login-title">
-            <h1>University Single Sign-On</h1>
-            <p>One account for all modules — LMS, Finance, Admission, and Examination.</p>
-        </div>
-        <div class="hero-points">
-            <div class="hero-point">
-                <div class="role-pill">SEC</div>
-                <div>
-                    <strong>Secure Authentication</strong>
-                    <p class="small">Centralized login with role-based access control.</p>
-                </div>
-            </div>
-            <div class="hero-point">
-                <div class="role-pill">ACC</div>
-                <div>
-                    <strong>Unified Account</strong>
-                    <p class="small">Same credentials work across all university modules.</p>
-                </div>
-            </div>
-        </div>
-    </section>
-
     <aside class="login-panel">
-        <div style="font-size:2rem;font-weight:800;color:var(--accent);margin-bottom:18px;">&#9733;</div>
         <h3>Sign In</h3>
-        <p class="muted" style="margin-bottom:22px;">Use your University account to continue.</p>
+        <p class="muted" style="margin-bottom:20px;">Use your University account to continue.</p>
 
         <?php if ($already_logged_in): ?>
             <div class="alert alert-success" style="margin-bottom:16px;">
@@ -135,7 +108,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 <input type="text" name="username" required placeholder="Enter your username" autocomplete="username" autofocus>
             </div>
 
-            <div class="field password-field" style="margin-bottom:24px;">
+            <div class="field password-field" style="margin-bottom:20px;">
                 <label>Password</label>
                 <input type="password" name="password" id="pass-field" required placeholder="Enter password" autocomplete="current-password">
                 <button class="password-toggle" type="button" onclick="togglePass()">&#128065;</button>

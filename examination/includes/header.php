@@ -111,6 +111,12 @@ function getGradeColor($grade) {
             <a class="<?= $currentDir === 'promote' ? 'active' : '' ?>" href="<?= BASE_URL ?>examination/promote/promote.php">
                 <span class="nav-icon">&#11014;</span> Promote Students
             </a>
+
+            <div class="spacer"></div>
+
+            <a href="<?= BASE_URL ?>modules/sso/logout.php" class="sidebar-logout-btn">
+                Logout
+            </a>
         </nav>
     </aside>
 

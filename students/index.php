@@ -183,161 +183,6 @@ include __DIR__ . '/../includes/header.php';
 include __DIR__ . '/../includes/sidebar.php';
 ?>
 
-<style>
-    .main-content {
-        margin-left: 250px;
-        padding: 20px;
-        min-height: 100vh;
-        background: #f5f6fa;
-    }
-    
-    .student-avatar {
-        width: 40px;
-        height: 40px;
-        border-radius: 50%;
-        background: #3498db;
-        color: white;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-weight: 600;
-        font-size: 16px;
-    }
-    
-    .status-badge {
-        padding: 4px 12px;
-        border-radius: 20px;
-        font-size: 12px;
-        font-weight: 500;
-    }
-    
-    .status-active {
-        background: #d4edda;
-        color: #155724;
-    }
-    
-    .status-confirmed {
-        background: #cce5ff;
-        color: #004085;
-    }
-    
-    .status-pending {
-        background: #fff3cd;
-        color: #856404;
-    }
-    
-    .status-inactive {
-        background: #e2e3e5;
-        color: #383d41;
-    }
-    
-    .status-graduated {
-        background: #d4edda;
-        color: #155724;
-    }
-    
-    .filter-section {
-        background: white;
-        padding: 20px;
-        border-radius: 10px;
-        margin-bottom: 20px;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    }
-    
-    .table-actions .btn {
-        padding: 4px 8px;
-        font-size: 12px;
-        margin: 0 2px;
-    }
-    
-    .empty-state {
-        padding: 60px 0;
-        text-align: center;
-        color: #95a5a6;
-    }
-    
-    .empty-state i {
-        font-size: 64px;
-        margin-bottom: 20px;
-        opacity: 0.5;
-    }
-    
-    .roll-badge {
-        font-family: 'Courier New', monospace;
-        font-weight: 700;
-        font-size: 13px;
-        color: #2c3e50;
-        background: #f8f9fa;
-        padding: 2px 8px;
-        border-radius: 4px;
-        border: 1px solid #dee2e6;
-    }
-
-    .father-name {
-        color: #495057;
-    }
-    
-    /* Page Header Styles */
-    .page-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        margin-bottom: 20px;
-        flex-wrap: wrap;
-        gap: 10px;
-    }
-    
-    .page-header h2 {
-        margin: 0;
-    }
-    
-    .page-header .btn-group {
-        display: flex;
-        gap: 10px;
-        flex-wrap: wrap;
-    }
-    
-    .btn-add-student {
-        background: linear-gradient(135deg, #28a745, #20c997);
-        color: white;
-        border: none;
-        padding: 10px 20px;
-        border-radius: 8px;
-        font-weight: 500;
-        transition: all 0.3s ease;
-    }
-    
-    .btn-add-student:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 5px 15px rgba(40, 167, 69, 0.3);
-        color: white;
-    }
-    
-    .btn-export {
-        background: linear-gradient(135deg, #17a2b8, #0dcaf0);
-        color: white;
-        border: none;
-        padding: 10px 20px;
-        border-radius: 8px;
-        font-weight: 500;
-        transition: all 0.3s ease;
-    }
-    
-    .btn-export:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 5px 15px rgba(23, 162, 184, 0.3);
-        color: white;
-    }
-    
-    @media (max-width: 768px) {
-        .main-content {
-            margin-left: 0;
-            padding: 15px;
-        }
-    }
-</style>
-
-<div class="main-content">
     <div class="container-fluid">
         <!-- Page Header with Add Student Button -->
         <div class="page-header">
@@ -353,7 +198,7 @@ include __DIR__ . '/../includes/sidebar.php';
         </div>
 
         <!-- Filter Section -->
-        <div class="filter-section">
+        <div class="panel">
             <form method="GET" class="row g-3">
                 <div class="col-md-4">
                     <input type="text" name="search" class="form-control" 
@@ -503,6 +348,5 @@ include __DIR__ . '/../includes/sidebar.php';
             </div>
         </div>
     </div>
-</div>
 
 <?php include __DIR__ . '/../includes/footer.php'; ?>

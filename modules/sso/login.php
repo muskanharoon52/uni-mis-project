@@ -30,43 +30,9 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 <body class="login-page">
 
 <div class="login-container">
-    <section class="login-hero">
-        <div class="login-brand">
-            <div class="brand-mark">SSO</div>
-        </div>
-        <div class="login-title">
-            <h1>Single Sign-On Administration</h1>
-            <p>Manage users, roles, and authentication across all University MIS modules from one central dashboard.</p>
-        </div>
-        <div class="hero-points">
-            <div class="hero-point">
-                <div class="role-pill">USR</div>
-                <div>
-                    <strong>User Management</strong>
-                    <p class="small">Create, update, and manage user accounts and roles.</p>
-                </div>
-            </div>
-            <div class="hero-point">
-                <div class="role-pill">SEC</div>
-                <div>
-                    <strong>Centralized Auth</strong>
-                    <p class="small">Single login for all modules — LMS, Finance, Admission, Examination.</p>
-                </div>
-            </div>
-            <div class="hero-point">
-                <div class="role-pill">MSG</div>
-                <div>
-                    <strong>Broadcast Messages</strong>
-                    <p class="small">Send announcements and notifications to students and staff.</p>
-                </div>
-            </div>
-        </div>
-    </section>
-
     <aside class="login-panel">
-        <div style="font-size:2rem;font-weight:800;color:var(--accent);margin-bottom:18px;">&#9733;</div>
         <h3>Sign in to SSO</h3>
-        <p class="muted" style="margin-bottom:22px;">Use your SSO administrator account to continue.</p>
+        <p class="muted" style="margin-bottom:20px;">Use your SSO administrator account to continue.</p>
 
         <?php if ($error): ?>
             <div class="alert alert-error" style="margin-bottom:16px;"><?= htmlspecialchars($error) ?></div>
@@ -78,7 +44,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 <input type="text" name="username" required placeholder="Enter your username" autocomplete="username">
             </div>
 
-            <div class="field password-field" style="margin-bottom:24px;">
+            <div class="field password-field" style="margin-bottom:20px;">
                 <label>Password</label>
                 <input type="password" name="password" id="pass-field" required placeholder="Enter password" autocomplete="current-password">
                 <button class="password-toggle" type="button" onclick="togglePass()">&#128065;</button>

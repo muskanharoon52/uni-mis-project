@@ -145,9 +145,15 @@ $links = $role === 'teacher' ? $teacherLinks : ($role === 'student' ? $studentLi
                 <a class="<?= $active === 'applications' ? 'active' : '' ?>" href="<?= app_url('student/applications.php') ?>">
                     <span class="nav-icon">&#128203;</span> Applications
                 </a>
-            <?php endif; ?>
-        </nav>
-    </aside>
+             <?php endif; ?>
+         </nav>
+
+         <div class="sidebar-logout">
+             <a class="sidebar-logout-btn" href="/uni-mis-project/logout.php">
+                 <i class="fas fa-sign-out-alt"></i> Logout
+             </a>
+         </div>
+     </aside>
 
     <main class="content">
         <div class="topbar">

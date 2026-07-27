@@ -95,52 +95,7 @@ $page_title = 'Edit Application';
 include __DIR__ . '/../includes/sidebar.php';
 ?>
 
-<style>
-    .edit-content {
-        margin-left: 250px;
-        padding: 20px;
-        min-height: 100vh;
-        background: #f5f6fa;
-    }
-    
-    .form-container {
-        max-width: 700px;
-        margin: 0 auto;
-        background: white;
-        padding: 30px;
-        border-radius: 10px;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    }
-    
-    .form-container .form-label {
-        font-weight: 600;
-        color: #2c3e50;
-    }
-    
-    .required-star {
-        color: #e74c3c;
-        margin-left: 3px;
-    }
-    
-    .btn-submit {
-        border-radius: 20px;
-        padding: 10px 30px;
-        font-weight: 600;
-    }
-    
-    @media (max-width: 768px) {
-        .edit-content {
-            margin-left: 0;
-            padding: 15px;
-        }
-        
-        .form-container {
-            padding: 20px;
-        }
-    }
-</style>
 
-<div class="edit-content">
     <div class="container-fluid">
         
         <div class="d-flex justify-content-between align-items-center mb-4">
@@ -195,6 +150,5 @@ include __DIR__ . '/../includes/sidebar.php';
         </div>
         
     </div>
-</div>
 
 <?php include __DIR__ . '/../includes/footer.php'; ?>

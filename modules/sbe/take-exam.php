@@ -10,7 +10,7 @@ require_login(['Student']);
 
 $db = db();
 $student = current_user();
-$studentId = (int) $student['login_id'];
+$studentId = (int) $student['student_id'];
 $scheduleId = (int) ($_GET['schedule_id'] ?? $_POST['schedule_id'] ?? 0);
 
 $scheduleStmt = $db->prepare('SELECT es.*, e.exam_code, e.title, e.duration_minutes, e.total_questions, e.total_marks, e.passing_marks, e.allow_review, e.selection_mode, e.status AS exam_status FROM sbe_exam_schedule es INNER JOIN sbe_exams e ON e.exam_id = es.exam_id WHERE es.schedule_id = :id');
@@ -156,6 +156,52 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             ':remarks'           => 'Auto-graded MCQ result submitted from student exam room.',
         ]);
 
+        // Also sync result to Examination module
+        try {
+            $sbeExamStmt = $db->prepare('SELECT course_id FROM sbe_exams WHERE exam_id = ?');
+            $sbeExamStmt->execute([$schedule['exam_id']]);
+            $sbeExam = $sbeExamStmt->fetch();
+            
+            if ($sbeExam) {
+                $courseId = (int) $sbeExam['course_id'];
+                $examDate = $schedule['exam_date'];
+                
+                // Find matching examination schedule
+                $examSchedStmt = $db->prepare('SELECT es.exam_id FROM exam_schedules es WHERE es.course_id = ? AND es.date = ? LIMIT 1');
+                $examSchedStmt->execute([$courseId, $examDate]);
+                $examSched = $examSchedStmt->fetch();
+                
+                if ($examSched) {
+                    $examId = (int) $examSched['exam_id'];
+                    
+                    // Determine grade from percentage
+                    $grade = 'F';
+                    if ($percentage >= 90) $grade = 'A';
+                    elseif ($percentage >= 80) $grade = 'B';
+                    elseif ($percentage >= 70) $grade = 'C';
+                    elseif ($percentage >= 60) $grade = 'D';
+                    
+                    $examResultSql = 'INSERT INTO exam_results (student_id, exam_id, marks_obtained, total_marks, grade, percentage, status, remarks, entered_by, published_at)
+                                      VALUES (?, ?, ?, ?, ?, ?, \'published\', ?, ?, NOW())
+                                      ON DUPLICATE KEY UPDATE marks_obtained = VALUES(marks_obtained), total_marks = VALUES(total_marks), grade = VALUES(grade), percentage = VALUES(percentage), status = \'published\', remarks = VALUES(remarks), published_at = NOW()';
+                    $examResultStmt = $db->prepare($examResultSql);
+                    $examResultStmt->execute([
+                        $studentId,
+                        $examId,
+                        $obtainedMarks,
+                        $totalMarks,
+                        $grade,
+                        $percentage,
+                        'Auto-graded MCQ result from SBE exam submission.',
+                        $studentId // entered_by
+                    ]);
+                }
+            }
+        } catch (Throwable $e) {
+            // Log error but don't fail the main submission
+            error_log('Exam result sync failed: ' . $e->getMessage());
+        }
+
         $db->commit();
         $_SESSION['message'] = 'Exam submitted successfully. Your result has been sent to the teacher.';
         redirect('student-home.php');
@@ -260,15 +306,15 @@ require __DIR__ . '/includes/header.php';
         </form>
 
         <div id="submit-modal" style="display:none; position:fixed; inset:0; z-index:9999; background:rgba(0,0,0,0.5); backdrop-filter:blur(4px); align-items:center; justify-content:center;">
-            <div style="background:var(--bg-card); border-radius:16px; padding:32px; max-width:440px; width:90%; box-shadow:0 25px 50px rgba(0,0,0,0.25); text-align:center;">
+            <div style="background:var(--bg-card); border-radius:16px; padding:32px; max-width:440px; width:90%; box-shadow:0 25px 50px rgba(0,0,0,0.25); text-align:center; color:#fff;">
                 <div style="width:64px; height:64px; border-radius:50%; background:#fef2f2; display:inline-flex; align-items:center; justify-content:center; font-size:2rem; margin-bottom:16px;">&#9888;</div>
-                <h2 style="margin:0 0 8px; font-size:1.3rem;">Are you sure?</h2>
-                <p style="margin:0 0 24px; color:var(--text-muted); font-size:0.9rem; line-height:1.6;">
+                <h2 style="margin:0 0 8px; font-size:1.3rem; color:#fff;">Are you sure?</h2>
+                <p style="margin:0 0 24px; color:#fff; font-size:0.9rem; line-height:1.6;">
                     Once you submit this exam, <strong>you cannot re-enter or change your answers</strong>. Your responses will be auto-graded and sent to your teacher immediately.
                 </p>
-                <div id="submit-countdown" style="margin-bottom:20px; font-size:0.8rem; color:var(--text-muted);"></div>
+                <div id="submit-countdown" style="margin-bottom:20px; font-size:0.8rem; color:#fff;"></div>
                 <div style="display:flex; gap:12px; justify-content:center;">
-                    <button class="btn btn-ghost" onclick="closeSubmitModal()" style="min-width:120px;">Go Back</button>
+                    <button class="btn btn-ghost" onclick="closeSubmitModal()" style="min-width:120px; color:#fff; border-color:#fff;">Go Back</button>
                     <button class="btn" type="button" id="confirm-submit-btn" onclick="doSubmit()" style="min-width:120px; background:#ef4444; color:#fff;" disabled>
                         Confirm Submit
                     </button>

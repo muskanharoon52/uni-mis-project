@@ -1,14 +1,5 @@
 <?php
-session_start();
-if (!isset($_SESSION['user_id'])) {
-    header('Location: /uni-mis-project/modules/sso/login.php');
-    exit();
-}
-if ($_SESSION['role_id'] != 3 && $_SESSION['role_id'] != 1) {
-    header('Location: /uni-mis-project/modules/sso/login.php?error=Access denied');
-    exit();
-}
-
+$pageTitle = 'Payment Details';
 include_once __DIR__ . '/../includes/header.php';
 
 if (!isset($_GET['id']) || empty($_GET['id'])) {
@@ -18,19 +9,10 @@ if (!isset($_GET['id']) || empty($_GET['id'])) {
 
 $payment_id = mysqli_real_escape_string($conn, $_GET['id']);
 
-$sql = "SELECT 
-        p.payment_id,
-        p.amount_paid,
-        p.payment_method,
-        p.transaction_ref,
-        p.payment_date,
-        p.status,
-        s.full_name,
-        s.roll_no,
-        sf.total_amount,
-        sf.paid_amount,
-        sf.remaining_amount,
-        u.full_name AS received_by_name
+$sql = "SELECT p.payment_id, p.amount_paid, p.payment_method, p.transaction_ref, p.payment_date, p.status,
+               s.full_name, s.roll_no,
+               sf.total_amount, sf.paid_amount, sf.remaining_amount,
+               u.full_name AS received_by_name
         FROM payments p
         JOIN student_fee sf ON sf.student_fee_id = p.student_fee_id
         JOIN students s ON s.student_id = p.student_id
@@ -46,33 +28,35 @@ if (mysqli_num_rows($result) == 0) {
 $payment = mysqli_fetch_assoc($result);
 ?>
 
-<div class="d-flex justify-content-between align-items-center mb-3">
-    <h2><i class="fas fa-money-bill-wave text-primary"></i> Payment Details</h2>
-    <a href="index.php" class="btn btn-secondary"><i class="fas fa-arrow-left"></i> Back to List</a>
+<div style="margin-bottom:16px;">
+    <a href="index.php" class="btn btn-ghost" style="font-size:.82rem;">&#8592; Back to Payments</a>
 </div>
 
-<div class="card shadow">
-    <div class="card-body">
-        <table class="table table-bordered">
-            <tr><th style="width:30%;">Payment ID</th><td>#<?php echo $payment['payment_id']; ?></td></tr>
-            <tr><th>Student Name</th><td><strong><?php echo htmlspecialchars($payment['full_name']); ?></strong></td></tr>
-            <tr><th>Roll No</th><td><?php echo htmlspecialchars($payment['roll_no'] ?? 'N/A'); ?></td></tr>
-            <tr><th>Amount Paid</th><td><strong>PKR <?php echo number_format($payment['amount_paid'], 2); ?></strong></td></tr>
-            <tr><th>Payment Method</th><td><?php echo htmlspecialchars($payment['payment_method']); ?></td></tr>
-            <tr><th>Transaction Ref</th><td><?php echo htmlspecialchars($payment['transaction_ref'] ?? 'N/A'); ?></td></tr>
-            <tr><th>Payment Date</th><td><?php echo date('d-M-Y h:i A', strtotime($payment['payment_date'])); ?></td></tr>
-            <tr><th>Status</th><td>
-                <?php if($payment['status'] == 'Success'): ?>
-                    <span class="badge bg-success">Success</span>
-                <?php else: ?>
-                    <span class="badge bg-danger"><?php echo $payment['status']; ?></span>
-                <?php endif; ?>
-            </td></tr>
-            <tr><th>Received By</th><td><?php echo htmlspecialchars($payment['received_by_name'] ?? 'System'); ?></td></tr>
-            <tr><th>Total Fee</th><td>PKR <?php echo number_format($payment['total_amount'], 2); ?></td></tr>
-            <tr><th>Total Paid</th><td>PKR <?php echo number_format($payment['paid_amount'], 2); ?></td></tr>
-            <tr><th>Remaining</th><td><strong>PKR <?php echo number_format($payment['remaining_amount'], 2); ?></strong></td></tr>
-        </table>
+<div class="card" style="max-width:640px;">
+    <div class="card-header">
+        <h3>Payment #<?= $payment['payment_id'] ?></h3>
+    </div>
+    <div style="padding:22px;">
+        <div class="info-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:14px 24px;margin-bottom:18px;">
+            <div><span class="muted" style="font-size:.82rem;display:block;">Student</span><strong><?= htmlspecialchars($payment['full_name']) ?></strong></div>
+            <div><span class="muted" style="font-size:.82rem;display:block;">Roll No</span><?= htmlspecialchars($payment['roll_no'] ?? 'N/A') ?></div>
+            <div><span class="muted" style="font-size:.82rem;display:block;">Amount Paid</span><strong style="font-size:1.1rem;">PKR <?= number_format($payment['amount_paid'], 2) ?></strong></div>
+            <div><span class="muted" style="font-size:.82rem;display:block;">Payment Method</span><span class="badge badge-outline"><?= htmlspecialchars($payment['payment_method']) ?></span></div>
+            <div><span class="muted" style="font-size:.82rem;display:block;">Transaction Ref</span><?= htmlspecialchars($payment['transaction_ref'] ?? 'N/A') ?></div>
+            <div><span class="muted" style="font-size:.82rem;display:block;">Payment Date</span><?= date('M j, Y g:i A', strtotime($payment['payment_date'])) ?></div>
+            <div><span class="muted" style="font-size:.82rem;display:block;">Status</span>
+                <span class="badge <?= $payment['status'] === 'Success' ? 'badge-active' : 'badge-inactive' ?>"><?= $payment['status'] ?></span>
+            </div>
+            <div><span class="muted" style="font-size:.82rem;display:block;">Received By</span><?= htmlspecialchars($payment['received_by_name'] ?? 'System') ?></div>
+        </div>
+        <div style="border-top:1px solid var(--border);padding-top:16px;">
+            <div style="font-size:.82rem;font-weight:600;color:var(--muted);margin-bottom:8px;">Fee Summary</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;">
+                <div><span class="muted" style="font-size:.78rem;display:block;">Total Fee</span>PKR <?= number_format($payment['total_amount'], 2) ?></div>
+                <div><span class="muted" style="font-size:.78rem;display:block;">Total Paid</span>PKR <?= number_format($payment['paid_amount'], 2) ?></div>
+                <div><span class="muted" style="font-size:.78rem;display:block;">Remaining</span><strong style="color:<?= $payment['remaining_amount'] > 0 ? 'var(--danger)' : 'var(--success)' ?>;">PKR <?= number_format($payment['remaining_amount'], 2) ?></strong></div>
+            </div>
+        </div>
     </div>
 </div>
 

@@ -1,14 +1,5 @@
 <?php
-session_start();
-if (!isset($_SESSION['user_id'])) {
-    header('Location: /uni-mis-project/modules/sso/login.php');
-    exit();
-}
-if ($_SESSION['role_id'] != 3 && $_SESSION['role_id'] != 1) {
-    header('Location: /uni-mis-project/modules/sso/login.php?error=Access denied');
-    exit();
-}
-
+$pageTitle = 'Receipt Details';
 include_once __DIR__ . '/../includes/header.php';
 
 if (!isset($_GET['id']) || empty($_GET['id'])) {
@@ -18,27 +9,12 @@ if (!isset($_GET['id']) || empty($_GET['id'])) {
 
 $receipt_id = mysqli_real_escape_string($conn, $_GET['id']);
 
-$sql = "SELECT 
-        r.receipt_id,
-        r.receipt_no,
-        r.issued_at,
-        p.payment_id,
-        p.amount_paid,
-        p.payment_method,
-        p.transaction_ref,
-        p.payment_date,
-        s.full_name,
-        s.roll_no,
-        s.father_name,
-        s.email,
-        s.contact_no,
-        d.department_name,
-        sm.semester_name,
-        ses.session_name,
-        sf.total_amount,
-        sf.paid_amount,
-        sf.remaining_amount,
-        u.full_name AS issued_by_name
+$sql = "SELECT r.receipt_id, r.receipt_no, r.issued_at,
+               p.payment_id, p.amount_paid, p.payment_method, p.transaction_ref, p.payment_date,
+               s.full_name, s.roll_no, s.father_name, d.department_name,
+               sm.semester_name, ses.session_name,
+               sf.total_amount, sf.paid_amount, sf.remaining_amount,
+               u.full_name AS issued_by_name
         FROM receipts r
         JOIN payments p ON p.payment_id = r.payment_id
         JOIN student_fee sf ON sf.student_fee_id = p.student_fee_id
@@ -56,84 +32,68 @@ if (mysqli_num_rows($result) == 0) {
 }
 
 $receipt = mysqli_fetch_assoc($result);
+
+if ($receipt['remaining_amount'] == 0) $payBadge = 'badge-active';
+elseif ($receipt['paid_amount'] > 0) $payBadge = 'badge-pending';
+else $payBadge = 'badge-inactive';
 ?>
 
-<div class="d-flex justify-content-between align-items-center mb-3">
-    <h2><i class="fas fa-receipt text-primary"></i> Receipt Details</h2>
-    <a href="index.php" class="btn btn-secondary"><i class="fas fa-arrow-left"></i> Back to List</a>
+<div style="margin-bottom:16px;">
+    <a href="index.php" class="btn btn-ghost" style="font-size:.82rem;">&#8592; Back to Receipts</a>
 </div>
 
-<div class="card shadow receipt-border" style="border: 2px solid #198754; border-radius: 10px; padding: 20px;">
-    <div class="card-header bg-success text-white text-center">
-        <h3><i class="fas fa-university"></i> University MIS</h3>
-        <h5>Official Fee Receipt</h5>
+<div class="card" style="border:2px solid var(--success);max-width:720px;">
+    <div class="card-header" style="background:var(--success);color:white;text-align:center;padding:20px;">
+        <div style="font-size:1.1rem;font-weight:700;">University MIS</div>
+        <div style="font-size:.88rem;opacity:.9;">Official Fee Receipt</div>
     </div>
-    <div class="card-body">
-        <div class="row mb-3">
-            <div class="col-md-6">
-                <p><strong>Receipt No:</strong> <span class="badge bg-primary"><?php echo htmlspecialchars($receipt['receipt_no']); ?></span></p>
-                <p><strong>Date:</strong> <?php echo date('d-M-Y h:i A', strtotime($receipt['issued_at'])); ?></p>
-            </div>
-            <div class="col-md-6 text-end">
-                <p><strong>Payment Method:</strong> <?php echo htmlspecialchars($receipt['payment_method']); ?></p>
-                <p><strong>Transaction Ref:</strong> <?php echo htmlspecialchars($receipt['transaction_ref'] ?? 'N/A'); ?></p>
+    <div style="padding:24px;">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px 24px;margin-bottom:16px;">
+            <div><span class="muted" style="font-size:.82rem;display:block;">Receipt No</span><span class="badge badge-outline"><?= htmlspecialchars($receipt['receipt_no']) ?></span></div>
+            <div><span class="muted" style="font-size:.82rem;display:block;">Date</span><?= date('M j, Y g:i A', strtotime($receipt['issued_at'])) ?></div>
+            <div><span class="muted" style="font-size:.82rem;display:block;">Payment Method</span><?= htmlspecialchars($receipt['payment_method']) ?></div>
+            <div><span class="muted" style="font-size:.82rem;display:block;">Transaction Ref</span><?= htmlspecialchars($receipt['transaction_ref'] ?? 'N/A') ?></div>
+        </div>
+        <div style="border-top:1px solid var(--border);padding-top:16px;margin-bottom:16px;">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px 24px;">
+                <div>
+                    <div style="font-size:.82rem;font-weight:600;color:var(--muted);margin-bottom:8px;">Student Information</div>
+                    <div style="display:grid;gap:6px;">
+                        <div><span class="muted" style="font-size:.78rem;display:block;">Name</span><strong><?= htmlspecialchars($receipt['full_name']) ?></strong></div>
+                        <div><span class="muted" style="font-size:.78rem;display:block;">Father Name</span><?= htmlspecialchars($receipt['father_name'] ?? 'N/A') ?></div>
+                        <div><span class="muted" style="font-size:.78rem;display:block;">Roll No</span><?= htmlspecialchars($receipt['roll_no'] ?? 'N/A') ?></div>
+                        <div><span class="muted" style="font-size:.78rem;display:block;">Program</span><?= htmlspecialchars($receipt['department_name']) ?></div>
+                    </div>
+                </div>
+                <div>
+                    <div style="font-size:.82rem;font-weight:600;color:var(--muted);margin-bottom:8px;">Fee Details</div>
+                    <div style="display:grid;gap:6px;">
+                        <div><span class="muted" style="font-size:.78rem;display:block;">Semester</span><?= htmlspecialchars($receipt['semester_name']) ?></div>
+                        <div><span class="muted" style="font-size:.78rem;display:block;">Session</span><?= htmlspecialchars($receipt['session_name']) ?></div>
+                        <div><span class="muted" style="font-size:.78rem;display:block;">Total Fee</span>PKR <?= number_format($receipt['total_amount'], 2) ?></div>
+                        <div><span class="muted" style="font-size:.78rem;display:block;">Paid</span>PKR <?= number_format($receipt['paid_amount'], 2) ?></div>
+                    </div>
+                </div>
             </div>
         </div>
-
-        <hr>
-
-        <div class="row mb-3">
-            <div class="col-md-6">
-                <h6><i class="fas fa-user-graduate"></i> Student Information</h6>
-                <p>
-                    <strong>Name:</strong> <?php echo htmlspecialchars($receipt['full_name']); ?><br>
-                    <strong>Father Name:</strong> <?php echo htmlspecialchars($receipt['father_name'] ?? 'N/A'); ?><br>
-                    <strong>Roll No:</strong> <?php echo htmlspecialchars($receipt['roll_no'] ?? 'N/A'); ?><br>
-                    <strong>Program:</strong> <?php echo htmlspecialchars($receipt['department_name']); ?>
-                </p>
-            </div>
-            <div class="col-md-6">
-                <h6><i class="fas fa-info-circle"></i> Fee Details</h6>
-                <p>
-                    <strong>Semester:</strong> <?php echo htmlspecialchars($receipt['semester_name']); ?><br>
-                    <strong>Session:</strong> <?php echo htmlspecialchars($receipt['session_name']); ?><br>
-                    <strong>Total Fee:</strong> PKR <?php echo number_format($receipt['total_amount'], 2); ?><br>
-                    <strong>Paid Amount:</strong> PKR <?php echo number_format($receipt['paid_amount'], 2); ?>
-                </p>
+        <div style="border-top:1px solid var(--border);padding-top:16px;">
+            <div style="font-size:.82rem;font-weight:600;color:var(--muted);margin-bottom:8px;">Payment Summary</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;">
+                <div><span class="muted" style="font-size:.78rem;display:block;">Amount Paid</span><strong>PKR <?= number_format($receipt['amount_paid'], 2) ?></strong></div>
+                <div><span class="muted" style="font-size:.78rem;display:block;">Remaining</span><strong style="color:<?= $receipt['remaining_amount'] > 0 ? 'var(--danger)' : 'var(--success)' ?>;">PKR <?= number_format($receipt['remaining_amount'], 2) ?></strong></div>
+                <div><span class="muted" style="font-size:.78rem;display:block;">Status</span><span class="badge <?= $payBadge ?>">
+                    <?= $receipt['remaining_amount'] == 0 ? 'Fully Paid' : ($receipt['paid_amount'] > 0 ? 'Partially Paid' : 'Unpaid') ?>
+                </span></div>
             </div>
         </div>
-
-        <hr>
-
-        <div class="row">
-            <div class="col-md-12">
-                <h6><i class="fas fa-money-bill-wave"></i> Payment Summary</h6>
-                <table class="table table-bordered">
-                    <tr><th style="width:50%;">Amount Paid</th><td><strong>PKR <?php echo number_format($receipt['amount_paid'], 2); ?></strong></td></tr>
-                    <tr><th>Remaining Amount</th><td><strong>PKR <?php echo number_format($receipt['remaining_amount'], 2); ?></strong></td></tr>
-                    <tr><th>Payment Status</th><td>
-                        <?php 
-                        if($receipt['remaining_amount'] == 0):
-                            echo '<span class="badge bg-success">Fully Paid</span>';
-                        elseif($receipt['paid_amount'] > 0):
-                            echo '<span class="badge bg-warning">Partially Paid</span>';
-                        else:
-                            echo '<span class="badge bg-danger">Unpaid</span>';
-                        endif; ?>
-                    </td></tr>
-                </table>
-            </div>
-        </div>
-
-        <div class="text-center text-muted mt-3">
-            <small>This is a system-generated receipt. Valid without signature.</small><br>
-            <small>Generated on: <?php echo date('d-M-Y h:i A'); ?></small>
+        <div style="text-align:center;margin-top:20px;font-size:.82rem;color:var(--muted);">
+            This is a system-generated receipt. Valid without signature.
         </div>
     </div>
 </div>
 
-<div class="mt-3 text-end">
-    <button onclick="window.print()" class="btn btn-primary"><i class="fas fa-print"></i> Print</button>
+<div style="margin-top:16px;text-align:right;">
+    <button onclick="window.print()" class="btn btn-primary">Print Receipt</button>
 </div>
 
 <?php include_once __DIR__ . '/../includes/footer.php'; ?>

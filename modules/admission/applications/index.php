@@ -12,53 +12,76 @@ $apps = $pdo->query("
 
 $flash = getFlash();
 if ($flash): ?>
-    <div class="alert alert-<?= $flash['type'] ?> alert-dismissible fade show">
+    <div class="alert alert-<?= $flash['type'] ?>">
         <?= $flash['message'] ?>
-        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
     </div>
 <?php endif; ?>
 
-<div class="page-header d-flex justify-content-between align-items-center">
-    <h5><i class="fas fa-file-alt"></i> Applications (<?= count($apps) ?>)</h5>
-    <a href="add.php" class="btn btn-primary"><i class="fas fa-plus"></i> New Application</a>
+<div class="page-header">
+    <div class="page-header-left">
+        <h4><i class="fas fa-file-alt"></i> Applications (<?= count($apps) ?>)</h4>
+    </div>
+    <div class="page-header-actions">
+        <a href="add.php" class="btn btn-primary"><i class="fas fa-plus"></i> New Application</a>
+    </div>
 </div>
 
-<?php if (empty($apps)): ?>
-    <div class="alert alert-info">No applications found. <a href="add.php">Add new application</a></div>
-<?php else: ?>
-    <div class="table-responsive">
-        <table class="table table-hover datatable">
-            <thead>
-                <tr>
-                    <th>#</th>
-                    <th>Student Name</th>
-                    <th>Father Name</th>
-                    <th>Department</th>
-                    <th>Date</th>
-                    <th>Status</th>
-                    <th>Actions</th>
-                </tr>
-            </thead>
-            <tbody>
-                <?php foreach($apps as $app): ?>
-                <tr>
-                    <td><strong><?= $app['temp_application_no'] ?? 'N/A' ?></strong></td>
-                    <td><?= $app['full_name'] ?? 'N/A' ?></td>
-                    <td><?= $app['father_name'] ?? 'N/A' ?></td>
-                    <td><?= $app['department_name'] ?? 'N/A' ?></td>
-                    <td><?= isset($app['submitted_at']) ? date('d M Y', strtotime($app['submitted_at'])) : 'N/A' ?></td>
-                    <td><span class="badge bg-<?= getStatusBadge($app['application_status'] ?? 'Submitted') ?>"><?= $app['application_status'] ?? 'Submitted' ?></span></td>
-                    <td>
-                        <a href="view.php?id=<?= $app['application_id'] ?? 0 ?>" class="btn btn-sm btn-info"><i class="fas fa-eye"></i></a>
-                        <?php if(in_array($app['application_status'] ?? '', ['Submitted', 'Under Review'])): ?>
-                        <a href="review.php?id=<?= $app['application_id'] ?? 0 ?>" class="btn btn-sm btn-primary"><i class="fas fa-check"></i></a>
-                        <?php endif; ?>
-                    </td>
-                </tr>
-                <?php endforeach; ?>
-            </tbody>
-        </table>
+<div class="card">
+    <div class="card-header">
+        <div>
+            <h3>Applications Directory</h3>
+            <p>List of all student admission applications</p>
+        </div>
     </div>
-<?php endif; ?>
+    <div class="card-content">
+        <?php if (empty($apps)): ?>
+            <div class="empty-state">
+                <i class="fas fa-inbox"></i>
+                <h5>No Applications Found</h5>
+                <p>Start by adding a new student admission application.</p>
+                <a href="add.php" class="btn btn-primary"><i class="fas fa-plus"></i> New Application</a>
+            </div>
+        <?php else: ?>
+            <div class="table-responsive">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Application #</th>
+                            <th>Student Name</th>
+                            <th>Father Name</th>
+                            <th>Department</th>
+                            <th>Date Submitted</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php foreach($apps as $app): ?>
+                        <tr>
+                            <td><strong><?= htmlspecialchars($app['temp_application_no'] ?? 'N/A') ?></strong></td>
+                            <td><?= htmlspecialchars($app['full_name'] ?? 'N/A') ?></td>
+                            <td><?= htmlspecialchars($app['father_name'] ?? 'N/A') ?></td>
+                            <td><?= htmlspecialchars($app['department_name'] ?? 'N/A') ?></td>
+                            <td><?= isset($app['submitted_at']) ? date('d M Y', strtotime($app['submitted_at'])) : 'N/A' ?></td>
+                            <td>
+                                <?php $status = $app['application_status'] ?? 'Submitted'; ?>
+                                <span class="status-badge <?= htmlspecialchars($status) ?>"><?= htmlspecialchars($status) ?></span>
+                            </td>
+                            <td>
+                                <div class="actions">
+                                    <a href="view.php?id=<?= $app['application_id'] ?? 0 ?>" class="btn btn-sm btn-outline"><i class="fas fa-eye"></i> View</a>
+                                    <?php if(in_array($app['application_status'] ?? '', ['Submitted', 'Under Review'])): ?>
+                                    <a href="review.php?id=<?= $app['application_id'] ?? 0 ?>" class="btn btn-sm btn-primary"><i class="fas fa-check"></i> Review</a>
+                                    <?php endif; ?>
+                                </div>
+                            </td>
+                        </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </div>
+        <?php endif; ?>
+    </div>
+</div>
 
 <?php include __DIR__ . '/../includes/footer.php'; ?>

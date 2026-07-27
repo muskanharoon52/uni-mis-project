@@ -51,87 +51,104 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 ?>
-<div class="page-header"><h5><i class="fas fa-edit"></i> Edit Student</h5></div>
+<div class="page-header">
+    <div class="page-header-left">
+        <h4><i class="fas fa-user-edit"></i> Edit Student Profile</h4>
+    </div>
+    <div class="page-header-actions">
+        <a href="view.php?id=<?= $id ?>" class="btn btn-outline"><i class="fas fa-arrow-left"></i> Back</a>
+    </div>
+</div>
 
 <?php
 $flash = getFlash();
 if ($flash): ?>
-    <div class="alert alert-<?= $flash['type'] ?> alert-dismissible fade show">
+    <div class="alert alert-<?= $flash['type'] === 'error' ? 'error' : 'success' ?>">
         <?= $flash['message'] ?>
-        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
     </div>
 <?php endif; ?>
 
-<form method="POST" class="row g-3">
-    <div class="col-md-6">
-        <label class="form-label">Student Name *</label>
-        <input type="text" name="student_name" class="form-control" value="<?= $student['student_name'] ?? '' ?>" required>
-    </div>
-    
-    <div class="col-md-6">
-        <label class="form-label">Father Name *</label>
-        <input type="text" name="father_name" class="form-control" value="<?= $student['father_name'] ?? '' ?>" required>
-    </div>
-    
-    <div class="col-md-4">
-        <label class="form-label">CNIC/B-Form *</label>
-        <input type="text" name="cnic_or_bform" class="form-control" value="<?= $student['cnic_or_bform'] ?? '' ?>" required>
-    </div>
-    
-    <div class="col-md-4">
-        <label class="form-label">Date of Birth *</label>
-        <input type="date" name="dob" class="form-control" value="<?= $student['dob'] ?? '' ?>" required>
-    </div>
-    
-    <div class="col-md-4">
-        <label class="form-label">Gender *</label>
-        <select name="gender" class="form-select" required>
-            <option value="Male" <?= ($student['gender'] ?? '') == 'Male' ? 'selected' : '' ?>>Male</option>
-            <option value="Female" <?= ($student['gender'] ?? '') == 'Female' ? 'selected' : '' ?>>Female</option>
-            <option value="Other" <?= ($student['gender'] ?? '') == 'Other' ? 'selected' : '' ?>>Other</option>
-        </select>
-    </div>
-    
-    <div class="col-md-6">
-        <label class="form-label">Email *</label>
-        <input type="email" name="email" class="form-control" value="<?= $student['email'] ?? '' ?>" required>
-    </div>
-    
-    <div class="col-md-6">
-        <label class="form-label">Contact Number *</label>
-        <input type="text" name="contact_no" class="form-control" value="<?= $student['contact_no'] ?? '' ?>" required>
-    </div>
-    
-    <div class="col-md-12">
-        <label class="form-label">Address</label>
-        <textarea name="address" class="form-control" rows="2"><?= $student['address'] ?? '' ?></textarea>
-    </div>
-    
-    <div class="col-md-6">
-        <label class="form-label">Department *</label>
-        <select name="department_id" class="form-select" required>
-            <option value="">-- Select Department --</option>
-            <?php foreach($departments as $d): ?>
-            <option value="<?= $d['department_id'] ?>" <?= ($student['program_id'] ?? '') == $d['department_id'] ? 'selected' : '' ?>>
-                <?= $d['department_name'] ?> (<?= $d['department_code'] ?? 'N/A' ?>)
-            </option>
-            <?php endforeach; ?>
-        </select>
-    </div>
-    
-    <div class="col-md-6">
-        <label class="form-label">Status</label>
-        <select name="status" class="form-select">
-            <option value="active" <?= ($student['status'] ?? '') == 'active' ? 'selected' : '' ?>>Active</option>
-            <option value="inactive" <?= ($student['status'] ?? '') == 'inactive' ? 'selected' : '' ?>>Inactive</option>
-            <option value="graduated" <?= ($student['status'] ?? '') == 'graduated' ? 'selected' : '' ?>>Graduated</option>
-            <option value="suspended" <?= ($student['status'] ?? '') == 'suspended' ? 'selected' : '' ?>>Suspended</option>
-        </select>
-    </div>
-    
-    <div class="col-12">
-        <button type="submit" class="btn btn-primary">Update Student</button>
-        <a href="view.php?id=<?= $id ?>" class="btn btn-secondary">Cancel</a>
-    </div>
-</form>
+<div class="form-container">
+    <form method="POST">
+        <h6 style="font-size:.92rem;font-weight:700;color:var(--navy);margin-bottom:16px;padding-bottom:8px;border-bottom:1px solid var(--border);">Personal Information</h6>
+        
+        <div class="form-row">
+            <div class="form-group">
+                <label>Student Name *</label>
+                <input type="text" name="student_name" value="<?= htmlspecialchars($student['student_name'] ?? '') ?>" required>
+            </div>
+            <div class="form-group">
+                <label>Father Name *</label>
+                <input type="text" name="father_name" value="<?= htmlspecialchars($student['father_name'] ?? '') ?>" required>
+            </div>
+        </div>
+        
+        <div class="form-row">
+            <div class="form-group">
+                <label>CNIC/B-Form *</label>
+                <input type="text" name="cnic_or_bform" value="<?= htmlspecialchars($student['cnic_or_bform'] ?? '') ?>" required>
+            </div>
+            <div class="form-group">
+                <label>Date of Birth *</label>
+                <input type="date" name="dob" value="<?= htmlspecialchars($student['dob'] ?? '') ?>" required>
+            </div>
+        </div>
+        
+        <div class="form-row">
+            <div class="form-group">
+                <label>Gender *</label>
+                <select name="gender" required>
+                    <option value="Male" <?= ($student['gender'] ?? '') == 'Male' ? 'selected' : '' ?>>Male</option>
+                    <option value="Female" <?= ($student['gender'] ?? '') == 'Female' ? 'selected' : '' ?>>Female</option>
+                    <option value="Other" <?= ($student['gender'] ?? '') == 'Other' ? 'selected' : '' ?>>Other</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Email *</label>
+                <input type="email" name="email" value="<?= htmlspecialchars($student['email'] ?? '') ?>" required>
+            </div>
+        </div>
+        
+        <div class="form-row">
+            <div class="form-group">
+                <label>Contact Number *</label>
+                <input type="text" name="contact_no" value="<?= htmlspecialchars($student['contact_no'] ?? '') ?>" required>
+            </div>
+            <div class="form-group">
+                <label>Address</label>
+                <textarea name="address" rows="2"><?= htmlspecialchars($student['address'] ?? '') ?></textarea>
+            </div>
+        </div>
+        
+        <h6 style="font-size:.92rem;font-weight:700;color:var(--navy);margin-top:20px;margin-bottom:16px;padding-bottom:8px;border-bottom:1px solid var(--border);">Academic & Status Assignment</h6>
+        
+        <div class="form-row">
+            <div class="form-group">
+                <label>Department *</label>
+                <select name="department_id" required>
+                    <option value="">-- Select Department --</option>
+                    <?php foreach($departments as $d): ?>
+                    <option value="<?= $d['department_id'] ?>" <?= ($student['program_id'] ?? '') == $d['department_id'] ? 'selected' : '' ?>>
+                        <?= htmlspecialchars($d['department_name']) ?> (<?= htmlspecialchars($d['department_code'] ?? 'N/A') ?>)
+                    </option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Status</label>
+                <select name="status">
+                    <option value="active" <?= ($student['status'] ?? '') == 'active' ? 'selected' : '' ?>>Active</option>
+                    <option value="inactive" <?= ($student['status'] ?? '') == 'inactive' ? 'selected' : '' ?>>Inactive</option>
+                    <option value="graduated" <?= ($student['status'] ?? '') == 'graduated' ? 'selected' : '' ?>>Graduated</option>
+                    <option value="suspended" <?= ($student['status'] ?? '') == 'suspended' ? 'selected' : '' ?>>Suspended</option>
+                </select>
+            </div>
+        </div>
+        
+        <div class="form-actions">
+            <a href="view.php?id=<?= $id ?>" class="btn btn-outline">Cancel</a>
+            <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Update Student</button>
+        </div>
+    </form>
+</div>
 <?php include __DIR__ . '/../includes/footer.php'; ?>

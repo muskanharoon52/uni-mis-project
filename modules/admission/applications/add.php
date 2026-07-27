@@ -60,110 +60,124 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 ?>
-<div class="page-header"><h5><i class="fas fa-plus"></i> New Application</h5></div>
+<div class="page-header">
+    <div class="page-header-left">
+        <h4><i class="fas fa-plus"></i> New Application</h4>
+    </div>
+    <div class="page-header-actions">
+        <a href="index.php" class="btn btn-ghost">Back to List</a>
+    </div>
+</div>
 
 <?php
 $flash = getFlash();
 if ($flash): ?>
-    <div class="alert alert-<?= $flash['type'] ?> alert-dismissible fade show">
+    <div class="alert alert-<?= $flash['type'] ?>">
         <?= $flash['message'] ?>
-        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
     </div>
 <?php endif; ?>
 
-<form method="POST" class="row g-3">
-    <!-- Personal Information -->
-    <div class="col-12"><h6 class="text-primary">Personal Information</h6></div>
-    
-    <div class="col-md-6">
-        <label class="form-label">Full Name *</label>
-        <input type="text" name="full_name" class="form-control" required>
-    </div>
-    
-    <div class="col-md-6">
-        <label class="form-label">Father Name *</label>
-        <input type="text" name="father_name" class="form-control" required>
-    </div>
-    
-    <div class="col-md-4">
-        <label class="form-label">CNIC/B-Form *</label>
-        <input type="text" name="cnic_or_bform" class="form-control" placeholder="XXXXX-XXXXXXX-X" required>
-    </div>
-    
-    <div class="col-md-4">
-        <label class="form-label">Date of Birth *</label>
-        <input type="date" name="dob" class="form-control" required>
-    </div>
-    
-    <div class="col-md-4">
-        <label class="form-label">Gender *</label>
-        <select name="gender" class="form-select" required>
-            <option value="">Select Gender</option>
-            <option value="Male">Male</option>
-            <option value="Female">Female</option>
-            <option value="Other">Other</option>
-        </select>
-    </div>
-    
-    <div class="col-md-6">
-        <label class="form-label">Email *</label>
-        <input type="email" name="email" class="form-control" required>
-    </div>
-    
-    <div class="col-md-6">
-        <label class="form-label">Contact Number *</label>
-        <input type="text" name="contact_no" class="form-control" placeholder="03XX-XXXXXXX" required>
-    </div>
-    
-    <div class="col-md-12">
-        <label class="form-label">Address</label>
-        <textarea name="address" class="form-control" rows="2"></textarea>
-    </div>
-    
-    <!-- Academic Information -->
-    <div class="col-12"><h6 class="text-primary mt-2">Academic Information</h6></div>
-    
-    <div class="col-md-4">
-        <label class="form-label">Department/Program *</label>
-        <select name="department_id" class="form-select" required>
-            <option value="">-- Select Department --</option>
-            <?php foreach($departments as $d): ?>
-            <option value="<?= $d['department_id'] ?>">
-                <?= $d['department_name'] ?> (<?= $d['department_code'] ?? 'N/A' ?>)
-            </option>
-            <?php endforeach; ?>
-        </select>
-    </div>
-    
-    <div class="col-md-4">
-        <label class="form-label">Session *</label>
-        <select name="session_id" class="form-select" required>
-            <option value="">-- Select Session --</option>
-            <?php foreach($sessions as $s): ?>
-            <option value="<?= $s['session_id'] ?>">
-                <?= $s['session_name'] ?? $s['session_id'] ?>
-            </option>
-            <?php endforeach; ?>
-        </select>
-    </div>
-    
-    <div class="col-md-4">
-        <label class="form-label">Semester *</label>
-        <select name="semester_id" class="form-select" required>
-            <option value="">-- Select Semester --</option>
-            <?php foreach($semesters as $sem): ?>
-            <option value="<?= $sem['semester_id'] ?>">
-                <?= $sem['semester_name'] ?? $sem['semester_id'] ?>
-            </option>
-            <?php endforeach; ?>
-        </select>
-    </div>
-    
-    <div class="col-12">
-        <button type="submit" class="btn btn-primary">
-            <i class="fas fa-paper-plane"></i> Submit Application
-        </button>
-        <a href="index.php" class="btn btn-secondary">Cancel</a>
-    </div>
-</form>
+<div class="form-container">
+    <form method="POST">
+        <h6 style="font-size:.92rem;font-weight:700;color:var(--navy);margin-bottom:16px;padding-bottom:8px;border-bottom:1px solid var(--border);">Personal Information</h6>
+
+        <div class="form-row">
+            <div class="form-group">
+                <label>Full Name *</label>
+                <input type="text" name="full_name" required placeholder="Enter full student name">
+            </div>
+            <div class="form-group">
+                <label>Father Name *</label>
+                <input type="text" name="father_name" required placeholder="Enter father's name">
+            </div>
+        </div>
+
+        <div class="form-row">
+            <div class="form-group">
+                <label>CNIC/B-Form *</label>
+                <input type="text" name="cnic_or_bform" placeholder="XXXXX-XXXXXXX-X" required>
+            </div>
+            <div class="form-group">
+                <label>Date of Birth *</label>
+                <input type="date" name="dob" required>
+            </div>
+        </div>
+
+        <div class="form-row">
+            <div class="form-group">
+                <label>Gender *</label>
+                <select name="gender" required>
+                    <option value="">Select Gender</option>
+                    <option value="Male">Male</option>
+                    <option value="Female">Female</option>
+                    <option value="Other">Other</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Email *</label>
+                <input type="email" name="email" required placeholder="student@example.com">
+            </div>
+        </div>
+
+        <div class="form-row">
+            <div class="form-group">
+                <label>Contact Number *</label>
+                <input type="text" name="contact_no" placeholder="03XX-XXXXXXX" required>
+            </div>
+            <div class="form-group">
+                <label>Address</label>
+                <input type="text" name="address" placeholder="Residential address">
+            </div>
+        </div>
+
+        <h6 style="font-size:.92rem;font-weight:700;color:var(--navy);margin-top:20px;margin-bottom:16px;padding-bottom:8px;border-bottom:1px solid var(--border);">Academic Program Selection</h6>
+
+        <div class="form-row">
+            <div class="form-group">
+                <label>Department/Program *</label>
+                <select name="department_id" required>
+                    <option value="">-- Select Department --</option>
+                    <?php foreach($departments as $d): ?>
+                    <option value="<?= $d['department_id'] ?>">
+                        <?= htmlspecialchars($d['department_name']) ?> (<?= htmlspecialchars($d['department_code'] ?? 'N/A') ?>)
+                    </option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Session *</label>
+                <select name="session_id" required>
+                    <option value="">-- Select Session --</option>
+                    <?php foreach($sessions as $s): ?>
+                    <option value="<?= $s['session_id'] ?>">
+                        <?= htmlspecialchars($s['session_name'] ?? $s['session_id']) ?>
+                    </option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+        </div>
+
+        <div class="form-row">
+            <div class="form-group">
+                <label>Semester *</label>
+                <select name="semester_id" required>
+                    <option value="">-- Select Semester --</option>
+                    <?php foreach($semesters as $sem): ?>
+                    <option value="<?= $sem['semester_id'] ?>">
+                        <?= htmlspecialchars($sem['semester_name'] ?? $sem['semester_id']) ?>
+                    </option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+            <div class="form-group"></div>
+        </div>
+
+        <div class="form-actions">
+            <a href="index.php" class="btn btn-outline">Cancel</a>
+            <button type="submit" class="btn btn-primary">
+                <i class="fas fa-paper-plane"></i> Submit Application
+            </button>
+        </div>
+    </form>
+</div>
 <?php include __DIR__ . '/../includes/footer.php'; ?>

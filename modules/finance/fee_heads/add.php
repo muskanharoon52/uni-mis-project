@@ -1,21 +1,6 @@
 <?php
-session_start();
-
-if (!isset($_SESSION['user_id'])) {
-    header('Location: /uni-mis-project/modules/sso/login.php');
-    exit();
-}
-
-if ($_SESSION['role_id'] != 3 && $_SESSION['role_id'] != 1) {
-    header('Location: /uni-mis-project/modules/sso/login.php?error=Access denied');
-    exit();
-}
-
-// Include database connection - FIXED: Added slash
-include_once __DIR__ . '/../../../config/db_connect.php';
-
-// Include header - FIXED: Use include_once
-include_once __DIR__ . '/../includes/header.php';
+$pageTitle = 'Add Fee Head';
+include __DIR__ . '/../includes/header.php';
 
 $error = '';
 $success = '';
@@ -25,20 +10,16 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $description = mysqli_real_escape_string($conn, $_POST['description']);
     $status = mysqli_real_escape_string($conn, $_POST['status']);
     if (empty($fee_head_name)) {
-        $error = "Fee Head Name is required!";
+        $error = "Fee Head Name is required.";
     } else {
-        $check_sql = "SELECT * FROM fee_heads WHERE fee_head_name = '$fee_head_name' AND deleted_at IS NULL";
-        $check_result = mysqli_query($conn, $check_sql);
-        
-        if (mysqli_num_rows($check_result) > 0) {
-            $error = "Fee head '$fee_head_name' already exists!";
+        $check = mysqli_query($conn, "SELECT * FROM fee_heads WHERE fee_head_name = '$fee_head_name' AND deleted_at IS NULL");
+        if (mysqli_num_rows($check) > 0) {
+            $error = "Fee head '$fee_head_name' already exists.";
         } else {
-            $sql = "INSERT INTO fee_heads (fee_head_name, description, status) 
-                    VALUES ('$fee_head_name', '$description', '$status')";
-            
+            $sql = "INSERT INTO fee_heads (fee_head_name, description, status) VALUES ('$fee_head_name', '$description', '$status')";
             if (mysqli_query($conn, $sql)) {
-                $success = "Fee head added successfully!";
-                header("refresh:2;url=index.php");
+                $success = "Fee head added successfully.";
+                header("refresh:1;url=index.php");
             } else {
                 $error = "Error: " . mysqli_error($conn);
             }
@@ -47,59 +28,41 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 }
 ?>
 
-<div class="container-fluid">
-    <div class="d-flex justify-content-between align-items-center mb-3">
-        <h2><i class="fas fa-plus-circle text-success"></i> Add New Fee Head</h2>
-        <a href="index.php" class="btn btn-secondary"><i class="fas fa-arrow-left"></i> Back to List</a>
+<div style="margin-bottom:16px;">
+    <a href="index.php" class="btn btn-ghost" style="font-size:.82rem;">&#8592; Back to Fee Heads</a>
+</div>
+
+<?php if ($error): ?><div class="alert alert-error"><?= htmlspecialchars($error) ?></div><?php endif; ?>
+<?php if ($success): ?><div class="alert alert-success"><?= htmlspecialchars($success) ?></div><?php endif; ?>
+
+<div class="card" style="max-width:560px;">
+    <div class="card-header">
+        <h3>Add New Fee Head</h3>
     </div>
-
-    <?php if(!empty($error)): ?>
-        <div class="alert alert-danger alert-dismissible fade show" role="alert">
-            <i class="fas fa-exclamation-circle"></i> <?php echo htmlspecialchars($error); ?>
-            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    <form method="post">
+        <div style="padding:22px;">
+            <div class="field">
+                <label>Fee Head Name <span style="color:var(--danger);">*</span></label>
+                <input type="text" name="fee_head_name" required placeholder="e.g. Tuition Fee, Library Fee">
+                <p class="muted" style="margin-top:4px;">Enter a unique name for this fee head.</p>
+            </div>
+            <div class="field">
+                <label>Description</label>
+                <textarea name="description" rows="3" placeholder="Optional description..."></textarea>
+            </div>
+            <div class="field">
+                <label>Status</label>
+                <select name="status">
+                    <option value="Active">Active</option>
+                    <option value="Inactive">Inactive</option>
+                </select>
+            </div>
+            <div class="actions" style="margin-top:20px;">
+                <button class="btn btn-primary" type="submit">Save Fee Head</button>
+                <a href="index.php" class="btn btn-ghost">Cancel</a>
+            </div>
         </div>
-    <?php endif; ?>
-
-    <?php if(!empty($success)): ?>
-        <div class="alert alert-success alert-dismissible fade show" role="alert">
-            <i class="fas fa-check-circle"></i> <?php echo htmlspecialchars($success); ?>
-            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-        </div>
-    <?php endif; ?>
-
-    <div class="card shadow">
-        <div class="card-header bg-success text-white">
-            <i class="fas fa-plus"></i> Fee Head Details
-        </div>
-        <div class="card-body">
-            <form method="POST" action="">
-                <div class="mb-3">
-                    <label for="fee_head_name" class="form-label">Fee Head Name <span class="text-danger">*</span></label>
-                    <input type="text" class="form-control" id="fee_head_name" name="fee_head_name" 
-                           placeholder="e.g. Tuition Fee, Admission Fee, Library Fee" required>
-                    <small class="text-muted">Enter a unique name for this fee head.</small>
-                </div>
-
-                <div class="mb-3">
-                    <label for="description" class="form-label">Description</label>
-                    <textarea class="form-control" id="description" name="description" rows="3" 
-                              placeholder="Optional: Describe this fee head"></textarea>
-                </div>
-
-                <div class="mb-3">
-                    <label for="status" class="form-label">Status</label>
-                    <select class="form-select" id="status" name="status">
-                        <option value="Active">Active</option>
-                        <option value="Inactive">Inactive</option>
-                    </select>
-                    <small class="text-muted">Inactive fee heads won't appear in dropdown lists.</small>
-                </div>
-
-                <button type="submit" class="btn btn-success"><i class="fas fa-save"></i> Save Fee Head</button>
-                <a href="index.php" class="btn btn-secondary"><i class="fas fa-times"></i> Cancel</a>
-            </form>
-        </div>
-    </div>
+    </form>
 </div>
 
 <?php include_once __DIR__ . '/../includes/footer.php'; ?>

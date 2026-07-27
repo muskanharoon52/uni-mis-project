@@ -91,59 +91,7 @@ $page_title = 'Delete Application';
 include __DIR__ . '/../includes/sidebar.php';
 ?>
 
-<style>
-    .delete-content {
-        margin-left: 250px;
-        padding: 20px;
-        min-height: 100vh;
-        background: #f5f6fa;
-    }
-    
-    .delete-container {
-        max-width: 500px;
-        margin: 0 auto;
-        background: white;
-        padding: 30px;
-        border-radius: 10px;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        text-align: center;
-    }
-    
-    .delete-icon {
-        font-size: 64px;
-        color: #e74c3c;
-        margin-bottom: 20px;
-    }
-    
-    .info-box {
-        background: #f8f9fa;
-        padding: 15px;
-        border-radius: 8px;
-        margin: 20px 0;
-        text-align: left;
-    }
-    
-    .status-badge {
-        padding: 2px 10px;
-        border-radius: 12px;
-        font-size: 12px;
-        font-weight: 500;
-    }
-    
-    .status-badge.Pending {
-        background: #fff3cd;
-        color: #856404;
-    }
-    
-    @media (max-width: 768px) {
-        .delete-content {
-            margin-left: 0;
-            padding: 15px;
-        }
-    }
-</style>
 
-<div class="delete-content">
     <div class="container-fluid">
         
         <div class="d-flex justify-content-between align-items-center mb-4">
@@ -183,8 +131,6 @@ include __DIR__ . '/../includes/sidebar.php';
                 </div>
             </form>
         </div>
-        
     </div>
-</div>
 
 <?php include __DIR__ . '/../includes/footer.php'; ?>

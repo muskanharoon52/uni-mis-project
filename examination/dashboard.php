@@ -161,296 +161,252 @@ $conn->close();
 
 <div class="content-area" id="contentArea">
         <!-- Welcome Section -->
-        <div class="d-flex justify-content-between align-items-center mb-4">
+        <div style="background:linear-gradient(135deg,var(--navy) 0%,#1e3a5f 50%,#2563EB 100%);border-radius:var(--radius-lg);padding:28px 32px;margin-bottom:24px;color:#fff;display:flex;align-items:center;justify-content:space-between;">
             <div>
-                <h2><?php echo $greeting; ?>! 👋</h2>
-                <p class="text-muted">Welcome to the Examination Management Dashboard</p>
+                <div style="font-size:1.4rem;font-weight:700;margin-bottom:4px;"><?php echo $greeting; ?> &#128075;</div>
+                <div style="font-size:.88rem;color:rgba(255,255,255,0.7);">Welcome to the Examination Management Dashboard</div>
             </div>
-            <div class="d-flex gap-2">
-                <a href="schedule/add.php" class="btn btn-primary">
-                    <i class="bi bi-plus-circle"></i> Add Schedule
-                </a>
-                <a href="results/add.php" class="btn btn-success">
-                    <i class="bi bi-plus-circle"></i> Add Result
-                </a>
-                <a href="promote/promote.php" class="btn btn-warning">
-                    <i class="bi bi-arrow-up-circle"></i> Promote
-                </a>
+            <div style="text-align:right;">
+                <div style="font-size:.78rem;color:rgba(255,255,255,0.6);"><?php echo date('l'); ?></div>
+                <div style="font-size:1.1rem;font-weight:600;"><?php echo date('d M Y'); ?></div>
             </div>
         </div>
 
         <!-- Statistics Cards -->
-        <div class="row mb-4">
-            <div class="col-md-3">
-                <div class="stat-card stat-card-primary">
-                    <div class="stat-icon"><i class="bi bi-people"></i></div>
-                    <p class="stat-label">Total Students</p>
-                    <p class="stat-number"><?php echo $stats['students']; ?></p>
-                </div>
+        <div class="stat-row" style="margin-bottom:24px;">
+            <div class="stat-card-v2">
+                <div class="stat-card-icon" style="background:var(--primary-bg);color:var(--primary);"><i class="bi bi-people"></i></div>
+                <div class="stat-card-value"><?php echo $stats['students']; ?></div>
+                <div class="stat-card-label">Total Students</div>
             </div>
-            <div class="col-md-3">
-                <div class="stat-card stat-card-success">
-                    <div class="stat-icon"><i class="bi bi-person-badge"></i></div>
-                    <p class="stat-label">Faculty Members</p>
-                    <p class="stat-number"><?php echo $stats['faculty']; ?></p>
-                </div>
+            <div class="stat-card-v2">
+                <div class="stat-card-icon" style="background:var(--success-bg);color:var(--success);"><i class="bi bi-person-badge"></i></div>
+                <div class="stat-card-value"><?php echo $stats['faculty']; ?></div>
+                <div class="stat-card-label">Faculty Members</div>
             </div>
-            <div class="col-md-3">
-                <div class="stat-card stat-card-warning">
-                    <div class="stat-icon"><i class="bi bi-book"></i></div>
-                    <p class="stat-label">Courses</p>
-                    <p class="stat-number"><?php echo $stats['courses']; ?></p>
-                </div>
+            <div class="stat-card-v2">
+                <div class="stat-card-icon" style="background:var(--warning-bg);color:var(--warning);"><i class="bi bi-book"></i></div>
+                <div class="stat-card-value"><?php echo $stats['courses']; ?></div>
+                <div class="stat-card-label">Courses</div>
             </div>
-            <div class="col-md-3">
-                <div class="stat-card stat-card-info">
-                    <div class="stat-icon"><i class="bi bi-calendar-event"></i></div>
-                    <p class="stat-label">Upcoming Exams</p>
-                    <p class="stat-number"><?php echo $stats['upcoming_exams']; ?></p>
-                </div>
+            <div class="stat-card-v2">
+                <div class="stat-card-icon" style="background:var(--accent-light);color:var(--accent);"><i class="bi bi-calendar-event"></i></div>
+                <div class="stat-card-value"><?php echo $stats['upcoming_exams']; ?></div>
+                <div class="stat-card-label">Upcoming Exams</div>
             </div>
         </div>
 
         <!-- Second Row of Stats -->
-        <div class="row mb-4">
-            <div class="col-md-4">
-                <div class="card">
-                    <div class="card-body">
-                        <h6 class="card-subtitle mb-2 text-muted">Results Published</h6>
-                        <h3 class="card-title"><?php echo $stats['results_published']; ?></h3>
-                        <div class="progress">
-                            <?php 
-                            $total = $stats['results_published'] + $stats['pending_results'];
-                            $percentage = $total > 0 ? ($stats['results_published'] / $total) * 100 : 0;
-                            ?>
-                            <div class="progress-bar bg-success" style="width: <?php echo $percentage; ?>%"></div>
-                        </div>
-                        <small class="text-muted"><?php echo $stats['pending_results']; ?> pending</small>
+        <div class="grid-3" style="margin-bottom:24px;">
+            <div class="card">
+                <div class="card-content">
+                    <p class="muted" style="margin-bottom:8px;">Results Published</p>
+                    <h3 style="margin-bottom:8px;"><?php echo $stats['results_published']; ?></h3>
+                    <?php 
+                    $total = $stats['results_published'] + $stats['pending_results'];
+                    $percentage = $total > 0 ? ($stats['results_published'] / $total) * 100 : 0;
+                    ?>
+                    <div style="height:6px;background:var(--border);border-radius:4px;overflow:hidden;margin-bottom:8px;">
+                        <div style="height:100%;width:<?= $percentage ?>%;background:var(--success);border-radius:4px;"></div>
+                    </div>
+                    <span class="muted" style="font-size:12px;"><?php echo $stats['pending_results']; ?> pending</span>
+                </div>
+            </div>
+            <div class="card">
+                <div class="card-content">
+                    <p class="muted" style="margin-bottom:8px;">Programs Offered</p>
+                    <h3 style="margin-bottom:8px;"><?php echo $stats['programs']; ?></h3>
+                    <div style="display:flex;flex-wrap:wrap;gap:4px;">
+                        <?php foreach($program_codes as $code): ?>
+                            <span style="display:inline-block;padding:2px 8px;border-radius:4px;font-size:12px;font-weight:600;background:var(--accent-light);color:var(--accent);margin:2px;"><?php echo $code; ?></span>
+                        <?php endforeach; ?>
+                        <?php if($stats['programs'] > 4): ?>
+                            <span style="display:inline-block;padding:2px 8px;border-radius:4px;font-size:12px;font-weight:600;background:var(--border);color:var(--text-secondary);margin:2px;">+<?php echo $stats['programs'] - 4; ?> more</span>
+                        <?php endif; ?>
                     </div>
                 </div>
             </div>
-            <div class="col-md-4">
-                <div class="card">
-                    <div class="card-body">
-                        <h6 class="card-subtitle mb-2 text-muted">Programs Offered</h6>
-                        <h3 class="card-title"><?php echo $stats['programs']; ?></h3>
-                        <div class="d-flex gap-2 flex-wrap">
-                            <?php foreach($program_codes as $code): ?>
-                                <span class="badge bg-primary"><?php echo $code; ?></span>
-                            <?php endforeach; ?>
-                            <?php if($stats['programs'] > 4): ?>
-                                <span class="badge bg-secondary">+<?php echo $stats['programs'] - 4; ?> more</span>
-                            <?php endif; ?>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div class="col-md-4">
-                <div class="card">
-                    <div class="card-body">
-                        <h6 class="card-subtitle mb-2 text-muted">Exam Type Distribution</h6>
-                        <div class="d-flex flex-wrap gap-2">
-                            <?php if ($exam_types && $exam_types->num_rows > 0): ?>
-                                <?php while($type = $exam_types->fetch_assoc()): ?>
-                                    <span class="badge badge-exam-<?php echo $type['exam_type']; ?>">
-                                        <?php echo ucfirst($type['exam_type']); ?>: <?php echo $type['count']; ?>
-                                    </span>
-                                <?php endwhile; ?>
-                            <?php else: ?>
-                                <span class="text-muted">No exams scheduled</span>
-                            <?php endif; ?>
-                        </div>
+            <div class="card">
+                <div class="card-content">
+                    <p class="muted" style="margin-bottom:8px;">Exam Type Distribution</p>
+                    <div style="display:flex;flex-wrap:wrap;gap:4px;">
+                        <?php if ($exam_types && $exam_types->num_rows > 0): ?>
+                            <?php while($type = $exam_types->fetch_assoc()): ?>
+                                <span style="display:inline-block;padding:2px 8px;border-radius:4px;font-size:12px;font-weight:600;background:var(--success-bg);color:var(--success);border:1px solid var(--success-border);">
+                                    <?php echo ucfirst($type['exam_type']); ?>: <?php echo $type['count']; ?>
+                                </span>
+                            <?php endwhile; ?>
+                        <?php else: ?>
+                            <span class="muted">No exams scheduled</span>
+                        <?php endif; ?>
                     </div>
                 </div>
             </div>
         </div>
 
         <!-- Recent Activity -->
-        <div class="row">
+        <div class="grid-2" style="margin-bottom:24px;">
             <!-- Upcoming Exams -->
-            <div class="col-md-6">
-                <div class="card">
-                    <div class="card-header d-flex justify-content-between align-items-center">
-                        <h5><i class="bi bi-calendar-event"></i> Upcoming Exams</h5>
-                        <a href="schedule/index.php" class="btn btn-sm btn-outline-primary">View All</a>
-                    </div>
-                    <div class="card-body">
-                        <?php if ($recent_schedules && $recent_schedules->num_rows > 0): ?>
-                            <div class="timeline">
-                                <?php while($schedule = $recent_schedules->fetch_assoc()): ?>
-                                    <div class="timeline-item">
-                                        <div class="time">
-                                            <?php echo date('M d, Y', strtotime($schedule['date'])); ?>
-                                            <span class="badge badge-exam-<?php echo $schedule['exam_type']; ?> ms-2">
-                                                <?php echo ucfirst($schedule['exam_type']); ?>
-                                            </span>
-                                        </div>
-                                        <div class="title">
-                                            <?php echo $schedule['course_code']; ?> - <?php echo $schedule['course_name']; ?>
-                                        </div>
-                                        <div class="description">
-                                            <i class="bi bi-clock"></i> 
-                                            <?php echo date('h:i A', strtotime($schedule['start_time'])); ?> - 
-                                            <?php echo date('h:i A', strtotime($schedule['end_time'])); ?>
-                                            <br>
-                                            <i class="bi bi-geo-alt"></i> <?php echo $schedule['room']; ?>
-                                            <br>
-                                            <small class="text-muted"><?php echo $schedule['program_name']; ?></small>
-                                        </div>
-                                    </div>
-                                <?php endwhile; ?>
+            <div class="card">
+                <div class="card-header">
+                    <h5 style="margin:0;"><i class="bi bi-calendar-event"></i> Upcoming Exams</h5>
+                    <a href="schedule/index.php" class="btn btn-outline" style="padding:4px 12px;font-size:12px;">View All</a>
+                </div>
+                <div class="card-content">
+                    <?php if ($recent_schedules && $recent_schedules->num_rows > 0): ?>
+                        <?php $schedule_count = 0; ?>
+                        <?php while($schedule = $recent_schedules->fetch_assoc()): ?>
+                            <?php $schedule_count++; ?>
+                            <div style="padding:12px 0;<?php if($schedule_count < $recent_schedules->num_rows) echo 'border-bottom:1px solid var(--border);'; ?>">
+                                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+                                    <span class="muted" style="font-size:12px;">
+                                        <?php echo date('M d, Y', strtotime($schedule['date'])); ?>
+                                        <span style="display:inline-block;padding:2px 8px;border-radius:4px;font-size:12px;font-weight:600;background:var(--success-bg);color:var(--success);border:1px solid var(--success-border);margin-left:8px;">
+                                            <?php echo ucfirst($schedule['exam_type']); ?>
+                                        </span>
+                                    </span>
+                                </div>
+                                <div style="font-weight:600;margin-bottom:4px;">
+                                    <?php echo $schedule['course_code']; ?> - <?php echo $schedule['course_name']; ?>
+                                </div>
+                                <div style="font-size:13px;color:var(--text-secondary);">
+                                    <i class="bi bi-clock"></i> 
+                                    <?php echo date('h:i A', strtotime($schedule['start_time'])); ?> - 
+                                    <?php echo date('h:i A', strtotime($schedule['end_time'])); ?>
+                                    <i class="bi bi-geo-alt" style="margin-left:8px;"></i> <?php echo $schedule['room']; ?>
+                                </div>
+                                <div class="muted" style="font-size:12px;margin-top:4px;"><?php echo $schedule['program_name']; ?></div>
                             </div>
-                        <?php else: ?>
-                            <div class="text-center py-4">
-                                <i class="bi bi-calendar-check" style="font-size: 3rem; color: #dee2e6;"></i>
-                                <p class="mt-3 text-muted">No upcoming exams scheduled</p>
-                            </div>
-                        <?php endif; ?>
-                    </div>
+                        <?php endwhile; ?>
+                    <?php else: ?>
+                        <div class="empty-state">
+                            <div class="empty-state-icon"><i class="bi bi-calendar-check"></i></div>
+                            <p class="empty-state-text">No upcoming exams scheduled</p>
+                        </div>
+                    <?php endif; ?>
                 </div>
             </div>
 
             <!-- Recent Results -->
-            <div class="col-md-6">
-                <div class="card">
-                    <div class="card-header d-flex justify-content-between align-items-center">
-                        <h5><i class="bi bi-bar-chart"></i> Recent Results</h5>
-                        <a href="results/index.php" class="btn btn-sm btn-outline-primary">View All</a>
-                    </div>
-                    <div class="card-body">
-                        <?php if ($recent_results && $recent_results->num_rows > 0): ?>
-                            <div class="list-group">
-                                <?php while($result = $recent_results->fetch_assoc()): ?>
-                                    <div class="list-group-item">
-                                        <div class="d-flex justify-content-between align-items-center">
-                                            <div>
-                                                <h6 class="mb-1"><?php echo $result['student_name']; ?></h6>
-                                                <small class="text-muted">
-                                                    <?php echo $result['course_code']; ?> - <?php echo ucfirst($result['exam_type']); ?>
-                                                </small>
-                                            </div>
-                                            <div class="text-end">
-                                                <span class="badge badge-grade-<?php echo strtolower($result['grade']); ?>">
-                                                    <?php echo $result['grade']; ?>
-                                                </span>
-                                                <br>
-                                                <small>
-                                                    <?php echo $result['marks_obtained']; ?>/<?php echo $result['total_marks']; ?>
-                                                </small>
-                                            </div>
+            <div class="card">
+                <div class="card-header">
+                    <h5 style="margin:0;"><i class="bi bi-bar-chart"></i> Recent Results</h5>
+                    <a href="results/index.php" class="btn btn-outline" style="padding:4px 12px;font-size:12px;">View All</a>
+                </div>
+                <div class="card-content">
+                    <?php if ($recent_results && $recent_results->num_rows > 0): ?>
+                        <?php $result_count = 0; ?>
+                        <?php while($result = $recent_results->fetch_assoc()): ?>
+                            <?php $result_count++; ?>
+                            <div style="padding:12px 0;<?php if($result_count < $recent_results->num_rows) echo 'border-bottom:1px solid var(--border);'; ?>">
+                                <div style="display:flex;justify-content:space-between;align-items:center;">
+                                    <div>
+                                        <div style="font-weight:600;margin-bottom:2px;"><?php echo $result['student_name']; ?></div>
+                                        <span class="muted" style="font-size:12px;">
+                                            <?php echo $result['course_code']; ?> - <?php echo ucfirst($result['exam_type']); ?>
+                                        </span>
+                                    </div>
+                                    <div style="text-align:right;">
+                                        <span style="display:inline-block;padding:2px 8px;border-radius:4px;font-size:12px;font-weight:600;background:var(--success-bg);color:var(--success);border:1px solid var(--success-border);">
+                                            <?php echo $result['grade']; ?>
+                                        </span>
+                                        <div style="font-size:12px;color:var(--text-secondary);margin-top:4px;">
+                                            <?php echo $result['marks_obtained']; ?>/<?php echo $result['total_marks']; ?>
                                         </div>
                                     </div>
-                                <?php endwhile; ?>
+                                </div>
                             </div>
-                        <?php else: ?>
-                            <div class="text-center py-4">
-                                <i class="bi bi-file-bar-graph" style="font-size: 3rem; color: #dee2e6;"></i>
-                                <p class="mt-3 text-muted">No results recorded yet</p>
-                            </div>
-                        <?php endif; ?>
-                    </div>
+                        <?php endwhile; ?>
+                    <?php else: ?>
+                        <div class="empty-state">
+                            <div class="empty-state-icon"><i class="bi bi-file-bar-graph"></i></div>
+                            <p class="empty-state-text">No results recorded yet</p>
+                        </div>
+                    <?php endif; ?>
                 </div>
             </div>
         </div>
 
         <!-- Top Students -->
         <?php if ($top_students && $top_students->num_rows > 0): ?>
-        <div class="row mt-4">
-            <div class="col-12">
-                <div class="card">
-                    <div class="card-header">
-                        <h5><i class="bi bi-trophy"></i> Top Performing Students</h5>
-                    </div>
-                    <div class="card-body">
-                        <div class="table-responsive">
-                            <table class="table table-hover">
-                                <thead>
-                                    <tr>
-                                        <th>Rank</th>
-                                        <th>Student Name</th>
-                                        <th>Student ID</th>
-                                        <th>Average Percentage</th>
-                                        <th>Exams Taken</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <?php $rank = 1; ?>
-                                    <?php while($student = $top_students->fetch_assoc()): ?>
-                                        <tr>
-                                            <td>
-                                                <?php if($rank == 1): ?>
-                                                    <span class="badge bg-warning text-dark">🏆 #1</span>
-                                                <?php elseif($rank == 2): ?>
-                                                    <span class="badge bg-secondary">#2</span>
-                                                <?php elseif($rank == 3): ?>
-                                                    <span class="badge" style="background: #cd7f32; color: white;">#3</span>
-                                                <?php else: ?>
-                                                    <span class="badge bg-light text-dark">#<?php echo $rank; ?></span>
-                                                <?php endif; ?>
-                                            </td>
-                                            <td><?php echo $student['full_name']; ?></td>
-                                            <td><?php echo $student['student_id']; ?></td>
-                                            <td>
-                                                <div class="d-flex align-items-center">
-                                                    <div class="progress flex-grow-1 me-2" style="height: 8px;">
-                                                        <div class="progress-bar <?php 
-                                                            echo $student['avg_percentage'] >= 80 ? 'bg-success' : 
-                                                                ($student['avg_percentage'] >= 60 ? 'bg-warning' : 'bg-danger');
-                                                        ?>" 
-                                                        style="width: <?php echo $student['avg_percentage']; ?>%">
-                                                        </div>
-                                                    </div>
-                                                    <span><?php echo number_format($student['avg_percentage'], 1); ?>%</span>
-                                                </div>
-                                            </td>
-                                            <td><?php echo $student['exams_taken']; ?></td>
-                                        </tr>
-                                        <?php $rank++; ?>
-                                    <?php endwhile; ?>
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
+        <div class="card" style="margin-bottom:24px;">
+            <div class="card-header">
+                <h5 style="margin:0;"><i class="bi bi-trophy"></i> Top Performing Students</h5>
+            </div>
+            <div class="card-content">
+                <div class="table-responsive">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Rank</th>
+                                <th>Student Name</th>
+                                <th>Student ID</th>
+                                <th>Average Percentage</th>
+                                <th>Exams Taken</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php $rank = 1; ?>
+                            <?php while($student = $top_students->fetch_assoc()): ?>
+                                <tr>
+                                    <td>
+                                        <?php if($rank == 1): ?>
+                                            <span style="display:inline-block;padding:2px 8px;border-radius:4px;font-size:12px;font-weight:600;background:var(--warning-bg);color:var(--warning);">&#127942; #1</span>
+                                        <?php elseif($rank == 2): ?>
+                                            <span style="display:inline-block;padding:2px 8px;border-radius:4px;font-size:12px;font-weight:600;background:var(--border);color:var(--text-secondary);">#2</span>
+                                        <?php elseif($rank == 3): ?>
+                                            <span style="display:inline-block;padding:2px 8px;border-radius:4px;font-size:12px;font-weight:600;background:#cd7f32;color:#fff;">#3</span>
+                                        <?php else: ?>
+                                            <span style="display:inline-block;padding:2px 8px;border-radius:4px;font-size:12px;font-weight:600;background:var(--bg-secondary);color:var(--text-primary);">#<?php echo $rank; ?></span>
+                                        <?php endif; ?>
+                                    </td>
+                                    <td><?php echo $student['full_name']; ?></td>
+                                    <td><?php echo $student['student_id']; ?></td>
+                                    <td>
+                                        <div style="display:flex;align-items:center;gap:8px;">
+                                            <div style="flex:1;height:6px;background:var(--border);border-radius:4px;overflow:hidden;">
+                                                <div style="height:100%;width:<?php echo $student['avg_percentage']; ?>%;background:<?php 
+                                                    echo $student['avg_percentage'] >= 80 ? 'var(--success)' : 
+                                                        ($student['avg_percentage'] >= 60 ? 'var(--warning)' : 'var(--error)');
+                                                ?>;border-radius:4px;"></div>
+                                            </div>
+                                            <span style="white-space:nowrap;"><?php echo number_format($student['avg_percentage'], 1); ?>%</span>
+                                        </div>
+                                    </td>
+                                    <td><?php echo $student['exams_taken']; ?></td>
+                                </tr>
+                                <?php $rank++; ?>
+                            <?php endwhile; ?>
+                        </tbody>
+                    </table>
                 </div>
             </div>
         </div>
         <?php endif; ?>
 
         <!-- Quick Actions -->
-        <div class="row mt-4">
-            <div class="col-12">
-                <div class="card">
-                    <div class="card-header">
-                        <h5><i class="bi bi-lightning"></i> Quick Actions</h5>
-                    </div>
-                    <div class="card-body">
-                        <div class="row g-3">
-                            <div class="col-md-3">
-                                <a href="schedule/add.php" class="btn btn-primary w-100 py-3">
-                                    <i class="bi bi-calendar-plus" style="font-size: 1.5rem;"></i><br>
-                                    Schedule Exam
-                                </a>
-                            </div>
-                            <div class="col-md-3">
-                                <a href="results/add.php" class="btn btn-success w-100 py-3">
-                                    <i class="bi bi-pencil-square" style="font-size: 1.5rem;"></i><br>
-                                    Enter Results
-                                </a>
-                            </div>
-                            <div class="col-md-3">
-                                <a href="results/publish.php" class="btn btn-info w-100 py-3 text-white">
-                                    <i class="bi bi-cloud-upload" style="font-size: 1.5rem;"></i><br>
-                                    Publish Results
-                                </a>
-                            </div>
-                            <div class="col-md-3">
-                                <a href="promote/promote.php" class="btn btn-warning w-100 py-3">
-                                    <i class="bi bi-arrow-up-circle" style="font-size: 1.5rem;"></i><br>
-                                    Promote Students
-                                </a>
-                            </div>
-                        </div>
-                    </div>
+        <div class="card" style="margin-bottom:24px;">
+            <div class="card-header">
+                <h5 style="margin:0;"><i class="bi bi-lightning"></i> Quick Actions</h5>
+            </div>
+            <div class="card-content">
+                <div class="grid-4">
+                    <a href="schedule/add.php" class="btn btn-primary" style="display:flex;flex-direction:column;align-items:center;gap:8px;padding:20px;">
+                        <i class="bi bi-calendar-plus" style="font-size:1.5rem;"></i>
+                        Schedule Exam
+                    </a>
+                    <a href="results/add.php" class="btn btn-primary" style="display:flex;flex-direction:column;align-items:center;gap:8px;padding:20px;background:var(--success);border-color:var(--success);">
+                        <i class="bi bi-pencil-square" style="font-size:1.5rem;"></i>
+                        Enter Results
+                    </a>
+                    <a href="results/publish.php" class="btn btn-primary" style="display:flex;flex-direction:column;align-items:center;gap:8px;padding:20px;background:var(--accent);border-color:var(--accent);">
+                        <i class="bi bi-cloud-upload" style="font-size:1.5rem;"></i>
+                        Publish Results
+                    </a>
+                    <a href="promote/promote.php" class="btn btn-primary" style="display:flex;flex-direction:column;align-items:center;gap:8px;padding:20px;background:var(--warning);border-color:var(--warning);">
+                        <i class="bi bi-arrow-up-circle" style="font-size:1.5rem;"></i>
+                        Promote Students
+                    </a>
                 </div>
             </div>
         </div>

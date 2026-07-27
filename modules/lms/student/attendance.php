@@ -29,7 +29,7 @@ if ($courseId > 0 && student_enrolled_in_course((int) $user['id'], $courseId)) {
          WHERE a.student_id = ? AND a.course_id = ?
          ORDER BY a.class_date DESC'
     );
-    $attendanceStmt->execute([$user['id'], $courseId]);
+    $attendanceStmt->execute([$user['student_id'], $courseId]);
     $attendanceRows = $attendanceStmt->fetchAll();
 }
 

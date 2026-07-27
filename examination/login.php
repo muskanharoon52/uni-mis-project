@@ -40,43 +40,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <body class="login-page">
 
 <div class="login-container">
-    <section class="login-hero">
-        <div class="login-brand">
-            <div class="brand-mark">EXM</div>
-        </div>
-        <div class="login-title">
-            <h1>Examination Management</h1>
-            <p>Schedule exams, enter results, publish grades, and manage student promotion — all from one place.</p>
-        </div>
-        <div class="hero-points">
-            <div class="hero-point">
-                <div class="role-pill">SCH</div>
-                <div>
-                    <strong>Exam Scheduling</strong>
-                    <p class="small">Create and manage exam timetables and venues.</p>
-                </div>
-            </div>
-            <div class="hero-point">
-                <div class="role-pill">RES</div>
-                <div>
-                    <strong>Results & Grades</strong>
-                    <p class="small">Enter marks, calculate grades, and publish results.</p>
-                </div>
-            </div>
-            <div class="hero-point">
-                <div class="role-pill">PRM</div>
-                <div>
-                    <strong>Student Promotion</strong>
-                    <p class="small">Evaluate and promote students to the next semester.</p>
-                </div>
-            </div>
-        </div>
-    </section>
-
     <aside class="login-panel">
-        <div style="font-size:2rem;font-weight:800;color:var(--accent);margin-bottom:18px;">&#9733;</div>
         <h3>Sign in to Examination</h3>
-        <p class="muted" style="margin-bottom:22px;">Use your University account to access exam management.</p>
+        <p class="muted" style="margin-bottom:20px;">Use your University account to access exam management.</p>
 
         <?php if ($error): ?>
             <div class="alert alert-error" style="margin-bottom:16px;"><?= htmlspecialchars($error) ?></div>
@@ -88,7 +54,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 <input type="text" name="username" required placeholder="Enter your username" autocomplete="username">
             </div>
 
-            <div class="field password-field" style="margin-bottom:24px;">
+            <div class="field password-field" style="margin-bottom:20px;">
                 <label>Password</label>
                 <input type="password" name="password" id="pass-field" required placeholder="Enter password" autocomplete="current-password">
                 <button class="password-toggle" type="button" onclick="togglePass()">&#128065;</button>

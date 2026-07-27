@@ -1,107 +1,59 @@
 <?php
-session_start();
-
-if (!isset($_SESSION['user_id'])) {
-    header('Location: /uni-mis-project/modules/sso/login.php');
-    exit();
-}
-
-if ($_SESSION['role_id'] != 3 && $_SESSION['role_id'] != 1) {
-    header('Location: /uni-mis-project/modules/sso/login.php?error=Access denied');
-    exit();
-}
-
-// Include database connection
-include_once __DIR__ . '/../../../config/db_connect.php';
-
-// Include header - using relative path from fee_heads to finance includes
-include_once __DIR__ . '/../includes/header.php';
+$pageTitle = 'Fee Heads';
+include __DIR__ . '/../includes/header.php';
 
 $sql = "SELECT * FROM fee_heads WHERE deleted_at IS NULL ORDER BY fee_head_id DESC";
 $result = mysqli_query($conn, $sql);
 ?>
 
-<div class="container-fluid">
-    <div class="d-flex justify-content-between align-items-center mb-3">
-        <h2><i class="fas fa-money-bill-wave text-primary"></i> Fee Heads</h2>
-        <a href="add.php" class="btn btn-success"><i class="fas fa-plus"></i> Add New Fee Head</a>
+<?php if (isset($_GET['msg'])): ?>
+    <div class="alert alert-success"><?= htmlspecialchars($_GET['msg']) ?></div>
+<?php endif; ?>
+<?php if (isset($_GET['error'])): ?>
+    <div class="alert alert-error"><?= htmlspecialchars($_GET['error']) ?></div>
+<?php endif; ?>
+
+<div class="card">
+    <div class="card-header">
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+            <h3>Fee Heads</h3>
+            <a href="add.php" class="btn btn-primary">+ Add Fee Head</a>
+        </div>
     </div>
-
-    <?php if(isset($_GET['msg'])): ?>
-        <div class="alert alert-success alert-dismissible fade show" role="alert">
-            <?php echo htmlspecialchars($_GET['msg']); ?>
-            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-        </div>
-    <?php endif; ?>
-
-    <?php if(isset($_GET['error'])): ?>
-        <div class="alert alert-danger alert-dismissible fade show" role="alert">
-            <?php echo htmlspecialchars($_GET['error']); ?>
-            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-        </div>
-    <?php endif; ?>
-
-    <div class="card shadow">
-        <div class="card-header bg-primary text-white">
-            <i class="fas fa-list"></i> Fee Heads List
-        </div>
-        <div class="card-body">
-            <div class="table-responsive">
-                <table class="table table-striped table-hover">
-                    <thead class="table-dark">
+    <div class="table-responsive">
+        <table>
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Name</th>
+                    <th>Description</th>
+                    <th>Status</th>
+                    <th>Created</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                <?php $count = 1; if (mysqli_num_rows($result) > 0): ?>
+                    <?php while ($row = mysqli_fetch_assoc($result)): ?>
                         <tr>
-                            <th>#</th>
-                            <th>Fee Head Name</th>
-                            <th>Description</th>
-                            <th>Status</th>
-                            <th>Created At</th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <?php 
-                        $count = 1;
-                        if(mysqli_num_rows($result) > 0): 
-                            while($row = mysqli_fetch_assoc($result)): 
-                        ?>
-                        <tr>
-                            <td><?php echo $count++; ?></td>
-                            <td><strong><?php echo htmlspecialchars($row['fee_head_name']); ?></strong></td>
-                            <td><?php echo htmlspecialchars($row['description'] ?? 'N/A'); ?></td>
+                            <td><?= $count++ ?></td>
+                            <td style="font-weight:600;"><?= htmlspecialchars($row['fee_head_name']) ?></td>
+                            <td class="muted"><?= htmlspecialchars($row['description'] ?? 'N/A') ?></td>
+                            <td><span class="badge <?= $row['status'] === 'Active' ? 'badge-active' : 'badge-outline' ?>"><?= $row['status'] ?></span></td>
+                            <td class="muted"><?= date('M j, Y', strtotime($row['created_at'])) ?></td>
                             <td>
-                                <?php if($row['status'] == 'Active'): ?>
-                                    <span class="badge bg-success">Active</span>
-                                <?php else: ?>
-                                    <span class="badge bg-secondary">Inactive</span>
-                                <?php endif; ?>
-                            </td>
-                            <td><?php echo date('d-M-Y', strtotime($row['created_at'])); ?></td>
-                            <td>
-                                <a href="edit.php?id=<?php echo $row['fee_head_id']; ?>" class="btn btn-sm btn-warning">
-                                    <i class="fas fa-edit"></i> Edit
-                                </a>
-                                <a href="delete.php?id=<?php echo $row['fee_head_id']; ?>" 
-                                   class="btn btn-sm btn-danger" 
-                                   onclick="return confirm('Are you sure you want to delete this fee head?')">
-                                    <i class="fas fa-trash"></i> Delete
-                                </a>
+                                <div class="actions">
+                                    <a href="edit.php?id=<?= $row['fee_head_id'] ?>" class="btn btn-sm btn-outline">Edit</a>
+                                    <a href="delete.php?id=<?= $row['fee_head_id'] ?>" class="btn btn-sm btn-danger" onclick="return confirm('Delete this fee head?')">Delete</a>
+                                </div>
                             </td>
                         </tr>
-                        <?php 
-                            endwhile; 
-                        else: 
-                        ?>
-                        <tr>
-                            <td colspan="6" class="text-center text-muted">
-                                <i class="fas fa-info-circle"></i> No fee heads found. 
-                                <a href="add.php" class="text-primary">Add one now!</a>
-                            </td>
-                        </tr>
-                        <?php endif; ?>
-                    </tbody>
-                </table>
-            </div>
-        </div>
+                    <?php endwhile; ?>
+                <?php else: ?>
+                    <tr><td colspan="6" class="muted text-center" style="padding:24px;">No fee heads found. <a href="add.php" style="color:var(--accent);font-weight:600;">Add one now.</a></td></tr>
+                <?php endif; ?>
+            </tbody>
+        </table>
     </div>
 </div>
 

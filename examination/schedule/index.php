@@ -5,43 +5,44 @@ require_once '../models/ExamSchedule.php';
 include '../includes/header.php';
 include '../includes/sidebar.php';
 
-// Initialize the model
 $model = new ExamSchedule();
 $schedules = $model->getAll();
 ?>
 
 <div class="content-area" id="contentArea">
-        <div class="d-flex justify-content-between align-items-center mb-4">
-            <h2> Exam Schedules</h2>
+    <div class="page-header">
+        <div class="page-header-left">
+            <h4>Exam Schedules</h4>
+        </div>
+        <div class="page-header-actions">
             <a href="add.php" class="btn btn-primary">
                 <i class="bi bi-plus-circle"></i> Add New Schedule
             </a>
         </div>
+    </div>
 
-        <?php if (isset($_SESSION['success'])): ?>
-            <div class="alert alert-success alert-dismissible fade show">
-                <?php 
-                echo $_SESSION['success'];
-                unset($_SESSION['success']);
-                ?>
-                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-            </div>
-        <?php endif; ?>
+    <?php if (isset($_SESSION['success'])): ?>
+        <div class="alert alert-success">
+            <?php echo $_SESSION['success']; unset($_SESSION['success']); ?>
+        </div>
+    <?php endif; ?>
 
-        <?php if (isset($_SESSION['error'])): ?>
-            <div class="alert alert-danger alert-dismissible fade show">
-                <?php 
-                echo $_SESSION['error'];
-                unset($_SESSION['error']);
-                ?>
-                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-            </div>
-        <?php endif; ?>
+    <?php if (isset($_SESSION['error'])): ?>
+        <div class="alert alert-error">
+            <?php echo $_SESSION['error']; unset($_SESSION['error']); ?>
+        </div>
+    <?php endif; ?>
 
-        <div class="card">
-            <div class="card-body">
+    <div class="card">
+        <div class="card-content">
+            <?php if (empty($schedules)): ?>
+                <div class="empty-state">
+                    <div class="empty-state-icon">&#128197;</div>
+                    <p class="empty-state-text">No exam schedules found</p>
+                </div>
+            <?php else: ?>
                 <div class="table-responsive">
-                    <table class="table table-striped table-hover datatable" id="scheduleTable">
+                    <table class="data-table datatable" id="scheduleTable">
                         <thead>
                             <tr>
                                 <th>Course</th>
@@ -53,53 +54,54 @@ $schedules = $model->getAll();
                             </tr>
                         </thead>
                         <tbody>
-                            <?php if (empty($schedules)): ?>
+                            <?php foreach ($schedules as $schedule): ?>
                                 <tr>
-                                    <td colspan="6" class="text-center">No exam schedules found</td>
+                                    <td>
+                                        <strong><?php echo htmlspecialchars($schedule['course_code']); ?></strong><br>
+                                        <span class="muted"><?php echo htmlspecialchars($schedule['course_name']); ?></span>
+                                    </td>
+                                    <td>
+                                        <?php
+                                        $typeColors = [
+                                            'mid' => 'background:var(--warning-bg);color:var(--warning);border:1px solid var(--warning-border);',
+                                            'final' => 'background:var(--danger-bg);color:var(--danger);border:1px solid var(--danger-border);',
+                                            'quiz' => 'background:var(--info-bg);color:var(--accent);border:1px solid var(--info-border);',
+                                            'lab' => 'background:#F3E8FF;color:#7c3aed;border:1px solid #DDD6FE;',
+                                        ];
+                                        $typeStyle = $typeColors[$schedule['exam_type']] ?? 'background:var(--border);color:var(--text);';
+                                        ?>
+                                        <span class="status-badge" style="<?php echo $typeStyle; ?>">
+                                            <?php echo strtoupper(htmlspecialchars($schedule['exam_type'])); ?>
+                                        </span>
+                                    </td>
+                                    <td><?php echo date('M d, Y', strtotime($schedule['date'])); ?></td>
+                                    <td>
+                                        <?php echo date('h:i A', strtotime($schedule['start_time'])); ?> &ndash;
+                                        <?php echo date('h:i A', strtotime($schedule['end_time'])); ?>
+                                    </td>
+                                    <td><?php echo htmlspecialchars($schedule['room']); ?></td>
+                                    <td>
+                                        <div style="display:flex;gap:4px;">
+                                            <a href="view.php?id=<?php echo $schedule['exam_id']; ?>" class="btn btn-outline" style="padding:4px 10px;font-size:12px;" title="View">
+                                                <i class="bi bi-eye"></i>
+                                            </a>
+                                            <a href="edit.php?id=<?php echo $schedule['exam_id']; ?>" class="btn btn-outline" style="padding:4px 10px;font-size:12px;" title="Edit">
+                                                <i class="bi bi-pencil"></i>
+                                            </a>
+                                            <a href="delete.php?id=<?php echo $schedule['exam_id']; ?>" class="btn btn-danger" style="padding:4px 10px;font-size:12px;" title="Delete"
+                                               onclick="return confirm('Are you sure you want to delete this exam schedule?')">
+                                                <i class="bi bi-trash"></i>
+                                            </a>
+                                        </div>
+                                    </td>
                                 </tr>
-                            <?php else: ?>
-                                <?php foreach ($schedules as $schedule): ?>
-                                    <tr>
-                                        <td>
-                                            <strong><?php echo htmlspecialchars($schedule['course_code']); ?></strong><br>
-                                            <small><?php echo htmlspecialchars($schedule['course_name']); ?></small>
-                                        </td>
-                                        <td>
-                                            <span class="badge badge-exam-<?php echo $schedule['exam_type']; ?>">
-                                                <?php echo strtoupper(htmlspecialchars($schedule['exam_type'])); ?>
-                                            </span>
-                                        </td>
-                                        <td><?php echo date('M d, Y', strtotime($schedule['date'])); ?></td>
-                                        <td>
-                                            <?php echo date('h:i A', strtotime($schedule['start_time'])); ?> - 
-                                            <?php echo date('h:i A', strtotime($schedule['end_time'])); ?>
-                                        </td>
-                                        <td><?php echo htmlspecialchars($schedule['room']); ?></td>
-                                        <td>
-                                            <div class="btn-group" role="group">
-                                                <a href="view.php?id=<?php echo $schedule['exam_id']; ?>" 
-                                                   class="btn btn-sm btn-info" title="View">
-                                                    <i class="bi bi-eye"></i>
-                                                </a>
-                                                <a href="edit.php?id=<?php echo $schedule['exam_id']; ?>" 
-                                                   class="btn btn-sm btn-warning" title="Edit">
-                                                    <i class="bi bi-pencil"></i>
-                                                </a>
-                                                <a href="delete.php?id=<?php echo $schedule['exam_id']; ?>" 
-                                                   class="btn btn-sm btn-danger" title="Delete"
-                                                   onclick="return confirm('Are you sure you want to delete this exam schedule?')">
-                                                    <i class="bi bi-trash"></i>
-                                                </a>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                <?php endforeach; ?>
-                            <?php endif; ?>
+                            <?php endforeach; ?>
                         </tbody>
                     </table>
                 </div>
-            </div>
+            <?php endif; ?>
         </div>
     </div>
+</div>
 
 <?php include '../includes/footer.php'; ?>

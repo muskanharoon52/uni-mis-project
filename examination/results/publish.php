@@ -38,36 +38,38 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['publish'])) {
 ?>
 
 <div class="content-area" id="contentArea">
-    <h2>Publish Results</h2>
+    <div class="page-header">
+        <div class="page-header-left">
+            <h4>Publish Results</h4>
+        </div>
+    </div>
     
     <?php if (isset($_SESSION['success'])): ?>
-        <div class="alert alert-success alert-dismissible fade show">
+        <div class="alert alert-success">
             <?php 
             echo $_SESSION['success'];
             unset($_SESSION['success']);
             ?>
-            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
         </div>
     <?php endif; ?>
     
     <?php if (isset($_SESSION['error'])): ?>
-        <div class="alert alert-danger alert-dismissible fade show">
+        <div class="alert alert-error">
             <?php 
             echo $_SESSION['error'];
             unset($_SESSION['error']);
             ?>
-            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
         </div>
     <?php endif; ?>
     
     <div class="card">
-        <div class="card-body">
+        <div class="card-content">
             <form method="POST">
                 <div class="table-responsive">
-                    <table class="table table-striped datatable">
+                    <table class="data-table">
                         <thead>
                             <tr>
-                                <th><input type="checkbox" id="selectAll" onchange="toggleAll()"></th>
+                                <th><input type="checkbox" id="selectAll" onchange="toggleAll()" style="width:16px;height:16px;accent-color:var(--accent);"></th>
                                 <th>Student</th>
                                 <th>Course</th>
                                 <th>Exam Type</th>
@@ -78,7 +80,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['publish'])) {
                         <tbody>
                             <?php if ($unpublished->num_rows == 0): ?>
                                 <tr>
-                                    <td colspan="6" class="text-center">No unpublished results found</td>
+                                    <td colspan="6">
+                                        <div class="empty-state">
+                                            <div class="empty-state-icon">&#9729;</div>
+                                            <p class="empty-state-text">No unpublished results found</p>
+                                        </div>
+                                    </td>
                                 </tr>
                             <?php else: ?>
                                 <?php while($row = $unpublished->fetch_assoc()): ?>
@@ -86,19 +93,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['publish'])) {
                                         <td>
                                             <input type="checkbox" name="result_ids[]" 
                                                    value="<?php echo $row['result_id']; ?>" 
-                                                   class="result-checkbox">
+                                                   class="result-checkbox"
+                                                   style="width:16px;height:16px;accent-color:var(--accent);">
                                         </td>
                                         <td>
                                             <strong><?php echo $row['full_name']; ?></strong><br>
-                                            <small><?php echo $row['student_id']; ?></small>
+                                            <small style="color:var(--text-secondary);"><?php echo $row['student_id']; ?></small>
                                         </td>
                                         <td><?php echo $row['course_name']; ?></td>
                                         <td>
-                                            <span class="badge bg-info"><?php echo ucfirst($row['exam_type']); ?></span>
+                                            <span class="status-badge" style="background:var(--info-bg);color:var(--info);border:1px solid var(--info-border);"><?php echo ucfirst($row['exam_type']); ?></span>
                                         </td>
                                         <td><?php echo $row['marks_obtained']; ?>/<?php echo $row['total_marks']; ?></td>
                                         <td>
-                                            <span class="badge <?php echo getGradeColor($row['grade']); ?>">
+                                            <?php
+                                            $gradeStyles = [
+                                                'A' => 'background:var(--success-bg);color:var(--success);border:1px solid var(--success-border);',
+                                                'B' => 'background:var(--info-bg);color:var(--info);border:1px solid var(--info-border);',
+                                                'C' => 'background:var(--warning-bg);color:var(--warning);border:1px solid var(--warning-border);',
+                                                'D' => 'background:var(--accent-bg);color:var(--accent);border:1px solid var(--accent-border);',
+                                                'F' => 'background:var(--error-bg);color:var(--error);border:1px solid var(--error-border);',
+                                            ];
+                                            $style = $gradeStyles[$row['grade']] ?? 'background:var(--warning-bg);color:var(--warning);border:1px solid var(--warning-border);';
+                                            ?>
+                                            <span class="status-badge" style="<?php echo $style; ?>">
                                                 <?php echo $row['grade']; ?>
                                             </span>
                                         </td>
@@ -110,8 +128,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['publish'])) {
                 </div>
                 
                 <?php if ($unpublished->num_rows > 0): ?>
-                    <div class="d-flex justify-content-end mt-3">
-                        <button type="submit" name="publish" class="btn btn-success" 
+                    <div class="form-actions">
+                        <button type="submit" name="publish" class="btn btn-primary"
                                 onclick="return confirm('Are you sure you want to publish selected results?')">
                             <i class="bi bi-cloud-upload"></i> Publish Selected Results
                         </button>

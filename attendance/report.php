@@ -88,104 +88,6 @@ $page_title = 'Attendance Report';
 include __DIR__ . '/../includes/sidebar.php';
 ?>
 
-<style>
-    .report-content {
-        margin-left: 250px;
-        padding: 20px;
-        min-height: 100vh;
-        background: #f5f6fa;
-    }
-    
-    .filter-section {
-        background: white;
-        padding: 20px;
-        border-radius: 10px;
-        margin-bottom: 20px;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    }
-    
-    .stats-card {
-        background: white;
-        padding: 20px;
-        border-radius: 10px;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        text-align: center;
-    }
-    
-    .stats-number {
-        font-size: 2rem;
-        font-weight: 700;
-    }
-    
-    .stats-present .stats-number { color: #27ae60; }
-    .stats-absent .stats-number { color: #e74c3c; }
-    .stats-late .stats-number { color: #f39c12; }
-    .stats-excused .stats-number { color: #3498db; }
-    .stats-total .stats-number { color: #2c3e50; }
-    
-    .percentage-bar {
-        height: 8px;
-        background: #e9ecef;
-        border-radius: 4px;
-        overflow: hidden;
-        margin-top: 5px;
-    }
-    
-    .percentage-bar .fill {
-        height: 100%;
-        border-radius: 4px;
-        transition: width 0.5s;
-    }
-    
-    .percentage-bar .fill.green { background: #27ae60; }
-    .percentage-bar .fill.yellow { background: #f39c12; }
-    .percentage-bar .fill.red { background: #e74c3c; }
-    
-    .status-badge {
-        padding: 2px 10px;
-        border-radius: 12px;
-        font-size: 12px;
-        font-weight: 500;
-        text-transform: capitalize;
-    }
-    
-    .status-badge.present { background: #d4edda; color: #155724; }
-    .status-badge.absent { background: #f8d7da; color: #721c24; }
-    .status-badge.late { background: #fff3cd; color: #856404; }
-    .status-badge.excused { background: #cce5ff; color: #004085; }
-    
-    .btn-print {
-        border-radius: 20px;
-        padding: 8px 20px;
-    }
-    
-    @media (max-width: 768px) {
-        .report-content {
-            margin-left: 0;
-            padding: 15px;
-        }
-        
-        .stats-card {
-            margin-bottom: 15px;
-        }
-    }
-    
-    @media print {
-        .btn-print, .filter-section, .no-print {
-            display: none !important;
-        }
-        .report-content {
-            margin-left: 0 !important;
-            padding: 10px !important;
-        }
-        .stats-card {
-            box-shadow: none !important;
-            border: 1px solid #ddd !important;
-        }
-    }
-</style>
-
-<div class="report-content">
     <div class="container-fluid">
         
         <div class="d-flex justify-content-between align-items-center mb-4">
@@ -201,7 +103,7 @@ include __DIR__ . '/../includes/sidebar.php';
         </div>
 
         <!-- Filter Section -->
-        <div class="filter-section">
+        <div class="panel">
             <form method="GET" class="row g-3">
                 <div class="col-md-3">
                     <label class="form-label">Course</label>
@@ -338,6 +240,5 @@ include __DIR__ . '/../includes/sidebar.php';
         </div>
         
     </div>
-</div>
 
 <?php include __DIR__ . '/../includes/footer.php'; ?>

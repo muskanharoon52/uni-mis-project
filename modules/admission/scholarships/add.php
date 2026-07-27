@@ -1,5 +1,4 @@
 <?php
-// Correct path: Go up 1 level to admission folder, then into config
 require_once __DIR__ . '/../config/database.php';
 $page_title = 'Add Scholarship';
 include __DIR__ . '/../includes/header.php';
@@ -31,15 +30,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         ");
         
         $stmt->execute([
-            $scholarship_name, 
-            $scholarship_type, 
-            $description, 
-            $amount, 
-            $min_marks_percentage,
-            $scholarship_percentage,
-            $total_slots,
-            $deadline,
-            $status
+            $scholarship_name, $scholarship_type, $description, $amount, 
+            $min_marks_percentage, $scholarship_percentage, $total_slots, $deadline, $status
         ]);
         
         setFlash('success', 'Scholarship added successfully!');
@@ -52,78 +44,82 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 ?>
 
+<div class="page-header">
+    <div class="page-header-left">
+        <h4>Add New Scholarship</h4>
+    </div>
+    <div class="page-header-actions">
+        <a href="index.php" class="btn btn-ghost"><i class="fas fa-arrow-left"></i> Back</a>
+    </div>
+</div>
+
 <?php if ($error): ?>
-    <div class="alert alert-danger"><?= htmlspecialchars($error) ?></div>
+    <div class="alert alert-error"><?= htmlspecialchars($error) ?></div>
 <?php endif; ?>
 
-<div class="card">
-    <div class="card-header">
-        <h5><i class="fas fa-plus"></i> Add New Scholarship</h5>
-    </div>
-    <div class="card-body">
-        <form method="post">
-            <div class="row">
-                <div class="col-md-6 mb-3">
-                    <label for="scholarship_name" class="form-label">Scholarship Name *</label>
-                    <input type="text" class="form-control" id="scholarship_name" name="scholarship_name" required>
-                </div>
-                <div class="col-md-6 mb-3">
-                    <label for="scholarship_type" class="form-label">Scholarship Type</label>
-                    <select class="form-control" id="scholarship_type" name="scholarship_type">
-                        <option value="Merit">Merit</option>
-                        <option value="Need Based">Need Based</option>
-                        <option value="Sports">Sports</option>
-                        <option value="Research">Research</option>
-                        <option value="Other">Other</option>
-                    </select>
-                </div>
+<div class="form-container">
+    <form method="post">
+        <div class="form-row">
+            <div class="form-group">
+                <label>Scholarship Name *</label>
+                <input type="text" name="scholarship_name" required>
             </div>
-            
-            <div class="mb-3">
-                <label for="description" class="form-label">Description</label>
-                <textarea class="form-control" id="description" name="description" rows="3"></textarea>
+            <div class="form-group">
+                <label>Scholarship Type</label>
+                <select name="scholarship_type">
+                    <option value="Merit">Merit</option>
+                    <option value="Need Based">Need Based</option>
+                    <option value="Sports">Sports</option>
+                    <option value="Research">Research</option>
+                    <option value="Other">Other</option>
+                </select>
             </div>
-            
-            <div class="row">
-                <div class="col-md-4 mb-3">
-                    <label for="amount" class="form-label">Amount (Rs.)</label>
-                    <input type="number" class="form-control" id="amount" name="amount" step="0.01">
-                </div>
-                <div class="col-md-4 mb-3">
-                    <label for="min_marks_percentage" class="form-label">Minimum Marks %</label>
-                    <input type="number" class="form-control" id="min_marks_percentage" name="min_marks_percentage" step="0.01">
-                </div>
-                <div class="col-md-4 mb-3">
-                    <label for="scholarship_percentage" class="form-label">Scholarship %</label>
-                    <input type="number" class="form-control" id="scholarship_percentage" name="scholarship_percentage" step="0.01">
-                </div>
+        </div>
+        
+        <div class="form-group">
+            <label>Description</label>
+            <textarea name="description" rows="3"></textarea>
+        </div>
+        
+        <div class="form-row">
+            <div class="form-group">
+                <label>Amount (PKR)</label>
+                <input type="number" name="amount" step="0.01">
             </div>
-            
-            <div class="row">
-                <div class="col-md-4 mb-3">
-                    <label for="total_slots" class="form-label">Total Slots</label>
-                    <input type="number" class="form-control" id="total_slots" name="total_slots">
-                </div>
-                <div class="col-md-4 mb-3">
-                    <label for="deadline" class="form-label">Deadline</label>
-                    <input type="date" class="form-control" id="deadline" name="deadline">
-                </div>
-                <div class="col-md-4 mb-3">
-                    <label for="status" class="form-label">Status</label>
-                    <select class="form-control" id="status" name="status">
-                        <option value="active">Active</option>
-                        <option value="inactive">Inactive</option>
-                        <option value="expired">Expired</option>
-                    </select>
-                </div>
+            <div class="form-group">
+                <label>Minimum Marks %</label>
+                <input type="number" name="min_marks_percentage" step="0.01">
             </div>
-            
-            <button type="submit" class="btn btn-primary">
-                <i class="fas fa-save"></i> Save Scholarship
-            </button>
-            <a href="index.php" class="btn btn-secondary">Cancel</a>
-        </form>
-    </div>
+            <div class="form-group">
+                <label>Scholarship %</label>
+                <input type="number" name="scholarship_percentage" step="0.01">
+            </div>
+        </div>
+        
+        <div class="form-row">
+            <div class="form-group">
+                <label>Total Slots</label>
+                <input type="number" name="total_slots">
+            </div>
+            <div class="form-group">
+                <label>Deadline</label>
+                <input type="date" name="deadline">
+            </div>
+            <div class="form-group">
+                <label>Status</label>
+                <select name="status">
+                    <option value="active">Active</option>
+                    <option value="inactive">Inactive</option>
+                    <option value="expired">Expired</option>
+                </select>
+            </div>
+        </div>
+        
+        <div class="form-actions">
+            <a href="index.php" class="btn btn-ghost">Cancel</a>
+            <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Save Scholarship</button>
+        </div>
+    </form>
 </div>
 
 <?php include __DIR__ . '/../includes/footer.php'; ?>

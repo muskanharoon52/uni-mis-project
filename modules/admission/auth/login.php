@@ -33,43 +33,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <body class="login-page">
 
 <div class="login-container">
-    <section class="login-hero">
-        <div class="login-brand">
-            <div class="brand-mark">ADM</div>
-        </div>
-        <div class="login-title">
-            <h1>Admission Management System</h1>
-            <p>Process applications, manage student enrollments, track fees, and generate admission reports.</p>
-        </div>
-        <div class="hero-points">
-            <div class="hero-point">
-                <div class="role-pill">APP</div>
-                <div>
-                    <strong>Application Processing</strong>
-                    <p class="small">Review, approve, or reject student applications.</p>
-                </div>
-            </div>
-            <div class="hero-point">
-                <div class="role-pill">ENR</div>
-                <div>
-                    <strong>Student Enrollment</strong>
-                    <p class="small">Enroll accepted students and assign programs.</p>
-                </div>
-            </div>
-            <div class="hero-point">
-                <div class="role-pill">SCH</div>
-                <div>
-                    <strong>Scholarships</strong>
-                    <p class="small">Manage scholarship criteria and award allocations.</p>
-                </div>
-            </div>
-        </div>
-    </section>
-
     <aside class="login-panel">
-        <div style="font-size:2rem;font-weight:800;color:var(--accent);margin-bottom:18px;">&#9733;</div>
         <h3>Sign in to Admission</h3>
-        <p class="muted" style="margin-bottom:22px;">Use your University account to access the admission portal.</p>
+        <p class="muted" style="margin-bottom:20px;">Use your University account to continue.</p>
 
         <?php if ($error): ?>
             <div class="alert alert-error" style="margin-bottom:16px;"><?= htmlspecialchars($error) ?></div>
@@ -81,7 +47,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 <input type="text" name="username" required placeholder="Enter your username" autocomplete="username">
             </div>
 
-            <div class="field password-field" style="margin-bottom:24px;">
+            <div class="field password-field" style="margin-bottom:20px;">
                 <label>Password</label>
                 <input type="password" name="password" id="pass-field" required placeholder="Enter password" autocomplete="current-password">
                 <button class="password-toggle" type="button" onclick="togglePass()">&#128065;</button>

@@ -109,86 +109,7 @@ $page_title = 'Courses Management';
 include __DIR__ . '/../includes/sidebar.php';
 ?>
 
-<style>
-    .course-code-badge {
-        font-family: 'Courier New', monospace;
-        font-weight: 700;
-        color: #3498db;
-        background: #e8f0fe;
-        padding: 3px 10px;
-        border-radius: 5px;
-        font-size: 14px;
-    }
-    
-    .credit-badge {
-        background: #f3e8ff;
-        color: #7c3aed;
-        padding: 2px 10px;
-        border-radius: 15px;
-        font-size: 12px;
-        font-weight: 500;
-    }
-    
-    .filter-section {
-        background: white;
-        padding: 20px;
-        border-radius: 10px;
-        margin-bottom: 20px;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    }
-    
-    .table-actions .btn {
-        padding: 4px 8px;
-        font-size: 12px;
-        margin: 0 2px;
-    }
-    
-    .empty-state {
-        padding: 60px 0;
-        text-align: center;
-        color: #95a5a6;
-    }
-    
-    .empty-state i {
-        font-size: 64px;
-        margin-bottom: 20px;
-        opacity: 0.5;
-    }
-    
-    .courses-content {
-        margin-left: 250px;
-        padding: 20px;
-        min-height: 100vh;
-        background: #f5f6fa;
-    }
-    
-    .status-badge {
-        padding: 4px 12px;
-        border-radius: 20px;
-        font-size: 12px;
-        font-weight: 500;
-    }
-    
-    .status-badge.Active {
-        background: #d4edda;
-        color: #155724;
-    }
-    
-    .status-badge.Inactive {
-        background: #f8d7da;
-        color: #721c24;
-    }
-    
-    @media (max-width: 768px) {
-        .courses-content {
-            margin-left: 0;
-            padding: 15px;
-        }
-    }
-</style>
-
-<div class="courses-content">
-    <div class="container-fluid" style="padding: 0 !important;">
+<div class="container-fluid" style="padding: 0 !important;">
         
         <!-- Page Header -->
         <div class="d-flex justify-content-between align-items-center mb-4">
@@ -217,7 +138,7 @@ include __DIR__ . '/../includes/sidebar.php';
         <?php endif; ?>
 
         <!-- Filter Section -->
-        <div class="filter-section">
+        <div class="panel">
             <form method="GET" class="row g-3">
                 <div class="col-md-5">
                     <input type="text" name="search" class="form-control" 
@@ -331,6 +252,5 @@ include __DIR__ . '/../includes/sidebar.php';
         </div>
         
     </div>
-</div>
 
 <?php include __DIR__ . '/../includes/footer.php'; ?>

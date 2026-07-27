@@ -70,6 +70,21 @@ function loginUser($username, $password) {
         $_SESSION['full_name'] = $user['full_name'] ?? 'User';
         $_SESSION['username'] = $user['username'] ?? '';
         $_SESSION['login_id'] = $user['login_id'] ?? '';
+        
+        // Link to student/teacher records if applicable
+        $role_name = strtolower($user['role_name'] ?? '');
+        if ($role_name === 'student') {
+            $student_q = $conn->query("SELECT student_id FROM students WHERE user_id = {$user['user_id']} LIMIT 1");
+            if ($student_q && $student_q->num_rows > 0) {
+                $_SESSION['student_id'] = (int)$student_q->fetch_assoc()['student_id'];
+            }
+        } elseif ($role_name === 'teacher') {
+            $teacher_q = $conn->query("SELECT teacher_id FROM teachers WHERE user_id = {$user['user_id']} LIMIT 1");
+            if ($teacher_q && $teacher_q->num_rows > 0) {
+                $_SESSION['teacher_id'] = (int)$teacher_q->fetch_assoc()['teacher_id'];
+            }
+        }
+        
         return true;
     }
     
@@ -98,6 +113,21 @@ function loginUserById($loginId, $password) {
         $_SESSION['full_name'] = $user['full_name'] ?? 'User';
         $_SESSION['username'] = $user['username'] ?? '';
         $_SESSION['login_id'] = $user['login_id'] ?? '';
+        
+        // Link to student/teacher records if applicable
+        $role_name = strtolower($user['role_name'] ?? '');
+        if ($role_name === 'student') {
+            $student_q = $conn->query("SELECT student_id FROM students WHERE user_id = {$user['user_id']} LIMIT 1");
+            if ($student_q && $student_q->num_rows > 0) {
+                $_SESSION['student_id'] = (int)$student_q->fetch_assoc()['student_id'];
+            }
+        } elseif ($role_name === 'teacher') {
+            $teacher_q = $conn->query("SELECT teacher_id FROM teachers WHERE user_id = {$user['user_id']} LIMIT 1");
+            if ($teacher_q && $teacher_q->num_rows > 0) {
+                $_SESSION['teacher_id'] = (int)$teacher_q->fetch_assoc()['teacher_id'];
+            }
+        }
+        
         return $user;
     }
 

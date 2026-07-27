@@ -3,12 +3,9 @@ require_once __DIR__ . '/../config/database.php';
 $page_title = 'Fee Management';
 include __DIR__ . '/../includes/header.php';
 
-// Check if fee tables exist, if not create them
 try {
-    // Check fee_structures table
     $tables = $pdo->query("SHOW TABLES LIKE 'fee_structures'")->fetchAll();
     if (empty($tables)) {
-        // Create fee_structures table
         $pdo->exec("
             CREATE TABLE IF NOT EXISTS fee_structures (
                 id INT PRIMARY KEY AUTO_INCREMENT,
@@ -22,10 +19,8 @@ try {
         ");
     }
     
-    // Check fee_payments table
     $tables = $pdo->query("SHOW TABLES LIKE 'fee_payments'")->fetchAll();
     if (empty($tables)) {
-        // Create fee_payments table
         $pdo->exec("
             CREATE TABLE IF NOT EXISTS fee_payments (
                 id INT PRIMARY KEY AUTO_INCREMENT,
@@ -40,7 +35,6 @@ try {
         ");
     }
     
-    // Get fee structures with department names
     $structures = $pdo->query("
         SELECT fs.*, d.department_name 
         FROM fee_structures fs 
@@ -48,7 +42,6 @@ try {
         ORDER BY fs.id DESC
     ")->fetchAll();
     
-    // Get recent payments
     $payments = $pdo->query("
         SELECT fp.*, s.student_name, s.student_id 
         FROM fee_payments fp 
@@ -61,35 +54,44 @@ try {
     $payments = [];
 }
 ?>
-<!-- Find all ₹ and replace with PKR -->
 
-<!-- In fee structures table -->
-<td><strong><?= formatCurrency($fs['amount'] ?? 0) ?></strong></td>
-
-<!-- In payments table -->
-<td><?= formatCurrency($p['amount'] ?? 0) ?></td>
-<div class="page-header"><h5><i class="fas fa-money-bill"></i> Fee Management</h5></div>
-
-<!-- Fee Structures -->
-<div class="card mb-4">
-    <div class="card-header bg-primary text-white">
-        <h6 class="mb-0"><i class="fas fa-list"></i> Fee Structures</h6>
+<div class="page-header">
+    <div class="page-header-left">
+        <h4><i class="fas fa-money-bill"></i> Fee Management</h4>
     </div>
-    <div class="card-body">
+</div>
+
+<div class="card" style="margin-bottom:24px;">
+    <div class="card-header">
+        <div>
+            <h3>Fee Structures</h3>
+            <p>Configured admission and program fee heads</p>
+        </div>
+    </div>
+    <div class="card-content">
         <?php if (empty($structures)): ?>
-            <div class="alert alert-info">No fee structures found.</div>
+            <div class="empty-state">
+                <i class="fas fa-coins"></i>
+                <h5>No Fee Structures Found</h5>
+                <p>No program fee structures configured yet.</p>
+            </div>
         <?php else: ?>
             <div class="table-responsive">
-                <table class="table table-hover">
-                    <thead><tr><th>Department</th><th>Fee Type</th><th>Amount</th><th>Academic Year</th><th>Status</th></tr></thead>
+                <table class="data-table">
+                    <thead>
+                        <tr><th>Department</th><th>Fee Type</th><th>Amount</th><th>Academic Year</th><th>Status</th></tr>
+                    </thead>
                     <tbody>
                         <?php foreach($structures as $fs): ?>
                         <tr>
-                            <td><?= $fs['department_name'] ?? 'N/A' ?></td>
-                            <td><?= $fs['fee_type'] ?? 'N/A' ?></td>
-                            <td><strong>₹<?= number_format($fs['amount'] ?? 0, 2) ?></strong></td>
-                            <td><?= $fs['academic_year'] ?? 'N/A' ?></td>
-                            <td><span class="badge bg-<?= ($fs['status'] ?? 'active') == 'active' ? 'success' : 'secondary' ?>"><?= ucfirst($fs['status'] ?? 'active') ?></span></td>
+                            <td><?= htmlspecialchars($fs['department_name'] ?? 'N/A') ?></td>
+                            <td><?= htmlspecialchars($fs['fee_type'] ?? 'N/A') ?></td>
+                            <td><strong><?= formatCurrency($fs['amount'] ?? 0) ?></strong></td>
+                            <td><?= htmlspecialchars($fs['academic_year'] ?? 'N/A') ?></td>
+                            <td>
+                                <?php $status = strtolower($fs['status'] ?? 'active'); ?>
+                                <span class="status-badge <?= $status ?>"><?= ucfirst($status) ?></span>
+                            </td>
                         </tr>
                         <?php endforeach; ?>
                     </tbody>
@@ -99,27 +101,38 @@ try {
     </div>
 </div>
 
-<!-- Recent Payments -->
 <div class="card">
-    <div class="card-header bg-success text-white">
-        <h6 class="mb-0"><i class="fas fa-history"></i> Recent Payments</h6>
+    <div class="card-header">
+        <div>
+            <h3>Recent Fee Payments</h3>
+            <p>Latest payment transactions recorded</p>
+        </div>
     </div>
-    <div class="card-body">
+    <div class="card-content">
         <?php if (empty($payments)): ?>
-            <div class="alert alert-info">No payments recorded.</div>
+            <div class="empty-state">
+                <i class="fas fa-credit-card"></i>
+                <h5>No Payments Recorded</h5>
+                <p>No student fee payment transactions logged.</p>
+            </div>
         <?php else: ?>
             <div class="table-responsive">
-                <table class="table table-hover">
-                    <thead><tr><th>Student</th><th>Fee Type</th><th>Amount</th><th>Date</th><th>Method</th><th>Status</th></tr></thead>
+                <table class="data-table">
+                    <thead>
+                        <tr><th>Student Name</th><th>Fee Type</th><th>Amount</th><th>Payment Date</th><th>Method</th><th>Status</th></tr>
+                    </thead>
                     <tbody>
                         <?php foreach($payments as $p): ?>
                         <tr>
-                            <td><?= $p['student_name'] ?? 'N/A' ?> (<?= $p['student_id'] ?? 'N/A' ?>)</td>
-                            <td><?= $p['fee_type'] ?? 'N/A' ?></td>
-                            <td>₹<?= number_format($p['amount'] ?? 0, 2) ?></td>
+                            <td><?= htmlspecialchars($p['student_name'] ?? 'N/A') ?> <span class="muted">(<?= htmlspecialchars($p['student_id'] ?? 'N/A') ?>)</span></td>
+                            <td><?= htmlspecialchars($p['fee_type'] ?? 'N/A') ?></td>
+                            <td><strong><?= formatCurrency($p['amount'] ?? 0) ?></strong></td>
                             <td><?= isset($p['payment_date']) ? date('d M Y', strtotime($p['payment_date'])) : 'N/A' ?></td>
-                            <td><span class="badge bg-info"><?= ucfirst($p['payment_method'] ?? 'cash') ?></span></td>
-                            <td><span class="badge bg-<?= ($p['status'] ?? 'pending') == 'paid' ? 'success' : 'warning' ?>"><?= ucfirst($p['status'] ?? 'pending') ?></span></td>
+                            <td><span class="status-badge" style="background:var(--accent-light);color:var(--accent);border-color:var(--info-border);"><?= ucfirst(htmlspecialchars($p['payment_method'] ?? 'cash')) ?></span></td>
+                            <td>
+                                <?php $status = strtolower($p['status'] ?? 'pending'); ?>
+                                <span class="status-badge <?= $status ?>"><?= ucfirst($status) ?></span>
+                            </td>
                         </tr>
                         <?php endforeach; ?>
                     </tbody>
@@ -128,4 +141,5 @@ try {
         <?php endif; ?>
     </div>
 </div>
+
 <?php include __DIR__ . '/../includes/footer.php'; ?>

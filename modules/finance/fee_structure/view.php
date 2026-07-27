@@ -1,26 +1,10 @@
 <?php
-session_start();
-if (!isset($_SESSION['user_id'])) {
-    header('Location: /uni-mis-project/modules/sso/login.php');
-    exit();
-}
-if ($_SESSION['role_id'] != 3 && $_SESSION['role_id'] != 1) {
-    header('Location: /uni-mis-project/modules/sso/login.php?error=Access denied');
-    exit();
-}
-
+$pageTitle = 'Fee Structure Details';
 include_once __DIR__ . '/../includes/header.php';
 
-$sql = "SELECT 
-        fs.fee_structure_id,
-        fs.total_amount,
-        fs.status,
-        d.department_name,
-        s.session_name,
-        sm.semester_name,
-        fsd.fee_head_id,
-        fsd.amount,
-        fh.fee_head_name
+$sql = "SELECT fs.fee_structure_id, fs.total_amount, fs.status,
+               d.department_name, s.session_name, sm.semester_name,
+               fsd.fee_head_id, fsd.amount, fh.fee_head_name
         FROM fee_structures fs
         JOIN departments d ON d.department_id = fs.program_id
         JOIN sessions s ON s.session_id = fs.session_id
@@ -44,75 +28,55 @@ while ($row = mysqli_fetch_assoc($result)) {
             'heads' => []
         ];
     }
-    $structures[$id]['heads'][] = [
-        'name' => $row['fee_head_name'],
-        'amount' => $row['amount']
-    ];
+    $structures[$id]['heads'][] = ['name' => $row['fee_head_name'], 'amount' => $row['amount']];
 }
 ?>
 
-<div class="d-flex justify-content-between align-items-center mb-3">
-    <h2><i class="fas fa-eye text-primary"></i> Fee Structures (Read-Only)</h2>
-    <span class="badge bg-info text-white"><i class="fas fa-info-circle"></i> Read-Only Mode</span>
+<div style="margin-bottom:16px;">
+    <a href="index.php" class="btn btn-ghost" style="font-size:.82rem;">&#8592; Back to Fee Structures</a>
 </div>
 
-<?php if(empty($structures)): ?>
-    <div class="alert alert-warning">
-        <i class="fas fa-exclamation-triangle"></i> No fee structures found. SSO module will create them.
-    </div>
+<?php if (empty($structures)): ?>
+    <div class="alert alert-info">No fee structures found. SSO module will create them.</div>
 <?php else: ?>
-    <div class="row">
-        <?php foreach($structures as $id => $data): ?>
-            <div class="col-md-6 mb-4">
-                <div class="card shadow h-100">
-                    <div class="card-header bg-primary text-white">
-                        <h5><i class="fas fa-university"></i> <?php echo htmlspecialchars($data['program']); ?></h5>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;">
+        <?php foreach ($structures as $id => $data): ?>
+            <div class="card">
+                <div class="card-header">
+                    <div style="display:flex;justify-content:space-between;align-items:center;">
+                        <h3><?= htmlspecialchars($data['program']) ?></h3>
+                        <span class="badge badge-active"><?= $data['status'] ?></span>
                     </div>
-                    <div class="card-body">
-                        <p>
-                            <strong>Session:</strong> <?php echo htmlspecialchars($data['session']); ?><br>
-                            <strong>Semester:</strong> <?php echo htmlspecialchars($data['semester']); ?><br>
-                            <strong>Status:</strong> 
-                            <span class="badge bg-success"><?php echo $data['status']; ?></span>
-                        </p>
-                        <hr>
-                        <h6><i class="fas fa-list"></i> Fee Heads</h6>
-                        <table class="table table-sm table-bordered">
-                            <thead class="table-light">
-                                <tr>
-                                    <th>Fee Head</th>
-                                    <th class="text-end">Amount (PKR)</th>
-                                </tr>
-                            </thead>
+                </div>
+                <div style="padding:22px;">
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:16px;">
+                        <div><span class="muted" style="font-size:.82rem;display:block;">Session</span><?= htmlspecialchars($data['session']) ?></div>
+                        <div><span class="muted" style="font-size:.82rem;display:block;">Semester</span><?= htmlspecialchars($data['semester']) ?></div>
+                    </div>
+                    <div class="table-responsive">
+                        <table>
+                            <thead><tr><th>Fee Head</th><th style="text-align:right">Amount (PKR)</th></tr></thead>
                             <tbody>
-                                <?php foreach($data['heads'] as $head): ?>
+                                <?php foreach ($data['heads'] as $head): ?>
                                     <tr>
-                                        <td><?php echo htmlspecialchars($head['name']); ?></td>
-                                        <td class="text-end"><?php echo number_format($head['amount'], 2); ?></td>
+                                        <td><?= htmlspecialchars($head['name']) ?></td>
+                                        <td style="text-align:right;"><?= number_format($head['amount'], 2) ?></td>
                                     </tr>
                                 <?php endforeach; ?>
                             </tbody>
-                            <tfoot class="table-dark">
-                                <tr>
-                                    <th><strong>Total</strong></th>
-                                    <th class="text-end"><?php echo number_format($data['total'], 2); ?></th>
+                            <tfoot>
+                                <tr style="background:var(--navy);color:white;font-weight:700;">
+                                    <td>Total</td>
+                                    <td style="text-align:right;"><?= number_format($data['total'], 2) ?></td>
                                 </tr>
                             </tfoot>
                         </table>
                     </div>
-                    <div class="card-footer text-muted">
-                        <small><i class="fas fa-lock"></i> Read-only. To modify, contact SSO staff.</small>
-                    </div>
+                    <div style="font-size:.78rem;color:var(--muted);margin-top:12px;">Read-only. To modify, contact SSO staff.</div>
                 </div>
             </div>
         <?php endforeach; ?>
     </div>
 <?php endif; ?>
-
-<div class="mt-3">
-    <a href="../fee_heads/index.php" class="btn btn-secondary">
-        <i class="fas fa-arrow-left"></i> Back to Fee Heads
-    </a>
-</div>
 
 <?php include_once __DIR__ . '/../includes/footer.php'; ?>

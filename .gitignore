@@ -35,3 +35,13 @@ Thumbs.db
 # Temp
 *.tmp
 *.bak
+
+# Database dumps
+database/*.sql
+*.sql
+
+# Test data
+sbe_test_data.sql
+
+# Config (local development)
+config/*.php

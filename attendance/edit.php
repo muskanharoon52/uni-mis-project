@@ -58,61 +58,6 @@ $page_title = 'Edit Attendance';
 include __DIR__ . '/../includes/sidebar.php';
 ?>
 
-<style>
-    .edit-content {
-        margin-left: 250px;
-        padding: 20px;
-        min-height: 100vh;
-        background: #f5f6fa;
-    }
-    
-    .form-container {
-        max-width: 600px;
-        margin: 0 auto;
-        background: white;
-        padding: 30px;
-        border-radius: 10px;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    }
-    
-    .status-radio {
-        margin-right: 20px;
-    }
-    
-    .status-radio label {
-        margin-left: 5px;
-        cursor: pointer;
-    }
-    
-    .status-radio input[type="radio"] {
-        cursor: pointer;
-    }
-    
-    .status-present { color: #27ae60; }
-    .status-absent { color: #e74c3c; }
-    .status-late { color: #f39c12; }
-    .status-excused { color: #3498db; }
-    
-    .info-box {
-        background: #f8f9fa;
-        padding: 10px 15px;
-        border-radius: 8px;
-        border-left: 4px solid #3498db;
-    }
-    
-    @media (max-width: 768px) {
-        .edit-content {
-            margin-left: 0;
-            padding: 15px;
-        }
-        
-        .form-container {
-            padding: 20px;
-        }
-    }
-</style>
-
-<div class="edit-content">
     <div class="container-fluid">
         
         <div class="d-flex justify-content-between align-items-center mb-4">
@@ -199,6 +144,5 @@ include __DIR__ . '/../includes/sidebar.php';
         </div>
         
     </div>
-</div>
 
 <?php include __DIR__ . '/../includes/footer.php'; ?>

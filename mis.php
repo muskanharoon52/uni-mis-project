@@ -6,11 +6,14 @@ session_start();
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <title>MIS Portal Selection - University MIS</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: 'Inter', system-ui, -apple-system, sans-serif; background: #f4f5f8; min-height: 100vh; }
-        .navbar { background: #1a1d29; padding: 16px 32px; display: flex; align-items: center; justify-content: space-between; }
+        body { font-family: 'Inter', system-ui, -apple-system, sans-serif; background: #F8FAFC; min-height: 100vh; }
+        .navbar { background: #162B4D; padding: 16px 32px; display: flex; align-items: center; justify-content: space-between; }
         .navbar-brand { color: #fff; font-size: 1.4rem; font-weight: 700; text-decoration: none; }
         .navbar-nav { display: flex; gap: 24px; list-style: none; }
         .navbar-nav a { color: #c9cdd4; text-decoration: none; font-size: 0.95rem; transition: color 0.2s; }

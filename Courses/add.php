@@ -149,46 +149,7 @@ $page_title = 'Add Course';
 include __DIR__ . '/../includes/sidebar.php';
 ?>
 
-<style>
-    .main-content {
-        margin-left: 250px;
-        padding: 20px;
-        min-height: 100vh;
-        background: #f5f6fa;
-    }
-    
-    .form-section {
-        background: white;
-        padding: 25px;
-        border-radius: 10px;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        margin-bottom: 20px;
-    }
-    
-    .form-section-title {
-        font-weight: 600;
-        color: #2c3e50;
-        margin-bottom: 20px;
-        padding-bottom: 10px;
-        border-bottom: 2px solid #f0f2f5;
-    }
-    
-    .required-field::after {
-        content: '*';
-        color: #e74c3c;
-        margin-left: 4px;
-    }
-    
-    @media (max-width: 768px) {
-        .main-content {
-            margin-left: 0;
-            padding: 15px;
-        }
-    }
-</style>
-
-<div class="main-content">
-    <div class="container-fluid">
+<div class="container-fluid">
         
         <!-- Page Header -->
         <div class="d-flex justify-content-between align-items-center mb-4">
@@ -295,6 +256,5 @@ include __DIR__ . '/../includes/sidebar.php';
         </form>
         
     </div>
-</div>
 
 <?php include __DIR__ . '/../includes/footer.php'; ?>

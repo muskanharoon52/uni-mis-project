@@ -26,7 +26,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $status = $_POST['status'];
         $remarks = sanitize($_POST['remarks'] ?? '');
         
-        // Auto-approve if percentage meets criteria
         if ($status == 'approved') {
             $min = $app['min_marks_percentage'] ?? 0;
             if ($app['percentage'] < $min) {
@@ -52,60 +51,102 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 ?>
-<div class="page-header"><h5><i class="fas fa-check"></i> Review Scholarship Application</h5></div>
 
-<div class="row">
-    <div class="col-md-6">
-        <div class="card">
-            <div class="card-header bg-primary text-white"><h6 class="mb-0">Application Details</h6></div>
-            <div class="card-body">
-                <table class="table">
-                    <tr><th>Student</th><td><?= $app['student_name'] ?? 'N/A' ?></td></tr>
-                    <tr><th>Student ID</th><td><?= $app['student_id'] ?? 'N/A' ?></td></tr>
-                    <tr><th>Scholarship</th><td><?= $app['scholarship_name'] ?? 'N/A' ?></td></tr>
-                    <tr><th>Marks Obtained</th><td><?= $app['marks_obtained'] ?? 'N/A' ?></td></tr>
-                    <tr><th>Total Marks</th><td><?= $app['total_marks'] ?? 'N/A' ?></td></tr>
-                    <tr><th>Percentage</th><td><strong><?= number_format($app['percentage'] ?? 0, 2) ?>%</strong></td></tr>
-                    <tr><th>Minimum Required</th><td><strong><?= $app['min_marks_percentage'] ?? 0 ?>%</strong></td></tr>
-                    <tr><th>Eligibility</th>
-                        <td>
-                            <?php 
-                            $eligible = ($app['percentage'] ?? 0) >= ($app['min_marks_percentage'] ?? 0);
-                            echo $eligible ? '✅ <span class="text-success">Eligible</span>' : '❌ <span class="text-danger">Not Eligible</span>';
-                            ?>
-                        </td>
-                    </tr>
-                    <tr><th>Applied Date</th><td><?= date('d M Y', strtotime($app['application_date'] ?? 'now')) ?></td></tr>
-                </table>
+<div class="page-header">
+    <div class="page-header-left">
+        <h4>Review Scholarship Application</h4>
+    </div>
+    <div class="page-header-actions">
+        <a href="index.php" class="btn btn-ghost"><i class="fas fa-arrow-left"></i> Back</a>
+    </div>
+</div>
+
+<div class="grid-2">
+    <div class="card">
+        <div class="card-header">
+            <div>
+                <h3>Application Details</h3>
+                <p>Verify criteria before issuing decision</p>
+            </div>
+        </div>
+        <div class="card-content">
+            <div class="detail-row">
+                <div class="detail-label">Student Name</div>
+                <div class="detail-value"><?= htmlspecialchars($app['student_name'] ?? 'N/A') ?></div>
+            </div>
+            <div class="detail-row">
+                <div class="detail-label">Student ID</div>
+                <div class="detail-value"><strong><?= htmlspecialchars($app['student_id'] ?? 'N/A') ?></strong></div>
+            </div>
+            <div class="detail-row">
+                <div class="detail-label">Scholarship</div>
+                <div class="detail-value"><?= htmlspecialchars($app['scholarship_name'] ?? 'N/A') ?></div>
+            </div>
+            <div class="detail-row">
+                <div class="detail-label">Marks Obtained</div>
+                <div class="detail-value"><?= $app['marks_obtained'] ?? 'N/A' ?></div>
+            </div>
+            <div class="detail-row">
+                <div class="detail-label">Total Marks</div>
+                <div class="detail-value"><?= $app['total_marks'] ?? 'N/A' ?></div>
+            </div>
+            <div class="detail-row">
+                <div class="detail-label">Percentage</div>
+                <div class="detail-value"><strong><?= number_format($app['percentage'] ?? 0, 2) ?>%</strong></div>
+            </div>
+            <div class="detail-row">
+                <div class="detail-label">Minimum Required</div>
+                <div class="detail-value"><strong><?= $app['min_marks_percentage'] ?? 0 ?>%</strong></div>
+            </div>
+            <div class="detail-row">
+                <div class="detail-label">Eligibility Status</div>
+                <div class="detail-value">
+                    <?php 
+                    $eligible = ($app['percentage'] ?? 0) >= ($app['min_marks_percentage'] ?? 0);
+                    if ($eligible): ?>
+                        <span class="status-badge Eligible">Eligible</span>
+                    <?php else: ?>
+                        <span class="status-badge Not Eligible">Not Eligible</span>
+                    <?php endif; ?>
+                </div>
+            </div>
+            <div class="detail-row">
+                <div class="detail-label">Applied Date</div>
+                <div class="detail-value"><?= date('d M Y', strtotime($app['application_date'] ?? 'now')) ?></div>
             </div>
         </div>
     </div>
-    <div class="col-md-6">
-        <div class="card">
-            <div class="card-header bg-warning"><h6 class="mb-0">Review Decision</h6></div>
-            <div class="card-body">
-                <form method="POST">
-                    <div class="mb-3">
-                        <label class="form-label">Decision *</label>
-                        <select name="status" class="form-select" required>
-                            <option value="approved">✅ Approve</option>
-                            <option value="rejected">❌ Reject</option>
-                        </select>
-                        <small class="text-muted">
-                            <?php if (($app['percentage'] ?? 0) < ($app['min_marks_percentage'] ?? 0)): ?>
-                            <span class="text-danger">Warning: Student does not meet minimum percentage requirement!</span>
-                            <?php endif; ?>
-                        </small>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label">Remarks</label>
-                        <textarea name="remarks" class="form-control" rows="3"></textarea>
-                    </div>
-                    <button type="submit" class="btn btn-primary">Submit Review</button>
-                    <a href="index.php" class="btn btn-secondary">Cancel</a>
-                </form>
+    
+    <div class="card">
+        <div class="card-header">
+            <div>
+                <h3>Review Decision</h3>
+                <p>Record official approval decision</p>
             </div>
+        </div>
+        <div class="card-content">
+            <form method="POST">
+                <div class="field" style="margin-bottom:16px;">
+                    <label>Decision *</label>
+                    <select name="status" required>
+                        <option value="approved">Approve</option>
+                        <option value="rejected">Reject</option>
+                    </select>
+                    <?php if (($app['percentage'] ?? 0) < ($app['min_marks_percentage'] ?? 0)): ?>
+                        <div style="margin-top:6px;font-size:.84rem;color:var(--danger);"><i class="fas fa-exclamation-triangle"></i> Warning: Student does not meet minimum percentage requirement!</div>
+                    <?php endif; ?>
+                </div>
+                <div class="field" style="margin-bottom:16px;">
+                    <label>Remarks</label>
+                    <textarea name="remarks" rows="3" placeholder="Enter optional review notes..."></textarea>
+                </div>
+                <div class="form-actions" style="border-top:1px solid var(--border);padding-top:16px;">
+                    <a href="index.php" class="btn btn-outline">Cancel</a>
+                    <button type="submit" class="btn btn-primary"><i class="fas fa-check"></i> Submit Review</button>
+                </div>
+            </form>
         </div>
     </div>
 </div>
+
 <?php include __DIR__ . '/../includes/footer.php'; ?>

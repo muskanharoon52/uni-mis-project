@@ -283,17 +283,6 @@ include __DIR__ . '/../includes/header.php';
 include __DIR__ . '/../includes/sidebar.php';
 ?>
 
-<style>
-    .main-content { margin-left: 250px; padding: 20px; }
-    .form-section { background: white; padding: 25px; border-radius: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-bottom: 20px; }
-    .form-section-title { font-weight: 600; color: #2c3e50; margin-bottom: 20px; padding-bottom: 10px; border-bottom: 2px solid #f0f2f5; }
-    .required-field::after { content: '*'; color: #e74c3c; margin-left: 4px; }
-    .success-box { background: #d4edda; border: 1px solid #c3e6cb; border-radius: 8px; padding: 20px; color: #155724; margin-bottom: 20px; }
-    .field-hint { font-size: 12px; color: #6c757d; margin-top: 4px; }
-    @media (max-width: 768px) { .main-content { margin-left: 0; } }
-</style>
-
-<div class="main-content">
     <div class="container-fluid">
         <div class="d-flex justify-content-between align-items-center mb-4">
             <h4><i class="fas fa-user-plus"></i> Add New Student</h4>
@@ -449,6 +438,5 @@ include __DIR__ . '/../includes/sidebar.php';
             </div>
         </form>
     </div>
-</div>
 
 <?php include __DIR__ . '/../includes/footer.php'; ?>

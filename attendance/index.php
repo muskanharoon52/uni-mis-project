@@ -365,104 +365,6 @@ $page_title = 'Attendance Management';
 include __DIR__ . '/../includes/sidebar.php';
 ?>
 
-<style>
-    .attendance-content {
-        margin-left: 250px;
-        padding: 20px;
-        min-height: 100vh;
-        background: #f5f6fa;
-    }
-    
-    .stats-card {
-        background: white;
-        padding: 20px;
-        border-radius: 10px;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        text-align: center;
-        transition: transform 0.3s;
-    }
-    
-    .stats-card:hover {
-        transform: translateY(-5px);
-    }
-    
-    .stats-number {
-        font-size: 2.5rem;
-        font-weight: 700;
-    }
-    
-    .stats-label {
-        font-size: 0.9rem;
-        color: #7f8c8d;
-        margin-top: 5px;
-    }
-    
-    .stats-present .stats-number { color: #27ae60; }
-    .stats-absent .stats-number { color: #e74c3c; }
-    .stats-late .stats-number { color: #f39c12; }
-    .stats-excused .stats-number { color: #3498db; }
-    .stats-total .stats-number { color: #2c3e50; }
-    
-    .filter-section {
-        background: white;
-        padding: 20px;
-        border-radius: 10px;
-        margin-bottom: 20px;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    }
-    
-    .status-badge {
-        padding: 4px 12px;
-        border-radius: 20px;
-        font-size: 12px;
-        font-weight: 500;
-        text-transform: capitalize;
-    }
-    
-    .status-badge.present {
-        background: #d4edda;
-        color: #155724;
-    }
-    
-    .status-badge.absent {
-        background: #f8d7da;
-        color: #721c24;
-    }
-    
-    .status-badge.late {
-        background: #fff3cd;
-        color: #856404;
-    }
-    
-    .status-badge.excused {
-        background: #cce5ff;
-        color: #004085;
-    }
-    
-    .table-actions .btn {
-        padding: 4px 8px;
-        font-size: 12px;
-        margin: 0 2px;
-    }
-    
-    .btn-mark {
-        border-radius: 20px;
-        padding: 8px 20px;
-    }
-    
-    @media (max-width: 768px) {
-        .attendance-content {
-            margin-left: 0;
-            padding: 15px;
-        }
-        
-        .stats-card {
-            margin-bottom: 15px;
-        }
-    }
-</style>
-
-<div class="attendance-content">
     <div class="container-fluid">
         
         <!-- Page Header -->
@@ -522,7 +424,7 @@ include __DIR__ . '/../includes/sidebar.php';
         </div>
 
         <!-- Filter -->
-        <div class="filter-section">
+        <div class="panel">
             <form method="GET" class="row g-3">
                 <div class="col-md-3">
                     <input type="text" name="search" class="form-control" 
@@ -662,6 +564,5 @@ include __DIR__ . '/../includes/sidebar.php';
         </div>
         
     </div>
-</div>
 
 <?php include __DIR__ . '/../includes/footer.php'; ?>

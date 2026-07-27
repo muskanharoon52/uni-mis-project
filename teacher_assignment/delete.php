@@ -73,127 +73,7 @@ $page_title = 'Delete Teacher Assignment';
 include __DIR__ . '/../includes/sidebar.php';
 ?>
 
-<style>
-    .delete-content {
-        margin-left: 250px;
-        padding: 20px;
-        min-height: 100vh;
-        background: #f5f6fa;
-    }
-    
-    .delete-container {
-        max-width: 600px;
-        margin: 0 auto;
-        background: white;
-        padding: 30px;
-        border-radius: 10px;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        text-align: center;
-    }
-    
-    .delete-icon {
-        font-size: 64px;
-        color: #e74c3c;
-        margin-bottom: 20px;
-    }
-    
-    .delete-title {
-        color: #2c3e50;
-        margin-bottom: 15px;
-    }
-    
-    .delete-message {
-        color: #7f8c8d;
-        margin-bottom: 20px;
-    }
-    
-    .assignment-details {
-        background: #f8f9fa;
-        padding: 15px;
-        border-radius: 8px;
-        margin: 20px 0;
-        text-align: left;
-    }
-    
-    .assignment-details .detail-row {
-        padding: 8px 0;
-        border-bottom: 1px solid #e9ecef;
-    }
-    
-    .assignment-details .detail-row:last-child {
-        border-bottom: none;
-    }
-    
-    .assignment-details .label {
-        font-weight: 600;
-        color: #495057;
-        display: inline-block;
-        min-width: 120px;
-    }
-    
-    .assignment-details .value {
-        color: #2c3e50;
-    }
-    
-    .btn-danger {
-        background-color: #e74c3c;
-        border-color: #e74c3c;
-        padding: 10px 30px;
-        font-weight: 600;
-    }
-    
-    .btn-danger:hover {
-        background-color: #c0392b;
-        border-color: #c0392b;
-    }
-    
-    .btn-secondary {
-        padding: 10px 30px;
-        font-weight: 600;
-    }
-    
-    .warning-text {
-        color: #e74c3c;
-        font-weight: 600;
-        margin: 15px 0;
-    }
-    
-    .btn-group-delete {
-        display: flex;
-        justify-content: center;
-        gap: 10px;
-        flex-wrap: wrap;
-    }
-    
-    @media (max-width: 768px) {
-        .delete-content {
-            margin-left: 0;
-            padding: 15px;
-        }
-        
-        .delete-container {
-            padding: 20px;
-            margin: 10px;
-        }
-        
-        .assignment-details .label {
-            min-width: 100px;
-        }
-        
-        .btn-group-delete {
-            flex-direction: column;
-            align-items: center;
-        }
-        
-        .btn-group-delete .btn {
-            width: 100%;
-            max-width: 300px;
-        }
-    }
-</style>
-
-<div class="delete-content">
-    <div class="container-fluid">
+<div class="container-fluid">
         
         <!-- Page Header -->
         <div class="d-flex justify-content-between align-items-center mb-4">
@@ -266,6 +146,5 @@ include __DIR__ . '/../includes/sidebar.php';
         </div>
         
     </div>
-</div>
 
 <?php include __DIR__ . '/../includes/footer.php'; ?>

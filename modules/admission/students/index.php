@@ -36,88 +36,93 @@ try {
 
 $flash = getFlash();
 if ($flash): ?>
-    <div class="alert alert-<?= $flash['type'] ?> alert-dismissible fade show">
+    <div class="alert alert-<?= $flash['type'] ?>">
         <?= $flash['message'] ?>
-        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
     </div>
 <?php endif; ?>
 
 <div class="page-header">
-    <h5><i class="fas fa-users"></i> Students (<?= count($students) ?>)</h5>
-    <p class="text-muted small">Showing only admitted/confirmed students</p>
+    <div class="page-header-left">
+        <h4><i class="fas fa-user-graduate"></i> Enrolled Students Directory (<?= count($students) ?>)</h4>
+    </div>
+    <div class="page-header-actions">
+        <a href="add.php" class="btn btn-primary"><i class="fas fa-user-plus"></i> Add Student</a>
+    </div>
 </div>
 
-<!-- Search Form -->
-<form method="GET" class="mb-3">
-    <div class="row">
-        <div class="col-md-9">
-            <input type="text" name="search" class="form-control" 
-                   placeholder="Search by Student ID, Name, or Father Name..." 
-                   value="<?= htmlspecialchars($search) ?>">
-        </div>
-        <div class="col-md-3">
-            <button type="submit" class="btn btn-primary w-100">
-                <i class="fas fa-search"></i> Search
-            </button>
+<div class="filter-bar" style="margin-bottom:20px;">
+    <form method="GET" style="display:flex;gap:10px;width:100%;">
+        <input type="text" name="search" 
+               placeholder="Search by Student ID, Name, or Father Name..." 
+               value="<?= htmlspecialchars($search) ?>">
+        <button type="submit" class="btn btn-primary">
+            <i class="fas fa-search"></i> Search
+        </button>
+        <?php if (!empty($search)): ?>
+            <a href="index.php" class="btn btn-outline">Clear</a>
+        <?php endif; ?>
+    </form>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <div>
+            <h3>Students Directory</h3>
+            <p>Active and past admitted students in admission module</p>
         </div>
     </div>
-</form>
-
-<?php if (empty($students)): ?>
-    <div class="alert alert-info">
-        <i class="fas fa-info-circle"></i> 
-        <?php if (!empty($search)): ?>
-            No students found matching "<strong><?= htmlspecialchars($search) ?></strong>"
+    <div class="card-content">
+        <?php if (empty($students)): ?>
+            <div class="empty-state">
+                <i class="fas fa-users" style="font-size:2rem;margin-bottom:8px;color:var(--muted);"></i>
+                <h5>No Students Found</h5>
+                <?php if (!empty($search)): ?>
+                    <p>No student records matching "<strong><?= htmlspecialchars($search) ?></strong>"</p>
+                <?php else: ?>
+                    <p>No students found. Students are automatically enrolled when applications are approved.</p>
+                <?php endif; ?>
+            </div>
         <?php else: ?>
-            No students found. Students are added automatically when applications are approved.
+            <div class="table-responsive">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Student ID</th>
+                            <th>Student Name</th>
+                            <th>Father Name</th>
+                            <th>Department</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php foreach($students as $s): ?>
+                        <tr>
+                            <td><strong><?= htmlspecialchars($s['student_id'] ?? 'N/A') ?></strong></td>
+                            <td><?= htmlspecialchars($s['student_name'] ?? 'N/A') ?></td>
+                            <td><?= htmlspecialchars($s['father_name'] ?? 'N/A') ?></td>
+                            <td><?= htmlspecialchars($s['department_name'] ?? 'N/A') ?></td>
+                            <td>
+                                <?php $status = strtolower($s['status'] ?? 'active'); ?>
+                                <span class="status-badge <?= $status ?>"><?= ucfirst($status) ?></span>
+                            </td>
+                            <td>
+                                <div class="actions">
+                                    <a href="view.php?id=<?= $s['id'] ?? 0 ?>" class="btn btn-sm btn-outline">
+                                        <i class="fas fa-eye"></i> View
+                                    </a>
+                                    <a href="edit.php?id=<?= $s['id'] ?? 0 ?>" class="btn btn-sm btn-outline">
+                                        <i class="fas fa-edit"></i> Edit
+                                    </a>
+                                </div>
+                            </td>
+                        </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+            </div>
         <?php endif; ?>
     </div>
-<?php else: ?>
-    <div class="table-responsive">
-        <table class="table table-hover datatable">
-            <thead>
-                <tr>
-                    <th>Student ID</th>
-                    <th>Name</th>
-                    <th>Father Name</th>
-                    <th>Department</th>
-                    <th>Status</th>
-                    <th>Actions</th>
-                </tr>
-            </thead>
-            <tbody>
-                <?php foreach($students as $s): ?>
-                <tr>
-                    <td><strong><?= $s['student_id'] ?? 'N/A' ?></strong></td>
-                    <td><?= $s['student_name'] ?? 'N/A' ?></td>
-                    <td><?= $s['father_name'] ?? 'N/A' ?></td>
-                    <td><?= $s['department_name'] ?? 'N/A' ?></td>
-                    <td>
-                        <?php 
-                        $status = $s['status'] ?? 'active';
-                        $badge_color = match($status) {
-                            'active' => 'success',
-                            'inactive' => 'secondary',
-                            'graduated' => 'primary',
-                            'suspended' => 'danger',
-                            default => 'secondary'
-                        };
-                        ?>
-                        <span class="badge bg-<?= $badge_color ?>"><?= ucfirst($status) ?></span>
-                    </td>
-                    <td>
-                        <a href="view.php?id=<?= $s['id'] ?? 0 ?>" class="btn btn-sm btn-info">
-                            <i class="fas fa-eye"></i> View
-                        </a>
-                        <a href="edit.php?id=<?= $s['id'] ?? 0 ?>" class="btn btn-sm btn-warning">
-                            <i class="fas fa-edit"></i> Edit
-                        </a>
-                    </td>
-                </tr>
-                <?php endforeach; ?>
-            </tbody>
-        </table>
-    </div>
-<?php endif; ?>
+</div>
 
 <?php include __DIR__ . '/../includes/footer.php'; ?>

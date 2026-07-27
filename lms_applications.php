@@ -57,62 +57,6 @@ if (file_exists($headerFile)) include $headerFile;
 if (file_exists($sidebarFile)) include $sidebarFile;
 ?>
 
-<style>
-    .modal-overlay {
-        display: none;
-        position: fixed;
-        top: 0; left: 0; right: 0; bottom: 0;
-        background: rgba(0,0,0,0.5);
-        z-index: 9999;
-        align-items: center;
-        justify-content: center;
-    }
-    .modal-overlay.active { display: flex; }
-    .modal-box {
-        background: white;
-        border-radius: 12px;
-        padding: 30px;
-        width: 100%;
-        max-width: 480px;
-        box-shadow: 0 20px 60px rgba(0,0,0,0.3);
-    }
-    .modal-box h3 { margin: 0 0 6px; font-size: 18px; }
-    .modal-box .modal-subtitle { color: #7f8c8d; font-size: 13px; margin-bottom: 18px; }
-    .modal-box textarea {
-        width: 100%;
-        min-height: 100px;
-        border: 1px solid #ddd;
-        border-radius: 8px;
-        padding: 12px;
-        font-size: 14px;
-        resize: vertical;
-        font-family: inherit;
-    }
-    .modal-box textarea:focus { outline: none; border-color: #667eea; }
-    .modal-actions { display: flex; gap: 10px; margin-top: 16px; justify-content: flex-end; }
-    .modal-actions button {
-        padding: 8px 20px;
-        border-radius: 6px;
-        border: none;
-        font-size: 14px;
-        font-weight: 600;
-        cursor: pointer;
-    }
-    .btn-cancel { background: #e9ecef; color: #333; }
-    .btn-approve { background: #28a745; color: white; }
-    .btn-reject { background: #dc3545; color: white; }
-    .response-msg {
-        margin-top: 6px;
-        padding: 6px 10px;
-        background: #f8f9fa;
-        border-radius: 6px;
-        font-size: 12px;
-        color: #555;
-        max-width: 250px;
-        word-break: break-word;
-    }
-</style>
-
 <div class="main-content">
     <div class="topbar">
         <div>
@@ -197,7 +141,6 @@ if (file_exists($sidebarFile)) include $sidebarFile;
             </table>
         </div>
     </div>
-</div>
 
 <!-- Modal -->
 <div class="modal-overlay" id="modal">
@@ -244,5 +187,4 @@ document.getElementById('modal').addEventListener('click', function(e) {
 });
 </script>
 
-</body>
-</html>
+<?php include __DIR__ . '/includes/footer.php'; ?>

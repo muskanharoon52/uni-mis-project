@@ -50,106 +50,6 @@ $page_title = 'View Attendance';
 include __DIR__ . '/../includes/sidebar.php';
 ?>
 
-<style>
-    .view-content {
-        margin-left: 250px;
-        padding: 20px;
-        min-height: 100vh;
-        background: #f5f6fa;
-    }
-    
-    .view-container {
-        max-width: 700px;
-        margin: 0 auto;
-        background: white;
-        padding: 30px;
-        border-radius: 10px;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    }
-    
-    .detail-row {
-        display: flex;
-        padding: 12px 0;
-        border-bottom: 1px solid #f0f2f5;
-    }
-    
-    .detail-row:last-child {
-        border-bottom: none;
-    }
-    
-    .detail-label {
-        font-weight: 600;
-        color: #2c3e50;
-        width: 150px;
-        flex-shrink: 0;
-    }
-    
-    .detail-value {
-        color: #555;
-        flex: 1;
-    }
-    
-    .status-badge {
-        padding: 4px 12px;
-        border-radius: 20px;
-        font-size: 14px;
-        font-weight: 500;
-        text-transform: capitalize;
-    }
-    
-    .status-badge.present {
-        background: #d4edda;
-        color: #155724;
-    }
-    
-    .status-badge.absent {
-        background: #f8d7da;
-        color: #721c24;
-    }
-    
-    .status-badge.late {
-        background: #fff3cd;
-        color: #856404;
-    }
-    
-    .status-badge.excused {
-        background: #cce5ff;
-        color: #004085;
-    }
-    
-    .header-icon {
-        color: #667eea;
-    }
-    
-    .btn-group-custom {
-        display: flex;
-        gap: 10px;
-        flex-wrap: wrap;
-    }
-    
-    @media (max-width: 768px) {
-        .view-content {
-            margin-left: 0;
-            padding: 15px;
-        }
-        
-        .view-container {
-            padding: 20px;
-        }
-        
-        .detail-row {
-            flex-direction: column;
-            padding: 10px 0;
-        }
-        
-        .detail-label {
-            width: 100%;
-            margin-bottom: 5px;
-        }
-    }
-</style>
-
-<div class="view-content">
     <div class="container-fluid">
         
         <div class="d-flex justify-content-between align-items-center mb-4">
@@ -238,6 +138,5 @@ include __DIR__ . '/../includes/sidebar.php';
         </div>
         
     </div>
-</div>
 
 <?php include __DIR__ . '/../includes/footer.php'; ?>

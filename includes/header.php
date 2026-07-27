@@ -1,292 +1,113 @@
-<!DOCTYPE html>
+<?php
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+
+require_once __DIR__ . '/../config/db_connect.php';
+require_once __DIR__ . '/../modules/sso/includes/auth.php';
+
+if (!isLoggedIn()) {
+    header('Location: /uni-mis-project/modules/sso/login.php');
+    exit();
+}
+
+$user = getCurrentUser();
+$pageTitle = $pageTitle ?? 'Dashboard';
+$currentPage = basename($_SERVER['PHP_SELF']);
+$currentFolder = basename(dirname($_SERVER['PHP_SELF']));
+$userName = $_SESSION['full_name'] ?? 'User';
+$userInitial = strtoupper(substr($userName, 0, 1));
+$roleName = ucfirst($_SESSION['role_name'] ?? 'User');
+?>
+<!doctype html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SSO Dashboard - University MIS</title>
-    <!-- Bootstrap CSS -->
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title><?= htmlspecialchars($pageTitle) ?> | University MIS</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <!-- Font Awesome -->
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
-    <!-- DataTables -->
-    <link href="https://cdn.datatables.net/1.13.4/css/dataTables.bootstrap5.min.css" rel="stylesheet">
-    <!-- Custom CSS -->
-    <style>
-        /* Reset and Base */
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: #f4f6f9;
-        }
-        
-        /* Sidebar Styles */
-        .sidebar {
-            min-height: 100vh;
-            background: #2d3748;
-            color: white;
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 250px;
-            z-index: 1000;
-            overflow-y: auto;
-            transition: all 0.3s ease;
-        }
-        
-        .sidebar-brand {
-            padding: 20px;
-            text-align: center;
-            border-bottom: 1px solid #4a5568;
-        }
-        
-        .sidebar-brand h4 {
-            margin: 0;
-            color: #fff;
-        }
-        
-        .sidebar-brand h4 i {
-            color: #667eea;
-        }
-        
-        .sidebar-user {
-            padding: 15px 20px;
-            border-bottom: 1px solid #4a5568;
-            text-align: center;
-        }
-        
-        .sidebar-user i {
-            font-size: 2.5rem;
-            color: #667eea;
-            margin-bottom: 5px;
-        }
-        
-        .sidebar-user .name {
-            font-weight: bold;
-            display: block;
-        }
-        
-        .sidebar-user .role {
-            color: #a0aec0;
-            font-size: 0.8rem;
-        }
-        
-        .sidebar-nav {
-            padding: 10px 0;
-        }
-        
-        .sidebar-nav .nav-link {
-            color: #cbd5e0;
-            padding: 10px 20px;
-            border-radius: 0;
-            transition: all 0.3s;
-        }
-        
-        .sidebar-nav .nav-link:hover {
-            background: #4a5568;
-            color: #fff;
-        }
-        
-        .sidebar-nav .nav-link.active {
-            background: #667eea;
-            color: #fff;
-        }
-        
-        .sidebar-nav .nav-link i {
-            margin-right: 10px;
-            width: 20px;
-            text-align: center;
-        }
-        
-        /* Main Content */
-        .main-content {
-            margin-left: 250px;
-            padding: 20px;
-            min-height: 100vh;
-            width: calc(100% - 250px);
-        }
-        
-        /* Cards */
-        .card {
-            border: none;
-            border-radius: 10px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.08);
-            margin-bottom: 20px;
-        }
-        
-        .card-header {
-            background: #fff;
-            border-bottom: 1px solid #e2e8f0;
-            padding: 15px 20px;
-        }
-        
-        .card-header h5 {
-            margin: 0;
-            color: #2d3748;
-        }
-        
-        /* Stat Cards */
-        .stat-card {
-            background: white;
-            padding: 20px;
-            border-radius: 10px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.08);
-            text-align: center;
-            transition: transform 0.3s;
-        }
-        
-        .stat-card:hover {
-            transform: translateY(-5px);
-        }
-        
-        .stat-card .stat-number {
-            font-size: 2rem;
-            font-weight: bold;
-            color: #2d3748;
-        }
-        
-        .stat-card .stat-label {
-            color: #666;
-            font-size: 14px;
-        }
-        
-        /* Filter Section */
-        .filter-section {
-            background: white;
-            padding: 20px;
-            border-radius: 10px;
-            margin-bottom: 20px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        }
-        
-        /* Student Avatar */
-        .student-avatar {
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
-            background: #3498db;
-            color: white;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-weight: 600;
-            font-size: 16px;
-        }
-        
-        /* Status Badges */
-        .status-badge {
-            padding: 4px 12px;
-            border-radius: 20px;
-            font-size: 12px;
-            font-weight: 500;
-        }
-        
-        .status-active {
-            background: #d4edda;
-            color: #155724;
-        }
-        
-        .status-confirmed {
-            background: #cce5ff;
-            color: #004085;
-        }
-        
-        .status-pending {
-            background: #fff3cd;
-            color: #856404;
-        }
-        
-        .status-inactive {
-            background: #e2e3e5;
-            color: #383d41;
-        }
-        
-        .status-graduated {
-            background: #d4edda;
-            color: #155724;
-        }
-        
-        /* Roll Badge */
-        .roll-badge {
-            font-family: 'Courier New', monospace;
-            font-weight: 700;
-            font-size: 13px;
-            color: #2c3e50;
-            background: #f8f9fa;
-            padding: 2px 8px;
-            border-radius: 4px;
-            border: 1px solid #dee2e6;
-        }
-        
-        /* Table Actions */
-        .table-actions .btn {
-            padding: 4px 8px;
-            font-size: 12px;
-            margin: 0 2px;
-        }
-        
-        /* Empty State */
-        .empty-state {
-            padding: 60px 0;
-            text-align: center;
-            color: #95a5a6;
-        }
-        
-        .empty-state i {
-            font-size: 64px;
-            margin-bottom: 20px;
-            opacity: 0.5;
-        }
-        
-        /* Responsive */
-        @media (max-width: 768px) {
-            .sidebar {
-                width: 200px;
-                margin-left: -200px;
-            }
-            
-            .sidebar.active {
-                margin-left: 0;
-            }
-            
-            .main-content {
-                margin-left: 0;
-                width: 100%;
-            }
-            
-            .sidebar-toggle {
-                display: block !important;
-            }
-        }
-        
-        .sidebar-toggle {
-            display: none;
-            position: fixed;
-            top: 10px;
-            left: 10px;
-            z-index: 1001;
-            background: #2d3748;
-            color: white;
-            border: none;
-            padding: 8px 12px;
-            border-radius: 5px;
-            cursor: pointer;
-        }
-    </style>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="/uni-mis-project/modules/lms/public/assets/style.css?v=<?= @filemtime($_SERVER['DOCUMENT_ROOT'] . '/uni-mis-project/modules/lms/public/assets/style.css') ?>">
 </head>
 <body>
+<button class="menu-toggle" id="menu-toggle">&#9776;</button>
+<div class="sidebar-overlay" id="sidebar-overlay"></div>
 
-<!-- Sidebar Toggle Button (Mobile) -->
-<button class="sidebar-toggle" onclick="toggleSidebar()">
-    <i class="fas fa-bars"></i>
-</button>
+<div class="app-shell">
+    <aside class="sidebar" id="sidebar">
+        <a href="/uni-mis-project/dashboard.php" class="brand">
+            <div class="brand-mark">MIS</div>
+            <div>
+                <h1>University MIS</h1>
+                <p>SSO Module</p>
+            </div>
+        </a>
 
-<script>
-function toggleSidebar() {
-    document.querySelector('.sidebar').classList.toggle('active');
-}
-</script>
+        <nav class="nav">
+            <span class="nav-section-label">Overview</span>
+            <a class="<?= $currentPage === 'dashboard.php' ? 'active' : '' ?>" href="/uni-mis-project/dashboard.php">
+                Dashboard
+            </a>
+
+            <span class="nav-section-label">Student Management</span>
+            <a class="<?= $currentFolder === 'students' ? 'active' : '' ?>" href="/uni-mis-project/students/index.php">
+                Students
+            </a>
+            <a class="<?= $currentFolder === 'student_enrollment' ? 'active' : '' ?>" href="/uni-mis-project/student_enrollment/index.php">
+                Enrollment
+            </a>
+
+            <span class="nav-section-label">Academics</span>
+            <a class="<?= $currentFolder === 'Courses' ? 'active' : '' ?>" href="/uni-mis-project/Courses/index.php">
+                Courses
+            </a>
+            <a class="<?= $currentFolder === 'semester_courses' ? 'active' : '' ?>" href="/uni-mis-project/semester_courses/index.php">
+                Semester Courses
+            </a>
+            <a class="<?= $currentFolder === 'teacher_assignment' ? 'active' : '' ?>" href="/uni-mis-project/teacher_assignment/index.php">
+                Teachers
+            </a>
+            <a class="<?= $currentFolder === 'TImetable' ? 'active' : '' ?>" href="/uni-mis-project/TImetable/index.php">
+                Timetable
+            </a>
+            <a class="<?= $currentFolder === 'attendance' ? 'active' : '' ?>" href="/uni-mis-project/attendance/index.php">
+                Attendance
+            </a>
+            <a class="<?= $currentFolder === 'applications' ? 'active' : '' ?>" href="/uni-mis-project/applications/index.php">
+                Admission Apps
+            </a>
+            <a class="<?= $currentPage === 'lms_applications.php' ? 'active' : '' ?>" href="/uni-mis-project/lms_applications.php">
+                LMS Applications
+            </a>
+
+            <div class="spacer"></div>
+
+            <a href="/uni-mis-project/logout.php" class="sidebar-logout-btn">
+                Logout
+            </a>
+        </nav>
+    </aside>
+
+    <main class="content">
+        <div class="topbar">
+            <div>
+                <span class="eyebrow">SSO Module</span>
+                <h2><?= htmlspecialchars($pageTitle) ?></h2>
+            </div>
+            <div class="topbar-actions">
+                <div class="topbar-user-dropdown">
+                    <button class="topbar-user-btn">
+                        <span class="topbar-user-avatar"><?= htmlspecialchars($userInitial) ?></span>
+                        <span class="topbar-user-name"><?= htmlspecialchars($userName) ?></span>
+                        <span class="topbar-chevron">&#9662;</span>
+                    </button>
+                    <div class="topbar-dropdown-menu">
+                        <span style="display:block;padding:6px 16px;font-size:12px;color:var(--muted);"><?= htmlspecialchars($roleName) ?></span>
+                        <a href="/uni-mis-project/logout.php">&#x2190; Logout</a>
+                    </div>
+                </div>
+            </div>
+        </div>

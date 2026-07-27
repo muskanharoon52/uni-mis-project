@@ -77,6 +77,12 @@ $userInitial = strtoupper(substr($userName, 0, 1));
             <a class="<?= $current_folder === 'logs' ? 'active' : '' ?>" href="/uni-mis-project/modules/finance/logs/index.php">
                 <span class="nav-icon">&#128336;</span> Activity Logs
             </a>
+
+            <div class="spacer"></div>
+
+            <a href="/uni-mis-project/logout.php" class="sidebar-logout-btn">
+                Logout
+            </a>
         </nav>
     </aside>
 

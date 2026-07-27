@@ -19,7 +19,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         verify_csrf();
         $photoPath = save_uploaded_file('profile_photo', 'profiles', ['jpg', 'jpeg', 'png', 'webp']);
         $deptId = (int) ($_POST['department'] ?? 0);
-        if ($deptId <= 0) $deptId = null;
+        if ($deptId <= 0) {
+            $deptId = null;
+        } else {
+            // Validate department exists
+            $checkStmt = db()->prepare('SELECT department_id FROM departments WHERE department_id = ?');
+            $checkStmt->execute([$deptId]);
+            if (!$checkStmt->fetch()) {
+                $deptId = null;
+            }
+        }
         $stmt = db()->prepare(
             'UPDATE users
              SET full_name = ?, department_id = ?, profile_photo = COALESCE(?, profile_photo)

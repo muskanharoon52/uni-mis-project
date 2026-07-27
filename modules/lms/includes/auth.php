@@ -51,6 +51,18 @@ function current_user(): ?array
         }
     }
 
+    // Load student_id for student role
+    if ($user !== null && $user['role'] === 'student' && empty($user['student_id'])) {
+        try {
+            $stmt = db()->prepare('SELECT student_id FROM students WHERE user_id = ? LIMIT 1');
+            $stmt->execute([(int) $user['id']]);
+            $user['student_id'] = (int) ($stmt->fetchColumn() ?: 0);
+            $_SESSION['lms_auth_user'] = $user;
+        } catch (Throwable $e) {
+            $user['student_id'] = 0;
+        }
+    }
+
     if ($user !== null && (!isset($user['status']) || !isset($user['department']) || $user['department'] === '' || !isset($user['department_id']))) {
         try {
             $stmt = db()->prepare('SELECT u.profile_photo, u.department_id, u.status, d.department_name FROM users u LEFT JOIN departments d ON d.department_id = u.department_id WHERE u.user_id = ? LIMIT 1');

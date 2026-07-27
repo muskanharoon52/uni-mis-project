@@ -27,70 +27,109 @@ if (!$app) {
     exit();
 }
 ?>
-<div class="page-header d-flex justify-content-between align-items-center">
-    <h5><i class="fas fa-file-alt"></i> Application Details</h5>
-    <div>
-        <a href="index.php" class="btn btn-secondary">Back</a>
+<div class="page-header">
+    <div class="page-header-left">
+        <h4><i class="fas fa-file-alt"></i> Application Details</h4>
+    </div>
+    <div class="page-header-actions">
+        <a href="index.php" class="btn btn-ghost"><i class="fas fa-arrow-left"></i> Back</a>
         <?php if(in_array($app['application_status'] ?? '', ['Submitted', 'Under Review'])): ?>
-        <a href="review.php?id=<?= $app['application_id'] ?>" class="btn btn-primary">Review</a>
+        <a href="review.php?id=<?= $app['application_id'] ?>" class="btn btn-primary"><i class="fas fa-check"></i> Review</a>
         <?php endif; ?>
     </div>
 </div>
 
-<div class="row">
-    <div class="col-md-6">
-        <div class="card">
-            <div class="card-header bg-primary text-white"><h6 class="mb-0">Personal Information</h6></div>
-            <div class="card-body">
-                <table class="table">
-                    <tr><th>Application No</th><td><strong><?= $app['temp_application_no'] ?? 'N/A' ?></strong></td></tr>
-                    <tr><th>Full Name</th><td><?= $app['full_name'] ?? 'N/A' ?></td></tr>
-                    <tr><th>Father Name</th><td><?= $app['father_name'] ?? 'N/A' ?></td></tr>
-                    <tr><th>CNIC/B-Form</th><td><?= $app['cnic_or_bform'] ?? 'N/A' ?></td></tr>
-                    <tr><th>Date of Birth</th><td><?= isset($app['dob']) ? date('d M Y', strtotime($app['dob'])) : 'N/A' ?></td></tr>
-                    <tr><th>Gender</th><td><?= $app['gender'] ?? 'N/A' ?></td></tr>
-                    <tr><th>Email</th><td><?= $app['email'] ?? 'N/A' ?></td></tr>
-                    <tr><th>Contact No</th><td><?= $app['contact_no'] ?? 'N/A' ?></td></tr>
-                    <tr><th>Address</th><td><?= $app['address'] ?? 'N/A' ?></td></tr>
-                </table>
+<div class="grid-2">
+    <div class="card">
+        <div class="card-header">
+            <h3>Personal Information</h3>
+            <p>Applicant's basic profile details</p>
+        </div>
+        <div class="card-content">
+            <div class="detail-row">
+                <div class="detail-label">Application No</div>
+                <div class="detail-value"><strong><?= htmlspecialchars($app['temp_application_no'] ?? 'N/A') ?></strong></div>
+            </div>
+            <div class="detail-row">
+                <div class="detail-label">Full Name</div>
+                <div class="detail-value"><?= htmlspecialchars($app['full_name'] ?? 'N/A') ?></div>
+            </div>
+            <div class="detail-row">
+                <div class="detail-label">Father Name</div>
+                <div class="detail-value"><?= htmlspecialchars($app['father_name'] ?? 'N/A') ?></div>
+            </div>
+            <div class="detail-row">
+                <div class="detail-label">CNIC/B-Form</div>
+                <div class="detail-value"><?= htmlspecialchars($app['cnic_or_bform'] ?? 'N/A') ?></div>
+            </div>
+            <div class="detail-row">
+                <div class="detail-label">Date of Birth</div>
+                <div class="detail-value"><?= isset($app['dob']) ? date('d M Y', strtotime($app['dob'])) : 'N/A' ?></div>
+            </div>
+            <div class="detail-row">
+                <div class="detail-label">Gender</div>
+                <div class="detail-value"><?= htmlspecialchars($app['gender'] ?? 'N/A') ?></div>
+            </div>
+            <div class="detail-row">
+                <div class="detail-label">Email</div>
+                <div class="detail-value"><?= htmlspecialchars($app['email'] ?? 'N/A') ?></div>
+            </div>
+            <div class="detail-row">
+                <div class="detail-label">Contact No</div>
+                <div class="detail-value"><?= htmlspecialchars($app['contact_no'] ?? 'N/A') ?></div>
+            </div>
+            <div class="detail-row">
+                <div class="detail-label">Address</div>
+                <div class="detail-value"><?= htmlspecialchars($app['address'] ?? 'N/A') ?></div>
             </div>
         </div>
     </div>
-    <div class="col-md-6">
-        <div class="card">
-            <div class="card-header bg-success text-white"><h6 class="mb-0">Academic Information</h6></div>
-            <div class="card-body">
-                <table class="table">
-                    <tr><th>Department</th><td><?= $app['department_name'] ?? 'N/A' ?></td></tr>
-                    <tr><th>Session</th><td><?= $app['session_name'] ?? 'N/A' ?></td></tr>
-                    <tr><th>Semester</th><td><?= $app['semester_name'] ?? 'N/A' ?></td></tr>
-                    <tr><th>Submitted Date</th><td><?= isset($app['submitted_at']) ? date('d M Y, h:i A', strtotime($app['submitted_at'])) : 'N/A' ?></td></tr>
-                    <tr><th>Status</th>
-                        <td>
-                            <?php 
-                            $status = $app['application_status'] ?? 'Submitted';
-                            $badge_color = match($status) {
-                                'Submitted' => 'warning',
-                                'Under Review' => 'info',
-                                'Approved' => 'success',
-                                'Rejected' => 'danger',
-                                'Admitted' => 'primary',
-                                'Cancelled' => 'secondary',
-                                default => 'secondary'
-                            };
-                            ?>
-                            <span class="badge bg-<?= $badge_color ?>"><?= $status ?></span>
-                        </td>
-                    </tr>
-                    <?php if($app['reviewer_name']): ?>
-                    <tr><th>Reviewed By</th><td><?= $app['reviewer_name'] ?></td></tr>
-                    <tr><th>Review Date</th><td><?= isset($app['reviewed_at']) ? date('d M Y, h:i A', strtotime($app['reviewed_at'])) : 'N/A' ?></td></tr>
-                    <?php endif; ?>
-                    <?php if($app['rejection_reason']): ?>
-                    <tr><th>Rejection Reason</th><td class="text-danger"><?= $app['rejection_reason'] ?></td></tr>
-                    <?php endif; ?>
-                </table>
+
+    <div class="card">
+        <div class="card-header">
+            <h3>Academic Information</h3>
+            <p>Program and processing status</p>
+        </div>
+        <div class="card-content">
+            <div class="detail-row">
+                <div class="detail-label">Department</div>
+                <div class="detail-value"><?= htmlspecialchars($app['department_name'] ?? 'N/A') ?></div>
             </div>
+            <div class="detail-row">
+                <div class="detail-label">Session</div>
+                <div class="detail-value"><?= htmlspecialchars($app['session_name'] ?? 'N/A') ?></div>
+            </div>
+            <div class="detail-row">
+                <div class="detail-label">Semester</div>
+                <div class="detail-value"><?= htmlspecialchars($app['semester_name'] ?? 'N/A') ?></div>
+            </div>
+            <div class="detail-row">
+                <div class="detail-label">Submitted Date</div>
+                <div class="detail-value"><?= isset($app['submitted_at']) ? date('d M Y, h:i A', strtotime($app['submitted_at'])) : 'N/A' ?></div>
+            </div>
+            <div class="detail-row">
+                <div class="detail-label">Status</div>
+                <div class="detail-value">
+                    <?php $status = $app['application_status'] ?? 'Submitted'; ?>
+                    <span class="status-badge <?= htmlspecialchars($status) ?>"><?= htmlspecialchars($status) ?></span>
+                </div>
+            </div>
+            <?php if(!empty($app['reviewer_name'])): ?>
+            <div class="detail-row">
+                <div class="detail-label">Reviewed By</div>
+                <div class="detail-value"><?= htmlspecialchars($app['reviewer_name']) ?></div>
+            </div>
+            <div class="detail-row">
+                <div class="detail-label">Review Date</div>
+                <div class="detail-value"><?= isset($app['reviewed_at']) ? date('d M Y, h:i A', strtotime($app['reviewed_at'])) : 'N/A' ?></div>
+            </div>
+            <?php endif; ?>
+            <?php if(!empty($app['rejection_reason'])): ?>
+            <div class="detail-row">
+                <div class="detail-label">Rejection Reason</div>
+                <div class="detail-value" style="color:var(--danger);"><?= htmlspecialchars($app['rejection_reason']) ?></div>
+            </div>
+            <?php endif; ?>
         </div>
     </div>
 </div>

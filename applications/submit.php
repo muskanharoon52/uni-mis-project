@@ -7,7 +7,6 @@ $conn = getConnection();
 $error = '';
 $success = '';
 
-// Get student ID for logged in user
 $student_id = '';
 $user_id = $_SESSION['user_id'] ?? 0;
 if ($user_id > 0) {
@@ -21,18 +20,16 @@ if ($user_id > 0) {
     $student_stmt->close();
 }
 
-// Check if user is student or admin
 $role_id = $_SESSION['role_id'] ?? 0;
 $is_student = ($role_id == 4);
 $is_admin = in_array($role_id, [1, 2]);
 
-// If not student and not admin, redirect
 if (!$is_student && !$is_admin) {
     header("Location: index.php?error=Access denied");
     exit;
 }
 
-// For admin, allow selecting student
+$students = [];
 if ($is_admin && empty($student_id)) {
     $students_query = "SELECT s.student_id, u.full_name 
                        FROM students s 
@@ -43,7 +40,6 @@ if ($is_admin && empty($student_id)) {
     $students = $students_result ? $students_result->fetch_all(MYSQLI_ASSOC) : [];
 }
 
-// Handle form submission
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $student_id = $_POST['student_id'] ?? $student_id;
     $application_type = $_POST['application_type'] ?? '';
@@ -51,13 +47,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $description = trim($_POST['description'] ?? '');
     $attachment = $_FILES['attachment'] ?? null;
 
-    // Validation
     if (empty($student_id)) $error = "Please select a student";
     elseif (empty($application_type)) $error = "Please select application type";
     elseif (empty($subject)) $error = "Please enter a subject";
     elseif (empty($description)) $error = "Please enter a description";
 
-    // Handle file upload
     $attachment_path = '';
     if ($attachment && $attachment['error'] == 0) {
         $allowed_types = ['pdf', 'doc', 'docx', 'jpg', 'jpeg', 'png'];
@@ -69,9 +63,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $error = "File size too large. Maximum 5MB allowed.";
         } else {
             $upload_dir = __DIR__ . '/../uploads/applications/';
-            if (!is_dir($upload_dir)) {
-                mkdir($upload_dir, 0777, true);
-            }
+            if (!is_dir($upload_dir)) { mkdir($upload_dir, 0777, true); }
             $attachment_path = 'uploads/applications/' . time() . '_' . basename($attachment['name']);
             if (!move_uploaded_file($attachment['tmp_name'], __DIR__ . '/../' . $attachment_path)) {
                 $error = "Failed to upload file.";
@@ -96,172 +88,91 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-// ============================================
-// HEADER INCLUDE
-// ============================================
 require_once __DIR__ . '/../includes/header.php';
 $page_title = 'Submit Application';
 include __DIR__ . '/../includes/sidebar.php';
 ?>
 
-<style>
-    .submit-content {
-        margin-left: 250px;
-        padding: 20px;
-        min-height: 100vh;
-        background: #f5f6fa;
-    }
-    
-    .form-container {
-        max-width: 700px;
-        margin: 0 auto;
-        background: white;
-        padding: 30px;
-        border-radius: 10px;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    }
-    
-    .form-container .form-label {
-        font-weight: 600;
-        color: #2c3e50;
-    }
-    
-    .required-star {
-        color: #e74c3c;
-        margin-left: 3px;
-    }
-    
-    .file-upload-wrapper {
-        border: 2px dashed #ced4da;
-        border-radius: 8px;
-        padding: 20px;
-        text-align: center;
-        cursor: pointer;
-        transition: all 0.3s;
-    }
-    
-    .file-upload-wrapper:hover {
-        border-color: #3498db;
-        background: #f8f9ff;
-    }
-    
-    .file-upload-wrapper i {
-        font-size: 2rem;
-        color: #6c757d;
-    }
-    
-    .btn-submit {
-        border-radius: 20px;
-        padding: 10px 30px;
-        font-weight: 600;
-    }
-    
-    @media (max-width: 768px) {
-        .submit-content {
-            margin-left: 0;
-            padding: 15px;
-        }
-        
-        .form-container {
-            padding: 20px;
-        }
-    }
-</style>
-
-<div class="submit-content">
-    <div class="container-fluid">
-        
-        <div class="d-flex justify-content-between align-items-center mb-4">
-            <h4><i class="fas fa-plus-circle"></i> Submit Application</h4>
-            <a href="index.php" class="btn btn-secondary">
-                <i class="fas fa-arrow-left"></i> Back to List
-            </a>
-        </div>
-
-        <?php if ($error): ?>
-            <div class="alert alert-danger"><?= htmlspecialchars($error) ?></div>
-        <?php endif; ?>
-
-        <div class="form-container">
-            <form method="POST" action="" enctype="multipart/form-data">
-                <!-- Student Selection (Only for Admin) -->
-                <?php if ($is_admin && isset($students)): ?>
-                    <div class="mb-3">
-                        <label class="form-label">Student <span class="required-star">*</span></label>
-                        <select name="student_id" class="form-select" required>
-                            <option value="">Select Student</option>
-                            <?php foreach($students as $student): ?>
-                                <option value="<?= $student['student_id'] ?>">
-                                    <?= htmlspecialchars($student['full_name']) ?> (<?= $student['student_id'] ?>)
-                                </option>
-                            <?php endforeach; ?>
-                        </select>
-                    </div>
-                <?php else: ?>
-                    <input type="hidden" name="student_id" value="<?= $student_id ?>">
-                <?php endif; ?>
-
-                <!-- Application Type -->
-                <div class="mb-3">
-                    <label class="form-label">Application Type <span class="required-star">*</span></label>
-                    <select name="application_type" class="form-select" required>
-                        <option value="">Select Type</option>
-                        <option value="Leave">Leave Application</option>
-                        <option value="Bonafide Certificate">Bonafide Certificate</option>
-                        <option value="Transcript">Transcript Request</option>
-                        <option value="ID Card">ID Card Request</option>
-                        <option value="Semester Freeze">Semester Freeze</option>
-                        <option value="Course Withdrawal">Course Withdrawal</option>
-                    </select>
-                </div>
-
-                <!-- Subject -->
-                <div class="mb-3">
-                    <label class="form-label">Subject <span class="required-star">*</span></label>
-                    <input type="text" name="subject" class="form-control" placeholder="Brief subject of application" required>
-                </div>
-
-                <!-- Description -->
-                <div class="mb-3">
-                    <label class="form-label">Description <span class="required-star">*</span></label>
-                    <textarea name="description" class="form-control" rows="5" placeholder="Provide detailed description of your application..." required></textarea>
-                </div>
-
-                <!-- Attachment -->
-                <div class="mb-3">
-                    <label class="form-label">Attachment (Optional)</label>
-                    <div class="file-upload-wrapper" onclick="document.getElementById('fileInput').click()">
-                        <i class="fas fa-cloud-upload-alt"></i>
-                        <p class="mb-0 mt-2">Click to upload or drag and drop</p>
-                        <small class="text-muted">PDF, DOC, DOCX, JPG, PNG (Max 5MB)</small>
-                        <input type="file" name="attachment" id="fileInput" class="d-none" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png">
-                    </div>
-                    <div id="fileInfo" class="mt-2 text-success" style="display: none;">
-                        <i class="fas fa-check-circle"></i> <span id="fileName"></span>
-                    </div>
-                </div>
-
-                <!-- Submit Buttons -->
-                <div class="d-flex gap-2 mt-4">
-                    <button type="submit" class="btn btn-primary btn-submit">
-                        <i class="fas fa-paper-plane"></i> Submit Application
-                    </button>
-                    <a href="index.php" class="btn btn-secondary">Cancel</a>
-                </div>
-            </form>
-        </div>
-        
+<div class="page-header">
+    <h4>Submit Application</h4>
+    <div class="page-header-actions">
+        <a href="index.php" class="btn btn-outline">Back to List</a>
     </div>
 </div>
 
+<?php if ($error): ?>
+    <div class="alert alert-error"><?= htmlspecialchars($error) ?></div>
+<?php endif; ?>
+
+<div class="form-container">
+    <form method="POST" action="" enctype="multipart/form-data">
+        <?php if ($is_admin && !empty($students)): ?>
+            <div class="form-group">
+                <label>Student <span class="required-star">*</span></label>
+                <select name="student_id" required>
+                    <option value="">Select Student</option>
+                    <?php foreach($students as $student): ?>
+                        <option value="<?= $student['student_id'] ?>">
+                            <?= htmlspecialchars($student['full_name']) ?> (<?= $student['student_id'] ?>)
+                        </option>
+                    <?php endforeach; ?>
+                </select>
+            </div>
+        <?php else: ?>
+            <input type="hidden" name="student_id" value="<?= $student_id ?>">
+        <?php endif; ?>
+
+        <div class="form-group">
+            <label>Application Type <span class="required-star">*</span></label>
+            <select name="application_type" required>
+                <option value="">Select Type</option>
+                <option value="Leave">Leave Application</option>
+                <option value="Bonafide Certificate">Bonafide Certificate</option>
+                <option value="Transcript">Transcript Request</option>
+                <option value="ID Card">ID Card Request</option>
+                <option value="Semester Freeze">Semester Freeze</option>
+                <option value="Course Withdrawal">Course Withdrawal</option>
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label>Subject <span class="required-star">*</span></label>
+            <input type="text" name="subject" placeholder="Brief subject of application" required>
+        </div>
+
+        <div class="form-group">
+            <label>Description <span class="required-star">*</span></label>
+            <textarea name="description" rows="5" placeholder="Provide detailed description of your application..." required></textarea>
+        </div>
+
+        <div class="form-group">
+            <label>Attachment (Optional)</label>
+            <div onclick="document.getElementById('fileInput').click()" style="border:2px dashed var(--border);border-radius:var(--radius);padding:24px;text-align:center;cursor:pointer;transition:all .15s var(--ease);" onmouseover="this.style.borderColor='var(--accent)'" onmouseout="this.style.borderColor='var(--border)'">
+                <div style="font-size:1.5rem;color:var(--muted);margin-bottom:4px;">+</div>
+                <div style="font-size:.84rem;color:var(--text-secondary);">Click to upload or drag and drop</div>
+                <div class="muted" style="font-size:12px;margin-top:4px;">PDF, DOC, DOCX, JPG, PNG (Max 5MB)</div>
+                <input type="file" name="attachment" id="fileInput" style="display:none;" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png">
+            </div>
+            <div id="fileInfo" style="display:none;margin-top:8px;color:var(--success);font-size:.84rem;">
+                <span id="fileName"></span>
+            </div>
+        </div>
+
+        <div class="form-actions">
+            <button type="submit" class="btn btn-primary">Submit Application</button>
+            <a href="index.php" class="btn btn-ghost">Cancel</a>
+        </div>
+    </form>
+</div>
+
 <script>
-    document.getElementById('fileInput').addEventListener('change', function(e) {
-        const fileName = e.target.files[0]?.name;
-        if (fileName) {
-            document.getElementById('fileName').textContent = fileName;
-            document.getElementById('fileInfo').style.display = 'block';
-        }
-    });
+document.getElementById('fileInput').addEventListener('change', function(e) {
+    const fileName = e.target.files[0]?.name;
+    if (fileName) {
+        document.getElementById('fileName').textContent = fileName;
+        document.getElementById('fileInfo').style.display = 'block';
+    }
+});
 </script>
 
 <?php include __DIR__ . '/../includes/footer.php'; ?>

@@ -39,6 +39,8 @@ function ensure_lms_columns(PDO $pdo): void
     ensure_column($pdo, 'courses', 'teacher_id', 'INT NULL');
 
     ensure_column($pdo, 'attendance', 'teacher_id', 'INT NULL');
+
+    ensure_column($pdo, 'lms_marks', 'total_marks', 'DECIMAL(10,2) NULL');
 }
 
 function ensure_column(PDO $pdo, string $table, string $column, string $definition): void

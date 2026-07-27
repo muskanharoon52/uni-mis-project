@@ -63,82 +63,7 @@ $page_title = 'My Applications';
 include __DIR__ . '/../includes/sidebar.php';
 ?>
 
-<style>
-    .my-apps-content {
-        margin-left: 250px;
-        padding: 20px;
-        min-height: 100vh;
-        background: #f5f6fa;
-    }
-    
-    .stats-card {
-        background: white;
-        padding: 20px;
-        border-radius: 10px;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        text-align: center;
-    }
-    
-    .stats-number {
-        font-size: 2rem;
-        font-weight: 700;
-    }
-    
-    .stats-total .stats-number { color: #2c3e50; }
-    .stats-pending .stats-number { color: #f39c12; }
-    .stats-approved .stats-number { color: #27ae60; }
-    .stats-rejected .stats-number { color: #e74c3c; }
-    
-    .status-badge {
-        padding: 4px 12px;
-        border-radius: 20px;
-        font-size: 12px;
-        font-weight: 500;
-    }
-    
-    .status-badge.Pending {
-        background: #fff3cd;
-        color: #856404;
-    }
-    
-    .status-badge.Approved {
-        background: #d4edda;
-        color: #155724;
-    }
-    
-    .status-badge.Rejected {
-        background: #f8d7da;
-        color: #721c24;
-    }
-    
-    .type-badge {
-        padding: 4px 10px;
-        border-radius: 12px;
-        font-size: 11px;
-        font-weight: 500;
-        background: #e9ecef;
-        color: #495057;
-    }
-    
-    .table-actions .btn {
-        padding: 4px 8px;
-        font-size: 12px;
-        margin: 0 2px;
-    }
-    
-    @media (max-width: 768px) {
-        .my-apps-content {
-            margin-left: 0;
-            padding: 15px;
-        }
-        
-        .stats-card {
-            margin-bottom: 15px;
-        }
-    }
-</style>
 
-<div class="my-apps-content">
     <div class="container-fluid">
         
         <div class="d-flex justify-content-between align-items-center mb-4">
@@ -155,25 +80,25 @@ include __DIR__ . '/../includes/sidebar.php';
         <!-- Statistics -->
         <div class="row mb-4">
             <div class="col-md-3">
-                <div class="stats-card stats-total">
+                <div class="card stats-total">
                     <div class="stats-number"><?= $stats['total'] ?? 0 ?></div>
                     <div class="stats-label">Total</div>
                 </div>
             </div>
             <div class="col-md-3">
-                <div class="stats-card stats-pending">
+                <div class="card stats-pending">
                     <div class="stats-number"><?= $stats['pending'] ?? 0 ?></div>
                     <div class="stats-label">Pending</div>
                 </div>
             </div>
             <div class="col-md-3">
-                <div class="stats-card stats-approved">
+                <div class="card stats-approved">
                     <div class="stats-number"><?= $stats['approved'] ?? 0 ?></div>
                     <div class="stats-label">Approved</div>
                 </div>
             </div>
             <div class="col-md-3">
-                <div class="stats-card stats-rejected">
+                <div class="card stats-rejected">
                     <div class="stats-number"><?= $stats['rejected'] ?? 0 ?></div>
                     <div class="stats-label">Rejected</div>
                 </div>
@@ -264,8 +189,6 @@ include __DIR__ . '/../includes/sidebar.php';
                 <?php endif; ?>
             </div>
         </div>
-        
     </div>
-</div>
 
 <?php include __DIR__ . '/../includes/footer.php'; ?>

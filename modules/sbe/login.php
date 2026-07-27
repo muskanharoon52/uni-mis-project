@@ -7,6 +7,8 @@ require __DIR__ . '/includes/helpers.php';
 require __DIR__ . '/includes/auth.php';
 
 $config = require __DIR__ . '/config/app.php';
+$demoAuth = $config['demo_auth'] ?? [];
+$selected_role = (string) ($_POST['role'] ?? 'teacher');
 
 if (current_user()) {
     $user = current_user();
@@ -16,6 +18,7 @@ if (current_user()) {
 $error = null;
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    verify_csrf();
     $role    = (string) ($_POST['role'] ?? 'teacher');
     $loginId = trim((string) ($_POST['login_id'] ?? ''));
     $password = (string) ($_POST['password'] ?? '');
@@ -52,6 +55,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     if ($user && $user['status'] === 'Active' && password_verify($password, $user['password_hash'])) {
+        // Use IDs from sbe_auth_users directly
+        $teacherId = (int) ($user['teacher_id'] ?? 0);
+        $studentId = (int) ($user['student_id'] ?? 0);
+        $user['teacher_id'] = $teacherId;
+        $user['student_id'] = $studentId;
+        
         auth_login($user);
         redirect($role === 'student' ? 'student-home.php' : 'teacher-home.php');
     }
@@ -69,60 +78,36 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="assets/css/style.css">
+    <link rel="stylesheet" href="assets/css/style.css?v=<?= filemtime(__DIR__ . '/assets/css/style.css') ?>">
 </head>
 <body class="login-page">
 
 <div class="login-container">
-    <section class="login-hero">
-        <div class="login-brand">
-            <div class="brand-mark">SBE</div>
-        </div>
-        <div class="login-title">
-            <h1>System Based Examination</h1>
-            <p>Secure access to exams, schedules, question banks, and results.</p>
-        </div>
-        <div class="hero-points">
-            <div class="hero-point">
-                <div class="role-pill">TCH</div>
-                <div>
-                    <strong>Faculty Portal</strong>
-                    <p class="small">Create exams, manage question banks, and review results.</p>
-                </div>
-            </div>
-            <div class="hero-point">
-                <div class="role-pill">STU</div>
-                <div>
-                    <strong>Student Portal</strong>
-                    <p class="small">Take exams, view schedules, and check results.</p>
-                </div>
-            </div>
-        </div>
-    </section>
-
     <aside class="login-panel">
-        <div style="font-size:2rem;font-weight:800;color:var(--accent);margin-bottom:18px;">&#9733;</div>
         <h3>Sign in to SBE</h3>
-        <p class="muted" style="margin-bottom:22px;">Access your exams and results instantly.</p>
+        <p class="muted" style="margin-bottom:20px;">Access your portal securely.</p>
 
         <?php if ($error): ?>
             <div class="alert alert-error" style="margin-bottom:16px;"><?= e($error) ?></div>
         <?php endif; ?>
 
         <form method="post" onsubmit="setLoading(this)">
-            <div class="login-tabs">
-                <button class="login-tab active" type="button" onclick="setRole('teacher', this)">Faculty / Teacher</button>
-                <button class="login-tab" type="button" onclick="setRole('student', this)">Student</button>
-            </div>
+            <input type="hidden" name="_csrf_token" value="<?= e(csrf_token()) ?>">
 
-            <input type="hidden" name="role" id="selected-role" value="teacher">
+            <div class="field" style="margin-bottom:16px;">
+                <label>Login As</label>
+                <select name="role" required>
+                    <option value="teacher" <?= $selected_role === 'teacher' ? 'selected' : '' ?>>Faculty</option>
+                    <option value="student" <?= $selected_role === 'student' ? 'selected' : '' ?>>Student</option>
+                </select>
+            </div>
 
             <div class="field" style="margin-bottom:16px;">
                 <label>User ID</label>
                 <input type="text" name="login_id" required placeholder="Enter your ID" autocomplete="username">
             </div>
 
-            <div class="field password-field" style="margin-bottom:24px;">
+            <div class="field password-field" style="margin-bottom:20px;">
                 <label>Password</label>
                 <input type="password" name="password" id="pass-field" required placeholder="Enter password" autocomplete="current-password">
                 <button class="password-toggle" type="button" onclick="togglePass()">&#128065;</button>
@@ -134,17 +119,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 </div>
 
 <script>
-function setRole(role, btn) {
-    document.querySelectorAll('.login-tab').forEach(t => t.classList.remove('active'));
-    btn.classList.add('active');
-    document.getElementById('selected-role').value = role;
-}
-
 function togglePass() {
     const input = document.getElementById('pass-field');
     input.type = input.type === 'password' ? 'text' : 'password';
 }
-
 function setLoading(form) {
     const btn = form.querySelector('button[type="submit"]');
     btn.classList.add('btn-loading');

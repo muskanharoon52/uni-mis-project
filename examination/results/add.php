@@ -60,80 +60,78 @@ if (!$students) {
 ?>
 
 <div class="content-area" id="contentArea">
-    <div class="row justify-content-center">
-        <div class="col-md-8">
-            <div class="card">
-                <div class="card-header">
-                    <h5>Add Exam Results</h5>
-                </div>
-                <div class="card-body">
-                    <?php if ($formError): ?>
-                        <div class="alert alert-danger"><?php echo htmlspecialchars($formError); ?></div>
+    <div class="page-header">
+        <div class="page-header-left">
+            <h4>Add Exam Results</h4>
+        </div>
+    </div>
+
+    <div class="form-container">
+        <form method="POST">
+            <?php if ($formError): ?>
+                <div class="alert alert-error"><?php echo htmlspecialchars($formError); ?></div>
+            <?php endif; ?>
+
+            <div class="form-group">
+                <label for="student_id">Student</label>
+                <select id="student_id" name="student_id" required>
+                    <option value="">Select Student</option>
+                    <?php if ($students && $students->num_rows > 0): ?>
+                        <?php while($student = $students->fetch_assoc()): ?>
+                            <option value="<?php echo $student['student_id']; ?>">
+                                <?php echo htmlspecialchars($student['full_name'] . ' (ID: ' . $student['student_id'] . ') - ' . $student['program_name']); ?>
+                            </option>
+                        <?php endwhile; ?>
+                    <?php else: ?>
+                        <option value="">No students available</option>
                     <?php endif; ?>
-                    <form method="POST">
-                        <div class="mb-3">
-                            <label for="student_id" class="form-label">Student</label>
-                            <select class="form-select" id="student_id" name="student_id" required>
-                                <option value="">Select Student</option>
-                                <?php if ($students && $students->num_rows > 0): ?>
-                                    <?php while($student = $students->fetch_assoc()): ?>
-                                        <option value="<?php echo $student['student_id']; ?>">
-                                            <?php echo htmlspecialchars($student['full_name'] . ' (ID: ' . $student['student_id'] . ') - ' . $student['program_name']); ?>
-                                        </option>
-                                    <?php endwhile; ?>
-                                <?php else: ?>
-                                    <option value="">No students available</option>
-                                <?php endif; ?>
-                            </select>
-                        </div>
-                        
-                        <div class="mb-3">
-                            <label for="exam_id" class="form-label">Exam Schedule</label>
-                            <select class="form-select" id="exam_id" name="exam_id" required>
-                                <option value="">Select Exam</option>
-                                <?php if ($schedules && count($schedules) > 0): ?>
-                                    <?php foreach($schedules as $schedule): ?>
-                                        <option value="<?php echo $schedule['exam_id']; ?>">
-                                            <?php echo htmlspecialchars($schedule['course_code'] . ' - ' . $schedule['exam_type'] . ' (' . date('M d', strtotime($schedule['date'])) . ')'); ?>
-                                        </option>
-                                    <?php endforeach; ?>
-                                <?php else: ?>
-                                    <option value="">No exams available</option>
-                                <?php endif; ?>
-                            </select>
-                        </div>
-                        
-                        <div class="row">
-                            <div class="col-md-6 mb-3">
-                                <label for="marks_obtained" class="form-label">Marks Obtained</label>
-                                <input type="number" step="0.01" class="form-control" id="marks_obtained" name="marks_obtained" required min="0">
-                            </div>
-                            <div class="col-md-6 mb-3">
-                                <label for="total_marks" class="form-label">Total Marks</label>
-                                <input type="number" step="0.01" class="form-control" id="total_marks" name="total_marks" required min="1">
-                            </div>
-                        </div>
-                        
-                        <div class="mb-3">
-                            <label for="grade" class="form-label">Grade</label>
-                            <select class="form-select" id="grade" name="grade" required>
-                                <option value="">Select Grade</option>
-                                <option value="A">A (Excellent)</option>
-                                <option value="B">B (Good)</option>
-                                <option value="C">C (Average)</option>
-                                <option value="D">D (Poor)</option>
-                                <option value="F">F (Fail)</option>
-                            </select>
-                        </div>
-                        
-                        <div class="d-flex justify-content-end">
-                            <a href="index.php" class="btn btn-secondary me-2">Cancel</a>
-                            <button type="submit" class="btn btn-primary">Add Result</button>
-                        </div>
-                    </form>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label for="exam_id">Exam Schedule</label>
+                <select id="exam_id" name="exam_id" required>
+                    <option value="">Select Exam</option>
+                    <?php if ($schedules && count($schedules) > 0): ?>
+                        <?php foreach($schedules as $schedule): ?>
+                            <option value="<?php echo $schedule['exam_id']; ?>">
+                                <?php echo htmlspecialchars($schedule['course_code'] . ' - ' . $schedule['exam_type'] . ' (' . date('M d', strtotime($schedule['date'])) . ')'); ?>
+                            </option>
+                        <?php endforeach; ?>
+                    <?php else: ?>
+                        <option value="">No exams available</option>
+                    <?php endif; ?>
+                </select>
+            </div>
+            
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="marks_obtained">Marks Obtained</label>
+                    <input type="number" step="0.01" id="marks_obtained" name="marks_obtained" required min="0">
+                </div>
+                <div class="form-group">
+                    <label for="total_marks">Total Marks</label>
+                    <input type="number" step="0.01" id="total_marks" name="total_marks" required min="1">
                 </div>
             </div>
-        </div>
+            
+            <div class="form-group">
+                <label for="grade">Grade</label>
+                <select id="grade" name="grade" required>
+                    <option value="">Select Grade</option>
+                    <option value="A">A (Excellent)</option>
+                    <option value="B">B (Good)</option>
+                    <option value="C">C (Average)</option>
+                    <option value="D">D (Poor)</option>
+                    <option value="F">F (Fail)</option>
+                </select>
+            </div>
+            
+            <div class="form-actions">
+                <a href="index.php" class="btn btn-ghost">Cancel</a>
+                <button type="submit" class="btn btn-primary">Add Result</button>
+            </div>
+        </form>
     </div>
 </div>
 

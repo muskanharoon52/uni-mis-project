@@ -121,50 +121,7 @@ $page_title = 'Edit Course';
 include __DIR__ . '/../includes/sidebar.php';
 ?>
 
-<style>
-    .form-section {
-        background: white;
-        padding: 25px;
-        border-radius: 10px;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        margin-bottom: 20px;
-    }
-    
-    .form-section-title {
-        font-weight: 600;
-        color: #2c3e50;
-        margin-bottom: 20px;
-        padding-bottom: 10px;
-        border-bottom: 2px solid #f0f2f5;
-    }
-    
-    .required-field::after {
-        content: '*';
-        color: #e74c3c;
-        margin-left: 4px;
-    }
-    
-    /* FIX: Content container with margin-left to push content right */
-    .courses-content {
-        margin-left: 250px;
-        padding: 20px;
-        min-height: 100vh;
-        background: #f5f6fa;
-    }
-    
-    @media (max-width: 768px) {
-        .courses-content {
-            margin-left: 0;
-            padding: 15px;
-        }
-    }
-</style>
-
-<!-- ============================================ -->
-<!-- CONTENT WITH MARGIN-LEFT TO PUSH RIGHT -->
-<!-- ============================================ -->
-<div class="courses-content">
-    <div class="container-fluid" style="padding: 0 !important;">
+<div class="container-fluid" style="padding: 0 !important;">
         
         <!-- Page Header -->
         <div class="d-flex justify-content-between align-items-center mb-4">
@@ -272,6 +229,5 @@ include __DIR__ . '/../includes/sidebar.php';
         </form>
         
     </div>
-</div>
 
 <?php include __DIR__ . '/../includes/footer.php'; ?>

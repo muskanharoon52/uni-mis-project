@@ -35,7 +35,6 @@ include __DIR__ . '/../includes/header.php';
 include __DIR__ . '/../includes/sidebar.php';
 ?>
 
-<div class="main-content">
     <div class="container-fluid">
         <div class="d-flex justify-content-between align-items-center mb-4">
             <h2><i class="fas fa-user-graduate"></i> Student Profile</h2>
@@ -137,6 +136,5 @@ include __DIR__ . '/../includes/sidebar.php';
             </div>
         </div>
     </div>
-</div>
 
 <?php include __DIR__ . '/../includes/footer.php'; ?>

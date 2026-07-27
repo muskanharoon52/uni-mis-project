@@ -1,14 +1,5 @@
 <?php
-session_start();
-if (!isset($_SESSION['user_id'])) {
-    header('Location: /uni-mis-project/modules/sso/login.php');
-    exit();
-}
-if ($_SESSION['role_id'] != 3 && $_SESSION['role_id'] != 1) {
-    header('Location: /uni-mis-project/modules/sso/login.php?error=Access denied');
-    exit();
-}
-
+$pageTitle = 'Edit Fee Head';
 include_once __DIR__ . '/../includes/header.php';
 
 $error = '';
@@ -20,7 +11,6 @@ if (!isset($_GET['id']) || empty($_GET['id'])) {
 }
 
 $fee_head_id = mysqli_real_escape_string($conn, $_GET['id']);
-
 $sql = "SELECT * FROM fee_heads WHERE fee_head_id = '$fee_head_id' AND deleted_at IS NULL";
 $result = mysqli_query($conn, $sql);
 
@@ -35,7 +25,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $fee_head_name = mysqli_real_escape_string($conn, $_POST['fee_head_name']);
     $description = mysqli_real_escape_string($conn, $_POST['description']);
     $status = mysqli_real_escape_string($conn, $_POST['status']);
-    $updated_by = $_SESSION['user_id'] ?? 1;
 
     if (empty($fee_head_name)) {
         $error = "Fee Head Name is required!";
@@ -58,7 +47,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 $success = "Fee head updated successfully!";
                 $result = mysqli_query($conn, $sql);
                 $row = mysqli_fetch_assoc($result);
-                header("refresh:2;url=index.php?msg=Fee head updated successfully!");
+                header("refresh:1;url=index.php?msg=Fee head updated successfully!");
             } else {
                 $error = "Error: " . mysqli_error($conn);
             }
@@ -67,45 +56,40 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 }
 ?>
 
-<div class="d-flex justify-content-between align-items-center mb-3">
-    <h2><i class="fas fa-edit text-warning"></i> Edit Fee Head</h2>
-    <a href="index.php" class="btn btn-secondary"><i class="fas fa-arrow-left"></i> Back to List</a>
+<div style="margin-bottom:16px;">
+    <a href="index.php" class="btn btn-ghost" style="font-size:.82rem;">&#8592; Back to Fee Heads</a>
 </div>
 
-<?php if(!empty($error)): ?>
-    <div class="alert alert-danger"><?php echo $error; ?></div>
-<?php endif; ?>
+<?php if ($error): ?><div class="alert alert-error"><?= htmlspecialchars($error) ?></div><?php endif; ?>
+<?php if ($success): ?><div class="alert alert-success"><?= htmlspecialchars($success) ?></div><?php endif; ?>
 
-<?php if(!empty($success)): ?>
-    <div class="alert alert-success"><?php echo $success; ?></div>
-<?php endif; ?>
-
-<div class="card shadow">
-    <div class="card-body">
-        <form method="POST" action="">
-            <div class="mb-3">
-                <label for="fee_head_name" class="form-label">Fee Head Name <span class="text-danger">*</span></label>
-                <input type="text" class="form-control" id="fee_head_name" name="fee_head_name" 
-                       value="<?php echo htmlspecialchars($row['fee_head_name']); ?>" required>
+<div class="card" style="max-width:560px;">
+    <div class="card-header">
+        <h3>Edit Fee Head</h3>
+    </div>
+    <form method="post">
+        <div style="padding:22px;">
+            <div class="field">
+                <label>Fee Head Name <span style="color:var(--danger);">*</span></label>
+                <input type="text" name="fee_head_name" required value="<?= htmlspecialchars($row['fee_head_name']) ?>">
             </div>
-
-            <div class="mb-3">
-                <label for="description" class="form-label">Description</label>
-                <textarea class="form-control" id="description" name="description" rows="3"><?php echo htmlspecialchars($row['description']); ?></textarea>
+            <div class="field">
+                <label>Description</label>
+                <textarea name="description" rows="3"><?= htmlspecialchars($row['description']) ?></textarea>
             </div>
-
-            <div class="mb-3">
-                <label for="status" class="form-label">Status</label>
-                <select class="form-select" id="status" name="status">
-                    <option value="Active" <?php echo ($row['status'] == 'Active') ? 'selected' : ''; ?>>Active</option>
-                    <option value="Inactive" <?php echo ($row['status'] == 'Inactive') ? 'selected' : ''; ?>>Inactive</option>
+            <div class="field">
+                <label>Status</label>
+                <select name="status">
+                    <option value="Active" <?= $row['status'] === 'Active' ? 'selected' : '' ?>>Active</option>
+                    <option value="Inactive" <?= $row['status'] === 'Inactive' ? 'selected' : '' ?>>Inactive</option>
                 </select>
             </div>
-
-            <button type="submit" class="btn btn-warning"><i class="fas fa-save"></i> Update Fee Head</button>
-            <a href="index.php" class="btn btn-secondary"><i class="fas fa-times"></i> Cancel</a>
-        </form>
-    </div>
+            <div class="actions" style="margin-top:20px;">
+                <button class="btn btn-primary" type="submit">Update Fee Head</button>
+                <a href="index.php" class="btn btn-ghost">Cancel</a>
+            </div>
+        </div>
+    </form>
 </div>
 
 <?php include_once __DIR__ . '/../includes/footer.php'; ?>

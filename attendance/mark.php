@@ -34,38 +34,29 @@ $courses = $conn->query("SELECT course_id, course_code, course_name FROM courses
 
 // If course selected, fetch students enrolled in that course
 if ($course_id > 0) {
-    // First, check if student_courses table exists
-    $check_table = $conn->query("SHOW TABLES LIKE 'student_courses'");
-    if ($check_table && $check_table->num_rows > 0) {
-        // Use student_courses table
-        $students_query = "SELECT DISTINCT s.student_id, s.roll_no, s.full_name 
-                           FROM students s
-                           LEFT JOIN student_courses sc ON s.student_id = sc.student_id
-                           WHERE sc.course_id = ? AND s.status = 'active'
-                           ORDER BY s.full_name";
-        $stmt = $conn->prepare($students_query);
-        if ($stmt) {
-            $stmt->bind_param("i", $course_id);
-            $stmt->execute();
-            $students_result = $stmt->get_result();
-            $students = $students_result->fetch_all(MYSQLI_ASSOC);
-            $stmt->close();
-        }
-    } else {
-        // Fallback: Get students by program (if courses are linked to programs)
-        $students_query = "SELECT DISTINCT s.student_id, s.roll_no, s.full_name 
-                           FROM students s
-                           WHERE s.program_id IN (SELECT program_id FROM courses WHERE course_id = ?) 
-                           AND s.status = 'active'
-                           ORDER BY s.full_name";
-        $stmt = $conn->prepare($students_query);
-        if ($stmt) {
-            $stmt->bind_param("i", $course_id);
-            $stmt->execute();
-            $students_result = $stmt->get_result();
-            $students = $students_result->fetch_all(MYSQLI_ASSOC);
-            $stmt->close();
-        }
+    // Get the course's teacher_id
+    $course_teacher_query = "SELECT teacher_id FROM courses WHERE course_id = ?";
+    $course_teacher_stmt = $conn->prepare($course_teacher_query);
+    $course_teacher_stmt->bind_param("i", $course_id);
+    $course_teacher_stmt->execute();
+    $course_teacher_result = $course_teacher_stmt->get_result();
+    $course_data = $course_teacher_result->fetch_assoc();
+    $teacher_id = $course_data['teacher_id'] ?? 0;
+    $course_teacher_stmt->close();
+    
+    // Fetch students enrolled in this course
+    $students_query = "SELECT DISTINCT s.student_id, s.roll_no, s.full_name 
+                       FROM students s
+                       LEFT JOIN student_courses sc ON s.student_id = sc.student_id
+                       WHERE sc.course_id = ? AND s.status = 'Active'
+                       ORDER BY s.full_name";
+    $stmt = $conn->prepare($students_query);
+    if ($stmt) {
+        $stmt->bind_param("i", $course_id);
+        $stmt->execute();
+        $students_result = $stmt->get_result();
+        $students = $students_result->fetch_all(MYSQLI_ASSOC);
+        $stmt->close();
     }
 }
 
@@ -82,6 +73,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $error = "Please mark attendance for at least one student";
     }
 
+    // Get teacher_id for this course
+    $teacher_id = 0;
+    if ($course_id > 0) {
+        $tq = $conn->prepare("SELECT teacher_id FROM courses WHERE course_id = ?");
+        $tq->bind_param("i", $course_id);
+        $tq->execute();
+        $tr = $tq->get_result()->fetch_assoc();
+        $teacher_id = (int)($tr['teacher_id'] ?? 0);
+        $tq->close();
+    }
+
     if (empty($error)) {
         $success_count = 0;
         $error_count = 0;
@@ -89,10 +91,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         foreach ($statuses as $student_id => $status) {
             // Check if attendance already exists
             $check_query = "SELECT attendance_id FROM attendance 
-                            WHERE student_id = ? AND course_id = ? AND date = ?";
+                            WHERE student_id = ? AND course_id = ? AND class_date = ?";
             $check_stmt = $conn->prepare($check_query);
             if ($check_stmt) {
-                $check_stmt->bind_param("sis", $student_id, $course_id, $attendance_date);
+                $check_stmt->bind_param("iis", $student_id, $course_id, $attendance_date);
                 $check_stmt->execute();
                 $check_result = $check_stmt->get_result();
 
@@ -101,11 +103,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if ($check_result->num_rows > 0) {
                     // Update existing record
                     $row = $check_result->fetch_assoc();
-                    $update_query = "UPDATE attendance SET status = ?, remark = ? 
+                    $update_query = "UPDATE attendance SET status = ?, remark = ?, teacher_id = ? 
                                      WHERE attendance_id = ?";
                     $update_stmt = $conn->prepare($update_query);
                     if ($update_stmt) {
-                        $update_stmt->bind_param("ssi", $status, $remark, $row['attendance_id']);
+                        $update_stmt->bind_param("ssii", $status, $remark, $teacher_id, $row['attendance_id']);
                         if ($update_stmt->execute()) {
                             $success_count++;
                         } else {
@@ -114,14 +116,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         $update_stmt->close();
                     }
                 } else {
-                    // Insert new record
+                    // Insert new record with required teacher_id and class_date
                     $insert_query = "INSERT INTO attendance 
-                                    (student_id, course_id, date, status, remark) 
-                                    VALUES (?, ?, ?, ?, ?)";
+                                     (student_id, course_id, teacher_id, class_date, date, status, remark) 
+                                     VALUES (?, ?, ?, ?, ?, ?, ?)";
                     $insert_stmt = $conn->prepare($insert_query);
                     if ($insert_stmt) {
-                        $insert_stmt->bind_param("sisss", $student_id, $course_id, $attendance_date, 
-                                                $status, $remark);
+                        $insert_stmt->bind_param("iiissss", $student_id, $course_id, $teacher_id, 
+                                                $attendance_date, $attendance_date, $status, $remark);
                         if ($insert_stmt->execute()) {
                             $success_count++;
                         } else {
@@ -153,76 +155,6 @@ $page_title = 'Mark Attendance';
 include __DIR__ . '/../includes/sidebar.php';
 ?>
 
-<style>
-    .main-content {
-        margin-left: 250px;
-        padding: 20px;
-        min-height: 100vh;
-        background: #f5f6fa;
-    }
-    
-    .form-container {
-        background: white;
-        padding: 25px;
-        border-radius: 10px;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-    }
-    
-    .student-row {
-        padding: 10px 15px;
-        border-bottom: 1px solid #f0f2f5;
-        transition: background 0.2s;
-    }
-    
-    .student-row:hover {
-        background: #f8f9ff;
-    }
-    
-    .student-row:last-child {
-        border-bottom: none;
-    }
-    
-    .status-radio {
-        margin-right: 15px;
-    }
-    
-    .status-radio label {
-        margin-left: 5px;
-        cursor: pointer;
-    }
-    
-    .status-radio input[type="radio"] {
-        cursor: pointer;
-    }
-    
-    .status-present { color: #27ae60; }
-    .status-absent { color: #e74c3c; }
-    .status-late { color: #f39c12; }
-    .status-excused { color: #3498db; }
-    
-    .btn-mark {
-        border-radius: 20px;
-        padding: 10px 30px;
-        font-weight: 600;
-    }
-    
-    @media (max-width: 768px) {
-        .main-content {
-            margin-left: 0;
-            padding: 15px;
-        }
-        
-        .student-row {
-            padding: 10px;
-        }
-        
-        .status-radio {
-            margin-right: 8px;
-        }
-    }
-</style>
-
-<div class="main-content">
     <div class="container-fluid">
         
         <div class="d-flex justify-content-between align-items-center mb-4">
@@ -273,17 +205,14 @@ include __DIR__ . '/../includes/sidebar.php';
                     <div class="d-flex justify-content-between align-items-center mb-3">
                         <h6>Students (<?= count($students) ?>)</h6>
                         <div>
-                            <button type="button" class="btn btn-sm btn-outline-success" onclick="setAllStatus('present')">
+                            <button type="button" class="btn btn-sm btn-outline-success" onclick="setAllStatus('Present')">
                                 <i class="fas fa-check"></i> All Present
                             </button>
-                            <button type="button" class="btn btn-sm btn-outline-danger" onclick="setAllStatus('absent')">
+                            <button type="button" class="btn btn-sm btn-outline-danger" onclick="setAllStatus('Absent')">
                                 <i class="fas fa-times"></i> All Absent
                             </button>
-                            <button type="button" class="btn btn-sm btn-outline-warning" onclick="setAllStatus('late')">
-                                <i class="fas fa-clock"></i> All Late
-                            </button>
-                            <button type="button" class="btn btn-sm btn-outline-info" onclick="setAllStatus('excused')">
-                                <i class="fas fa-check-circle"></i> All Excused
+                            <button type="button" class="btn btn-sm btn-outline-warning" onclick="setAllStatus('Leave')">
+                                <i class="fas fa-clock"></i> All Leave
                             </button>
                         </div>
                     </div>
@@ -298,30 +227,23 @@ include __DIR__ . '/../includes/sidebar.php';
                                 </div>
                                 <div class="status-radio">
                                     <input type="radio" name="status[<?= $student['student_id'] ?>]" 
-                                           value="present" id="present_<?= $student['student_id'] ?>" checked>
+                                           value="Present" id="present_<?= $student['student_id'] ?>" checked>
                                     <label for="present_<?= $student['student_id'] ?>" class="status-present">
                                         <i class="fas fa-check-circle"></i> Present
                                     </label>
                                 </div>
                                 <div class="status-radio">
                                     <input type="radio" name="status[<?= $student['student_id'] ?>]" 
-                                           value="absent" id="absent_<?= $student['student_id'] ?>">
+                                           value="Absent" id="absent_<?= $student['student_id'] ?>">
                                     <label for="absent_<?= $student['student_id'] ?>" class="status-absent">
                                         <i class="fas fa-times-circle"></i> Absent
                                     </label>
                                 </div>
                                 <div class="status-radio">
                                     <input type="radio" name="status[<?= $student['student_id'] ?>]" 
-                                           value="late" id="late_<?= $student['student_id'] ?>">
-                                    <label for="late_<?= $student['student_id'] ?>" class="status-late">
-                                        <i class="fas fa-clock"></i> Late
-                                    </label>
-                                </div>
-                                <div class="status-radio">
-                                    <input type="radio" name="status[<?= $student['student_id'] ?>]" 
-                                           value="excused" id="excused_<?= $student['student_id'] ?>">
-                                    <label for="excused_<?= $student['student_id'] ?>" class="status-excused">
-                                        <i class="fas fa-check-circle"></i> Excused
+                                           value="Leave" id="leave_<?= $student['student_id'] ?>">
+                                    <label for="leave_<?= $student['student_id'] ?>" class="status-late">
+                                        <i class="fas fa-clock"></i> Leave
                                     </label>
                                 </div>
                                 <div class="ms-3" style="min-width: 150px;">
@@ -353,7 +275,6 @@ include __DIR__ . '/../includes/sidebar.php';
         </div>
         
     </div>
-</div>
 
 <script>
     function setAllStatus(status) {

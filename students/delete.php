@@ -98,84 +98,6 @@ include __DIR__ . '/../includes/header.php';
 include __DIR__ . '/../includes/sidebar.php';
 ?>
 
-<style>
-    .delete-container {
-        max-width: 600px;
-        margin: 50px auto;
-    }
-    
-    .delete-card {
-        background: white;
-        padding: 30px;
-        border-radius: 10px;
-        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-        text-align: center;
-    }
-    
-    .delete-icon {
-        font-size: 64px;
-        color: #e74c3c;
-        margin-bottom: 20px;
-    }
-    
-    .student-name {
-        font-size: 20px;
-        font-weight: 600;
-        color: #2c3e50;
-    }
-    
-    .student-roll {
-        color: #7f8c8d;
-        font-size: 14px;
-    }
-    
-    .warning-text {
-        background: #fef3cd;
-        padding: 15px;
-        border-radius: 8px;
-        color: #856404;
-        margin: 20px 0;
-        text-align: left;
-    }
-    
-    .btn-group-delete {
-        display: flex;
-        gap: 10px;
-        justify-content: center;
-        margin-top: 20px;
-    }
-    
-    .alert-danger-custom {
-        background: #f8d7da;
-        padding: 15px;
-        border-radius: 8px;
-        color: #721c24;
-        margin: 20px 0;
-        border: 1px solid #f5c6cb;
-    }
-    
-    .student-info-box {
-        background: #f8f9fa;
-        padding: 15px;
-        border-radius: 8px;
-        margin: 15px 0;
-        border: 1px solid #dee2e6;
-    }
-    
-    .student-info-box .label {
-        color: #6c757d;
-        font-size: 12px;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-    }
-    
-    .student-info-box .value {
-        font-size: 18px;
-        font-weight: 500;
-    }
-</style>
-
-<div class="main-content">
     <div class="container-fluid">
         <div class="delete-container">
             <div class="delete-card">
@@ -236,6 +158,5 @@ include __DIR__ . '/../includes/sidebar.php';
             </div>
         </div>
     </div>
-</div>
 
 <?php include __DIR__ . '/../includes/footer.php'; ?>

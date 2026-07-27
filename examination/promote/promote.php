@@ -40,88 +40,95 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['promote_students'])) 
 ?>
 
 <div class="content-area" id="contentArea">
-    <h2>Student Promotion</h2>
+    <div class="page-header">
+        <div class="page-header-left">
+            <h4>Student Promotion</h4>
+        </div>
+    </div>
     
     <?php if (isset($_SESSION['success'])): ?>
-        <div class="alert alert-success alert-dismissible fade show">
+        <div class="alert alert-success">
             <?php 
             echo $_SESSION['success'];
             unset($_SESSION['success']);
             ?>
-            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
         </div>
     <?php endif; ?>
     
     <?php if (isset($_SESSION['error'])): ?>
-        <div class="alert alert-danger alert-dismissible fade show">
+        <div class="alert alert-error">
             <?php 
             echo $_SESSION['error'];
             unset($_SESSION['error']);
             ?>
-            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
         </div>
     <?php endif; ?>
     
     <div class="card">
-        <div class="card-body">
-            <form method="POST" class="row g-3">
-                <div class="col-md-4">
-                    <label for="program_id" class="form-label">Program</label>
-                    <select class="form-select" id="program_id" name="program_id" required>
-                        <option value="">Select Program</option>
-                        <?php while($program = $programs->fetch_assoc()): ?>
-                            <option value="<?php echo $program['program_id']; ?>" 
-                                    <?php echo ($selected_program == $program['program_id']) ? 'selected' : ''; ?>>
-                                <?php echo $program['program_name']; ?>
-                            </option>
-                        <?php endwhile; ?>
-                    </select>
-                </div>
-                <div class="col-md-4">
-                    <label for="semester" class="form-label">Current Semester</label>
-                    <select class="form-select" id="semester" name="semester" required>
-                        <option value="">Select Semester</option>
-                        <?php for($i = 1; $i <= 8; $i++): ?>
-                            <option value="<?php echo $i; ?>" <?php echo ($selected_semester == $i) ? 'selected' : ''; ?>>
-                                Semester <?php echo $i; ?>
-                            </option>
-                        <?php endfor; ?>
-                    </select>
-                </div>
-                <div class="col-md-4 d-flex align-items-end">
-                    <button type="submit" class="btn btn-primary w-100">
-                        <i class="bi bi-search"></i> Check Eligibility
-                    </button>
-                </div>
-            </form>
+        <div class="card-content">
+            <div class="form-container">
+                <form method="POST">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="program_id">Program</label>
+                            <select id="program_id" name="program_id" required>
+                                <option value="">Select Program</option>
+                                <?php while($program = $programs->fetch_assoc()): ?>
+                                    <option value="<?php echo $program['program_id']; ?>" 
+                                            <?php echo ($selected_program == $program['program_id']) ? 'selected' : ''; ?>>
+                                        <?php echo $program['program_name']; ?>
+                                    </option>
+                                <?php endwhile; ?>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="semester">Current Semester</label>
+                            <select id="semester" name="semester" required>
+                                <option value="">Select Semester</option>
+                                <?php for($i = 1; $i <= 8; $i++): ?>
+                                    <option value="<?php echo $i; ?>" <?php echo ($selected_semester == $i) ? 'selected' : ''; ?>>
+                                        Semester <?php echo $i; ?>
+                                    </option>
+                                <?php endfor; ?>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>&nbsp;</label>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-search"></i> Check Eligibility
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
         </div>
     </div>
     
     <?php if (!empty($students)): ?>
-    <div class="card mt-4">
+    <div class="card">
         <div class="card-header">
-            <div class="d-flex justify-content-between align-items-center">
+            <div style="display:flex;justify-content:space-between;align-items:center;">
                 <h5>Eligible Students</h5>
-                <span class="badge bg-success"><?php echo count($students); ?> students found</span>
+                <span class="status-badge" style="background:var(--success-bg);color:var(--success);border:1px solid var(--success-border);"><?php echo count($students); ?> students found</span>
             </div>
         </div>
-        <div class="card-body">
+        <div class="card-content">
             <form method="POST">
                 <input type="hidden" name="program_id" value="<?php echo $selected_program; ?>">
                 <input type="hidden" name="semester" value="<?php echo $selected_semester; ?>">
                 <input type="hidden" name="next_semester" value="<?php echo $selected_semester + 1; ?>">
                 
-                <div class="mb-3">
-                    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="selectAll()">
+                <div style="margin-bottom:1rem;">
+                    <button type="button" class="btn btn-outline" onclick="selectAll()">
                         <i class="bi bi-check-all"></i> Select All
                     </button>
-                    <button type="button" class="btn btn-sm btn-outline-secondary" onclick="deselectAll()">
+                    <button type="button" class="btn btn-outline" onclick="deselectAll()">
                         <i class="bi bi-x-circle"></i> Deselect All
                     </button>
                 </div>
                 
                 <div class="table-responsive">
-                    <table class="table table-striped">
+                    <table class="data-table">
                         <thead>
                             <tr>
                                 <th><input type="checkbox" id="selectAllCheckbox" onchange="toggleAllCheckboxes()"></th>
@@ -143,7 +150,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['promote_students'])) 
                                 <td><?php echo $student['full_name']; ?></td>
                                 <td>Semester <?php echo $student['semester']; ?></td>
                                 <td>
-                                    <span class="badge bg-success">Eligible</span>
+                                    <span class="status-badge" style="background:var(--success-bg);color:var(--success);border:1px solid var(--success-border);">Eligible</span>
                                 </td>
                             </tr>
                             <?php endforeach; ?>
@@ -151,13 +158,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['promote_students'])) 
                     </table>
                 </div>
                 
-                <div class="alert alert-info mt-3">
+                <div class="alert" style="background:var(--info-bg);color:var(--accent);border:1px solid var(--info-border);margin-top:1rem;">
                     <i class="bi bi-info-circle"></i> 
                     Students will be promoted to <strong>Semester <?php echo $selected_semester + 1; ?></strong>
                 </div>
                 
-                <div class="d-flex justify-content-end mt-3">
-                    <button type="submit" name="promote_students" class="btn btn-success btn-lg"
+                <div class="form-actions">
+                    <button type="submit" name="promote_students" class="btn btn-primary"
                             onclick="return confirm('Are you sure you want to promote selected students?')">
                         <i class="bi bi-arrow-up-circle"></i> Promote Selected Students
                     </button>
@@ -166,7 +173,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['promote_students'])) 
         </div>
     </div>
     <?php elseif ($_SERVER['REQUEST_METHOD'] === 'POST'): ?>
-    <div class="alert alert-info mt-4">
+    <div class="alert" style="background:var(--info-bg);color:var(--accent);border:1px solid var(--info-border);">
         <i class="bi bi-info-circle"></i> 
         No students found eligible for promotion in this program and semester.
     </div>

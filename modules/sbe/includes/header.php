@@ -43,52 +43,34 @@ $userInitial = strtoupper(substr($user['display_name'] ?? 'G', 0, 1));
         <nav class="nav">
             <?php if ($userRole === 'guest'): ?>
                 <span class="nav-section-label">Portal</span>
-                <a class="<?= $activePage === 'dashboard' ? 'active' : '' ?>" href="index.php">
-                    <span class="nav-icon">&#127968;</span> Dashboard
-                </a>
-                <a class="<?= $activePage === 'login' ? 'active' : '' ?>" href="login.php">
-                    <span class="nav-icon">&#128273;</span> Sign In
-                </a>
+                <a class="<?= $activePage === 'dashboard' ? 'active' : '' ?>" href="index.php">Dashboard</a>
+                <a class="<?= $activePage === 'login' ? 'active' : '' ?>" href="login.php">Sign In</a>
             <?php elseif ($userRole === 'Teacher'): ?>
                 <span class="nav-section-label">Overview</span>
-                <a class="<?= $activePage === 'dashboard' ? 'active' : '' ?>" href="teacher-home.php">
-                    <span class="nav-icon">&#127968;</span> Dashboard
-                </a>
+                <a class="<?= $activePage === 'dashboard' ? 'active' : '' ?>" href="teacher-home.php">Dashboard</a>
                 
                 <span class="nav-section-label">Exam Builder</span>
-                <a class="<?= $activePage === 'question_bank' ? 'active' : '' ?>" href="question-bank.php">
-                    <span class="nav-icon">&#128218;</span> Question Pool
-                </a>
-                <a class="<?= $activePage === 'exams' ? 'active' : '' ?>" href="exams.php">
-                    <span class="nav-icon">&#128221;</span> Exam Pool
-                </a>
-                <a class="<?= $activePage === 'exam_schedule' ? 'active' : '' ?>" href="exam-schedule.php">
-                    <span class="nav-icon">&#128197;</span> Exam Schedule
-                </a>
-                <a class="<?= $activePage === 'exam_questions' ? 'active' : '' ?>" href="exam-questions.php">
-                    <span class="nav-icon">&#128450;</span> Question Mapping
-                </a>
+                <a class="<?= $activePage === 'question_bank' ? 'active' : '' ?>" href="question-bank.php">Question Pool</a>
+                <a class="<?= $activePage === 'exams' ? 'active' : '' ?>" href="exams.php">Exam Pool</a>
+                <a class="<?= $activePage === 'exam_schedule' ? 'active' : '' ?>" href="exam-schedule.php">Exam Schedule</a>
+                <a class="<?= $activePage === 'exam_questions' ? 'active' : '' ?>" href="exam-questions.php">Question Mapping</a>
                 
                 <span class="nav-section-label">Grading & Audits</span>
-                <a class="<?= $activePage === 'student_exams' ? 'active' : '' ?>" href="student-exams.php">
-                    <span class="nav-icon">&#128101;</span> Student Attempts
-                </a>
-                <a class="<?= $activePage === 'student_answers' ? 'active' : '' ?>" href="student-answers.php">
-                    <span class="nav-icon">&#9997;</span> Answer Audits
-                </a>
-                <a class="<?= $activePage === 'exam_results' ? 'active' : '' ?>" href="exam-results.php">
-                    <span class="nav-icon">&#127942;</span> Final Grades
-                </a>
+                <a class="<?= $activePage === 'student_exams' ? 'active' : '' ?>" href="student-exams.php">Student Attempts</a>
+                <a class="<?= $activePage === 'student_answers' ? 'active' : '' ?>" href="student-answers.php">Answer Audits</a>
+                <a class="<?= $activePage === 'exam_results' ? 'active' : '' ?>" href="exam-results.php">Final Grades</a>
             <?php elseif ($userRole === 'Student'): ?>
                 <span class="nav-section-label">Student</span>
-                <a class="<?= $activePage === 'dashboard' ? 'active' : '' ?>" href="student-home.php">
-                    <span class="nav-icon">&#127968;</span> My Dashboard
-                </a>
-                <a class="<?= $activePage === 'student_start_exam' ? 'active' : '' ?>" href="student-start-exam.php">
-                    <span class="nav-icon">&#9654;</span> Start Exam
-                </a>
+                <a class="<?= $activePage === 'dashboard' ? 'active' : '' ?>" href="student-home.php">My Dashboard</a>
+                <a class="<?= $activePage === 'student_start_exam' ? 'active' : '' ?>" href="student-start-exam.php">Start Exam</a>
             <?php endif; ?>
         </nav>
+
+        <div class="sidebar-logout">
+            <a class="sidebar-logout-btn" href="logout.php">
+                <i class="fas fa-sign-out-alt"></i> Logout
+            </a>
+        </div>
 
         <div class="sidebar-user">
             <?php if ($user): ?>
@@ -101,7 +83,7 @@ $userInitial = strtoupper(substr($user['display_name'] ?? 'G', 0, 1));
                 </div>
                 <div class="actions">
                     <a class="btn btn-ghost btn-sm" href="profile.php">&#9881; Profile</a>
-                    <a class="btn btn-ghost btn-sm" href="logout.php">Logout</a>
+                    <a class="btn btn-ghost btn-sm" href="logout.php">&#x2192; Logout</a>
                 </div>
             <?php else: ?>
                 <div class="user-strip">

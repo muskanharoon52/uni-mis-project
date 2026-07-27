@@ -16,77 +16,86 @@ if (!$result) {
 ?>
 
 <div class="content-area" id="contentArea">
-    <div class="card">
-        <div class="card-header">
-            <h5>Exam Result Details</h5>
+    <div class="page-header">
+        <div class="page-header-left">
+            <h4>Exam Result Details</h4>
         </div>
-        <div class="card-body">
-            <div class="row">
-                <div class="col-md-6">
-                    <table class="table table-borderless">
-                        <tr>
-                            <th width="150">Student</th>
-                            <td>
-                                <strong><?php echo $result['student_name']; ?></strong><br>
-                                <small><?php echo $result['student_id']; ?></small>
-                            </td>
-                        </tr>
-                        <tr>
-                            <th>Course</th>
-                            <td>
-                                <strong><?php echo $result['course_code']; ?></strong><br>
-                                <?php echo $result['course_name']; ?>
-                            </td>
-                        </tr>
-                        <tr>
-                            <th>Exam Type</th>
-                            <td>
-                                <span class="badge bg-info"><?php echo ucfirst($result['exam_type']); ?></span>
-                            </td>
-                        </tr>
-                        <tr>
-                            <th>Exam Date</th>
-                            <td><?php echo date('F d, Y', strtotime($result['exam_date'])); ?></td>
-                        </tr>
-                        <tr>
-                            <th>Marks</th>
-                            <td>
-                                <strong><?php echo $result['marks_obtained']; ?></strong> / 
-                                <strong><?php echo $result['total_marks']; ?></strong>
-                            </td>
-                        </tr>
-                        <tr>
-                            <th>Percentage</th>
-                            <td>
-                                <?php 
-                                $percentage = ($result['marks_obtained'] / $result['total_marks']) * 100;
-                                echo number_format($percentage, 2) . '%';
-                                ?>
-                            </td>
-                        </tr>
-                        <tr>
-                            <th>Grade</th>
-                            <td>
-                                <span class="badge <?php echo getGradeColor($result['grade']); ?>" style="font-size: 1.2rem;">
-                                    <?php echo $result['grade']; ?>
-                                </span>
-                            </td>
-                        </tr>
-                    </table>
+        <div class="page-header-actions">
+            <a href="edit.php?id=<?php echo $result['result_id']; ?>" class="btn btn-outline">
+                <i class="bi bi-pencil"></i> Edit
+            </a>
+            <a href="delete.php?id=<?php echo $result['result_id']; ?>" 
+               class="btn btn-danger"
+               onclick="return confirm('Are you sure you want to delete this result?')">
+                <i class="bi bi-trash"></i> Delete
+            </a>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-content">
+            <div class="detail-row">
+                <div class="detail-label">Student</div>
+                <div class="detail-value">
+                    <strong><?php echo $result['student_name']; ?></strong><br>
+                    <small style="color:var(--text-secondary);"><?php echo $result['student_id']; ?></small>
                 </div>
             </div>
-            
-            <div class="d-flex justify-content-end mt-3">
-                <a href="index.php" class="btn btn-secondary me-2">
+            <div class="detail-row">
+                <div class="detail-label">Course</div>
+                <div class="detail-value">
+                    <strong><?php echo $result['course_code']; ?></strong><br>
+                    <?php echo $result['course_name']; ?>
+                </div>
+            </div>
+            <div class="detail-row">
+                <div class="detail-label">Exam Type</div>
+                <div class="detail-value">
+                    <span class="status-badge" style="background:var(--info-bg);color:var(--info);border:1px solid var(--info-border);"><?php echo ucfirst($result['exam_type']); ?></span>
+                </div>
+            </div>
+            <div class="detail-row">
+                <div class="detail-label">Exam Date</div>
+                <div class="detail-value"><?php echo date('F d, Y', strtotime($result['exam_date'])); ?></div>
+            </div>
+            <div class="detail-row">
+                <div class="detail-label">Marks</div>
+                <div class="detail-value">
+                    <strong><?php echo $result['marks_obtained']; ?></strong> / 
+                    <strong><?php echo $result['total_marks']; ?></strong>
+                </div>
+            </div>
+            <div class="detail-row">
+                <div class="detail-label">Percentage</div>
+                <div class="detail-value">
+                    <?php 
+                    $percentage = ($result['marks_obtained'] / $result['total_marks']) * 100;
+                    echo number_format($percentage, 2) . '%';
+                    ?>
+                </div>
+            </div>
+            <div class="detail-row">
+                <div class="detail-label">Grade</div>
+                <div class="detail-value">
+                    <?php
+                    $gradeStyles = [
+                        'A' => 'background:var(--success-bg);color:var(--success);border:1px solid var(--success-border);',
+                        'B' => 'background:var(--info-bg);color:var(--info);border:1px solid var(--info-border);',
+                        'C' => 'background:var(--warning-bg);color:var(--warning);border:1px solid var(--warning-border);',
+                        'D' => 'background:var(--accent-bg);color:var(--accent);border:1px solid var(--accent-border);',
+                        'F' => 'background:var(--error-bg);color:var(--error);border:1px solid var(--error-border);',
+                    ];
+                    $style = $gradeStyles[$result['grade']] ?? 'background:var(--warning-bg);color:var(--warning);border:1px solid var(--warning-border);';
+                    ?>
+                    <span class="status-badge" style="<?php echo $style; ?>;font-size:1.2rem;">
+                        <?php echo $result['grade']; ?>
+                    </span>
+                </div>
+            </div>
+
+            <div class="form-actions">
+                <a href="index.php" class="btn btn-ghost">
                     <i class="bi bi-arrow-left"></i> Back
-                </a>
-                <a href="edit.php?id=<?php echo $result['result_id']; ?>" class="btn btn-warning me-2">
-                    <i class="bi bi-pencil"></i> Edit
-                </a>
-                <a href="delete.php?id=<?php echo $result['result_id']; ?>" 
-                   class="btn btn-danger" 
-                   onclick="return confirm('Are you sure you want to delete this result?')">
-                    <i class="bi bi-trash"></i> Delete
                 </a>
             </div>
         </div>

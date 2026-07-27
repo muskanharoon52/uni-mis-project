@@ -188,54 +188,89 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 ?>
-<div class="page-header"><h5><i class="fas fa-check"></i> Review Application</h5></div>
+<div class="page-header">
+    <div class="page-header-left">
+        <h4><i class="fas fa-check"></i> Review Application</h4>
+    </div>
+    <div class="page-header-actions">
+        <a href="index.php" class="btn btn-ghost">Back to List</a>
+    </div>
+</div>
 
-<div class="row">
-    <div class="col-md-6">
-        <div class="card">
-            <div class="card-header bg-primary text-white"><h6 class="mb-0">Application Details</h6></div>
-            <div class="card-body">
-                <table class="table">
-                    <tr><th>Application No</th><td><strong><?= $app['temp_application_no'] ?></strong></td></tr>
-                    <tr><th>Student Name</th><td><?= $app['full_name'] ?></td></tr>
-                    <tr><th>Father Name</th><td><?= $app['father_name'] ?></td></tr>
-                    <tr><th>CNIC/B-Form</th><td><?= $app['cnic_or_bform'] ?? 'N/A' ?></td></tr>
-                    <tr><th>Department</th><td><?= $app['department_name'] ?? 'N/A' ?></td></tr>
-                    <tr><th>Submitted Date</th><td><?= date('d M Y', strtotime($app['submitted_at'])) ?></td></tr>
-                    <tr><th>Current Status</th><td><span class="badge bg-warning"><?= $app['application_status'] ?></span></td></tr>
-                </table>
+<div class="grid-2">
+    <div class="card">
+        <div class="card-header">
+            <h3>Application Summary</h3>
+            <p>Details for verification prior to review</p>
+        </div>
+        <div class="card-content">
+            <div class="detail-row">
+                <div class="detail-label">Application No</div>
+                <div class="detail-value"><strong><?= htmlspecialchars($app['temp_application_no']) ?></strong></div>
+            </div>
+            <div class="detail-row">
+                <div class="detail-label">Student Name</div>
+                <div class="detail-value"><?= htmlspecialchars($app['full_name']) ?></div>
+            </div>
+            <div class="detail-row">
+                <div class="detail-label">Father Name</div>
+                <div class="detail-value"><?= htmlspecialchars($app['father_name']) ?></div>
+            </div>
+            <div class="detail-row">
+                <div class="detail-label">CNIC/B-Form</div>
+                <div class="detail-value"><?= htmlspecialchars($app['cnic_or_bform'] ?? 'N/A') ?></div>
+            </div>
+            <div class="detail-row">
+                <div class="detail-label">Department</div>
+                <div class="detail-value"><?= htmlspecialchars($app['department_name'] ?? 'N/A') ?></div>
+            </div>
+            <div class="detail-row">
+                <div class="detail-label">Submitted Date</div>
+                <div class="detail-value"><?= date('d M Y', strtotime($app['submitted_at'])) ?></div>
+            </div>
+            <div class="detail-row">
+                <div class="detail-label">Current Status</div>
+                <div class="detail-value">
+                    <span class="status-badge <?= htmlspecialchars($app['application_status']) ?>"><?= htmlspecialchars($app['application_status']) ?></span>
+                </div>
             </div>
         </div>
     </div>
-    <div class="col-md-6">
-        <div class="card">
-            <div class="card-header bg-warning"><h6 class="mb-0">Review Decision</h6></div>
-            <div class="card-body">
-                <form method="POST" id="reviewForm">
-                    <div class="mb-3">
-                        <label class="form-label">Decision *</label>
-                        <select name="status" class="form-select" required id="decisionSelect">
-                            <option value="Approved">✅ Approve (Auto-create Student)</option>
-                            <option value="Admitted">🎓 Admit (Auto-create Student)</option>
-                            <option value="Rejected">❌ Reject</option>
-                            <option value="Under Review">⏳ Keep Under Review</option>
-                        </select>
-                        <small class="text-muted">Selecting "Approve" or "Admit" will automatically create a student record.</small>
+
+    <div class="card">
+        <div class="card-header">
+            <h3>Review Decision</h3>
+            <p>Select approval decision for student application</p>
+        </div>
+        <div class="card-content">
+            <form method="POST" id="reviewForm">
+                <div class="field" style="margin-bottom:16px;">
+                    <label>Decision *</label>
+                    <select name="status" required id="decisionSelect">
+                        <option value="Approved">Approve (Auto-create Student)</option>
+                        <option value="Admitted">Admit (Auto-create Student)</option>
+                        <option value="Rejected">Reject</option>
+                        <option value="Under Review">Keep Under Review</option>
+                    </select>
+                    <small style="color:var(--text-secondary);margin-top:4px;display:block;">Selecting "Approve" or "Admit" will automatically create a student record.</small>
+                </div>
+                <div id="rejection_reason_div" style="display:none;margin-bottom:16px;">
+                    <div class="field">
+                        <label>Rejection Reason <small style="color:var(--danger);">(Required if Rejected)</small></label>
+                        <textarea name="rejection_reason" rows="3" placeholder="Enter reason for rejection..."></textarea>
                     </div>
-                    <div class="mb-3" id="rejection_reason_div" style="display:none;">
-                        <label class="form-label">Rejection Reason <small class="text-danger">(Required if Rejected)</small></label>
-                        <textarea name="rejection_reason" class="form-control" rows="3" placeholder="Enter reason for rejection..."></textarea>
+                </div>
+                <div id="student_id_preview" style="display:none;margin-bottom:16px;">
+                    <div class="alert alert-success">
+                        <i class="fas fa-info-circle"></i>
+                        Student will be created with ID: <strong id="previewStudentId">UNI-2024-00001</strong>
                     </div>
-                    <div class="mb-3" id="student_id_preview" style="display:none;">
-                        <div class="alert alert-info">
-                            <i class="fas fa-info-circle"></i> 
-                            Student will be created with ID: <strong id="previewStudentId">UNI-2024-00001</strong>
-                        </div>
-                    </div>
-                    <button type="submit" class="btn btn-primary">Submit Review</button>
-                    <a href="view.php?id=<?= $id ?>" class="btn btn-secondary">Cancel</a>
-                </form>
-            </div>
+                </div>
+                <div class="form-actions" style="margin-top:20px;padding-top:16px;border-top:1px solid var(--border);">
+                    <a href="view.php?id=<?= $id ?>" class="btn btn-outline">Cancel</a>
+                    <button type="submit" class="btn btn-primary"><i class="fas fa-check"></i> Submit Review</button>
+                </div>
+            </form>
         </div>
     </div>
 </div>
