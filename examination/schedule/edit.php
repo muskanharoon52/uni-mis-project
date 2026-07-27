@@ -1,8 +1,9 @@
 <?php
-require_once '../../../../config/db_connect.php';
+$page_title = 'Edit Exam Schedule';
+require_once '../../config/db_connect.php';
 require_once '../models/ExamSchedule.php';
-include '../../includes/header.php';
-include '../../includes/navbar.php';
+include '../includes/header.php';
+include '../includes/sidebar.php';
 
 $conn = getConnection();
 $model = new ExamSchedule();
@@ -51,11 +52,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 $conn->close();
 ?>
 
-<!-- Main Container -->
-<div class="main-container">
-    
-    
-    <div class="content-area" id="contentArea">
+<div class="content-area" id="contentArea">
         <div class="row justify-content-center">
             <div class="col-md-8">
                 <div class="card">
@@ -134,7 +131,6 @@ $conn->close();
             </div>
         </div>
     </div>
-</div>
 
 <script>
 document.getElementById('scheduleForm').addEventListener('submit', function(e) {
@@ -149,4 +145,4 @@ document.getElementById('scheduleForm').addEventListener('submit', function(e) {
 });
 </script>
 
-<?php include '../../includes/footer.php'; ?>
+<?php include '../includes/footer.php'; ?>

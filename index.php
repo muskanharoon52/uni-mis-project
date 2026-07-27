@@ -52,7 +52,7 @@ session_start();
             <li><a href="modules/lms/public/login.php">LMS</a></li>
             <li><a href="modules/sbe/login.php">SBE</a></li>
             <li><a href="modules/admission/auth/login.php">Admission</a></li>
-            <li><a href="modules/examination/login.php">Examination</a></li>
+            <li><a href="examination/index.php">Examination</a></li>
             <li><a href="modules/sso/login.php">SSO Login</a></li>
             <li><a href="modules/finance/login.php">Finance</a></li>
         </ul>
@@ -96,7 +96,7 @@ session_start();
                         <span class="badge badge-active">active</span>
                     </li>
                     <li>
-                        <a href="modules/examination/login.php">Examination</a>
+                        <a href="examination/index.php">Examination</a>
                         <span class="badge badge-active">active</span>
                     </li>
                     <li>

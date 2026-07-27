@@ -151,7 +151,7 @@ require_once __DIR__ . '/../includes/header.php';
                         ?>
                     </td>
                     <td>
-                        <?php if ($assignment['file_path']): ?><a href="<?= app_url($assignment['file_path']) ?>" target="_blank">Download</a><?php else: ?><span class="muted">No file</span><?php endif; ?>
+                        <?php if (!empty($assignment['file_path'])): ?><a href="<?= app_url($assignment['file_path']) ?>" target="_blank">Download</a><?php else: ?><span class="muted">No file</span><?php endif; ?>
                     </td>
                     <td><?= e($assignment['due_date']) ?></td>
                 </tr>

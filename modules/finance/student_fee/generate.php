@@ -2,12 +2,12 @@
 session_start();
 
 if (!isset($_SESSION['user_id'])) {
-    header('Location: ../../../auth/login.php');
+    header('Location: /uni-mis-project/modules/sso/login.php');
     exit();
 }
 
 if ($_SESSION['role_id'] != 3 && $_SESSION['role_id'] != 1) {
-    header('Location: ../../../auth/login.php?error=Access denied. Finance Officer only.');
+    header('Location: /uni-mis-project/modules/sso/login.php?error=Access denied');
     exit();
 }
 
@@ -16,6 +16,7 @@ include_once __DIR__ . '/../../../config/db_connect.php';
 
 // Include header - FIXED: Use include_once
 include_once __DIR__ . '/../includes/header.php';
+require_once __DIR__ . '/../includes/lms_sync.php';
 
 $error = '';
 $success = '';
@@ -133,6 +134,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['generate_fee'])) {
                     
                     if (mysqli_query($conn, $insert_sql)) {
                         $student_fee_id = mysqli_insert_id($conn);
+                        syncFeeToLMS($conn, intval($student_id), floatval($total_amount), floatval($amount_paid), $due_date);
                         
                         $detail_sql = "SELECT fee_head_id, amount FROM fee_structure_details 
                                        WHERE fee_structure_id = '$fee_structure_id'";

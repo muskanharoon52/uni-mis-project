@@ -9,14 +9,6 @@ $active = 'dashboard';
 $pageTitle = 'Student Dashboard';
 $now = new DateTimeImmutable('now');
 
-$detailsStmt = db()->prepare(
-    'SELECT COUNT(*) AS course_count
-     FROM lms_enrollments
-     WHERE student_user_id = ?'
-);
-$detailsStmt->execute([$user['id']]);
-$courseCount = (int) $detailsStmt->fetchColumn();
-
 $internalMarks = internal_mark_rows_for_student((int) $user['id']);
 $internalMarkTotals = array_map(static function (array $row): array {
     return [
@@ -28,40 +20,26 @@ $internalMarkTotals = array_map(static function (array $row): array {
 }, $internalMarks);
 
 $attendanceStmt = db()->prepare(
-    "SELECT
-        c.course_code,
-        c.course_title,
-        COUNT(a.attendance_id) AS total_classes,
-        SUM(a.status = 'Present') AS present_count,
-        SUM(a.status = 'Absent') AS absent_count
+    "SELECT c.course_code, c.course_title, COUNT(a.attendance_id) AS total_classes,
+            SUM(a.status = 'Present') AS present_count, SUM(a.status = 'Absent') AS absent_count
      FROM lms_enrollments e
      JOIN courses c ON c.course_id = e.course_id
      LEFT JOIN attendance a ON a.course_id = c.course_id AND a.student_id = e.student_user_id
      WHERE e.student_user_id = ?
-     GROUP BY c.course_id, c.course_code, c.course_title
-     ORDER BY c.course_code"
+     GROUP BY c.course_id, c.course_code, c.course_title ORDER BY c.course_code"
 );
 $attendanceStmt->execute([$user['id']]);
 $attendanceRows = $attendanceStmt->fetchAll();
 
-$totalPresent = 0;
-$totalClasses = 0;
-foreach ($attendanceRows as $row) {
-    $totalClasses += (int) $row['total_classes'];
-    $totalPresent += (int) $row['present_count'];
-}
-$overallAttendance = $totalClasses > 0 ? round(($totalPresent / $totalClasses) * 100, 1) : 0;
-
 $feesStmt = db()->prepare('SELECT * FROM lms_fees WHERE student_user_id = ? ORDER BY due_date DESC');
 $feesStmt->execute([$user['id']]);
 $feeRows = $feesStmt->fetchAll();
-$totalAmount = array_sum(array_map(static fn (array $row): float => (float) $row['amount'], $feeRows));
-$paidAmount = array_sum(array_map(static fn (array $row): float => $row['status'] === 'paid' ? (float) $row['amount'] : ($row['status'] === 'partial' ? (float) $row['amount'] * 0.5 : 0.0), $feeRows));
+$totalAmount = array_sum(array_map(static fn ($r) => (float) $r['amount'], $feeRows));
+$paidAmount = array_sum(array_map(static fn ($r) => $r['status'] === 'paid' ? (float) $r['amount'] : ($r['status'] === 'partial' ? (float) $r['amount'] * 0.5 : 0.0), $feeRows));
 $balance = $totalAmount - $paidAmount;
 
 $studentCode = 'LMS-' . str_pad((string) $user['id'], 5, '0', STR_PAD_LEFT);
 $initials = strtoupper(substr((string) $user['name'], 0, 1));
-
 $greetingHour = (int) $now->format('G');
 $greeting = $greetingHour < 12 ? 'Good Morning' : ($greetingHour < 17 ? 'Good Afternoon' : 'Good Evening');
 
@@ -69,53 +47,24 @@ require_once __DIR__ . '/../includes/header.php';
 ?>
 
 <div class="greeting-card">
+    <?php if ($user['profile_photo']): ?>
+        <img class="dashboard-avatar-img" src="<?= app_url($user['profile_photo']) ?>" alt="">
+    <?php else: ?>
+        <div class="greeting-card-avatar"><?= e($initials) ?></div>
+    <?php endif; ?>
     <div class="greeting-card-body">
         <span class="eyebrow">Student Portal &middot; Spring 2026</span>
         <h1><?= e($greeting . ', ' . $user['name']) ?></h1>
-        <p class="muted" style="margin-top:4px;"><?= e($now->format('l, F j, Y')) ?> &middot; <?= e($studentCode) ?></p>
+        <div class="student-info-row">
+            <span><strong>ID:</strong> <?= e($studentCode) ?></span>
+            <span><strong>Department:</strong> <?= e($user['department'] ?: 'N/A') ?></span>
+            <span><strong>Status:</strong> <span class="badge badge-active"><?= e($user['status'] ?? 'Active') ?></span></span>
+        </div>
+        <p class="dashboard-date"><?= e($now->format('l, F j, Y')) ?></p>
     </div>
-    <div class="greeting-card-avatar"><?= e($initials) ?></div>
 </div>
 
-<div class="stat-row">
-    <div class="stat-card-v2"><div class="stat-label">Courses</div><div class="stat-number"><?= $courseCount ?></div><div class="stat-hint">Registered this semester</div></div>
-    <div class="stat-card-v2"><div class="stat-label">Attendance</div><div class="stat-number"><?= $overallAttendance ?>%</div><div class="stat-hint">Overall average</div></div>
-    <div class="stat-card-v2"><div class="stat-label">Balance</div><div class="stat-number <?= $balance > 0 ? 'warning-text' : 'success-text' ?>">PKR <?= number_format($balance) ?></div><div class="stat-hint">Outstanding fees</div></div>
-    <div class="stat-card-v2"><div class="stat-label">Internal Marks</div><div class="stat-number"><?= count($internalMarkTotals) ?></div><div class="stat-hint">Courses with marks</div></div>
-</div>
 
-<div class="action-cards">
-    <a class="action-card" href="<?= app_url('student/courses.php') ?>">
-        <span class="action-card-icon">&#128218;</span>
-        <div class="action-card-title">My Courses</div>
-        <div class="action-card-desc"><?= $courseCount ?> enrolled course<?= $courseCount !== 1 ? 's' : '' ?></div>
-    </a>
-    <a class="action-card" href="<?= app_url('student/attendance.php') ?>">
-        <span class="action-card-icon">&#128197;</span>
-        <div class="action-card-title">Attendance</div>
-        <div class="action-card-desc"><?= $overallAttendance ?>% overall</div>
-    </a>
-    <a class="action-card" href="<?= app_url('student/marks.php') ?>">
-        <span class="action-card-icon">&#128200;</span>
-        <div class="action-card-title">Internal Marks</div>
-        <div class="action-card-desc">View marks &amp; grades</div>
-    </a>
-    <a class="action-card" href="<?= app_url('student/fees.php') ?>">
-        <span class="action-card-icon">&#128176;</span>
-        <div class="action-card-title">Fees</div>
-        <div class="action-card-desc">View fee status &amp; payments</div>
-    </a>
-    <a class="action-card" href="<?= app_url('student/queries.php') ?>">
-        <span class="action-card-icon">&#10067;</span>
-        <div class="action-card-title">Queries</div>
-        <div class="action-card-desc">Ask a question</div>
-    </a>
-    <a class="action-card" href="<?= app_url('student/applications.php') ?>">
-        <span class="action-card-icon">&#128203;</span>
-        <div class="action-card-title">Applications</div>
-        <div class="action-card-desc">Submit applications</div>
-    </a>
-</div>
 
 <?php if ($internalMarkTotals): ?>
 <div class="card mt-4">
@@ -132,7 +81,7 @@ require_once __DIR__ . '/../includes/header.php';
                 <?php foreach ($internalMarkTotals as $row): ?>
                     <tr>
                         <td><span class="badge badge-outline"><?= e($row['code']) ?></span></td>
-                        <td><?= e($row['title']) ?></td>
+                        <td style="font-weight:500;"><?= e($row['title']) ?></td>
                         <td><strong><?= e(number_format((float) $row['total'], 2)) ?></strong></td>
                         <td><span class="badge badge-<?= $row['status'] === 'Finalized' ? 'active' : 'draft' ?>"><?= e($row['status']) ?></span></td>
                     </tr>
@@ -156,14 +105,10 @@ require_once __DIR__ . '/../includes/header.php';
             </thead>
             <tbody>
                 <?php foreach ($attendanceRows as $row): ?>
-                    <?php
-                    $total = (int) $row['total_classes'];
-                    $present = (int) $row['present_count'];
-                    $percent = $total > 0 ? round(($present / $total) * 100, 1) : 0;
-                    ?>
+                    <?php $total = (int) $row['total_classes']; $present = (int) $row['present_count']; $percent = $total > 0 ? round(($present / $total) * 100, 1) : 0; ?>
                     <tr>
                         <td><span class="badge badge-outline"><?= e($row['course_code']) ?></span></td>
-                        <td><?= e($row['course_title']) ?></td>
+                        <td style="font-weight:500;"><?= e($row['course_title']) ?></td>
                         <td><?= $total ?></td>
                         <td><span class="badge badge-active"><?= (int) $row['present_count'] ?></span></td>
                         <td><span class="badge badge-inactive"><?= (int) $row['absent_count'] ?></span></td>
@@ -181,7 +126,7 @@ require_once __DIR__ . '/../includes/header.php';
         <h3>Fee Status</h3>
         <a class="btn btn-sm btn-outline" href="<?= app_url('student/fees.php') ?>">View Ledger</a>
     </div>
-    <div style="padding:1.5rem;display:flex;gap:1.5rem;flex-wrap:wrap;">
+    <div style="padding:1.5rem;display:flex;gap:2rem;flex-wrap:wrap;">
         <div style="flex:1;min-width:180px;">
             <div class="stat-label">Outstanding Balance</div>
             <div class="stat-number <?= $balance > 0 ? 'warning-text' : 'success-text' ?>">PKR <?= number_format($balance) ?></div>
@@ -190,12 +135,19 @@ require_once __DIR__ . '/../includes/header.php';
             <?php $latestFee = $feeRows[0]; ?>
             <div style="flex:1;min-width:180px;">
                 <div class="stat-label">Latest Fee</div>
-                <div class="muted" style="font-size:.85rem;"><?= e((string) $latestFee['course_id']) ?></div>
-                <div class="stat-hint">PKR <?= number_format((float) $latestFee['amount']) ?></div>
-                <span class="badge badge-<?= $latestFee['status'] === 'paid' ? 'active' : 'draft' ?>" style="margin-top:4px;"><?= e($latestFee['status']) ?></span>
+                <div class="stat-hint">Due: <?= e($latestFee['due_date'] ?? 'N/A') ?></div>
+                <div style="font-size:1.2rem;font-weight:700;margin-top:2px;">PKR <?= number_format((float) $latestFee['amount']) ?></div>
+                <span class="badge badge-<?= $latestFee['status'] === 'paid' ? 'active' : 'draft' ?>" style="margin-top:6px;"><?= e(ucfirst($latestFee['status'])) ?></span>
             </div>
         <?php endif; ?>
     </div>
 </div>
+
+<style>
+.student-info-row { display: flex; flex-wrap: wrap; gap: 8px 20px; margin-top: 6px; font-size: 13px; color: rgba(255,255,255,0.8); }
+.student-info-row strong { color: #fff; font-weight: 600; }
+.dashboard-date { margin-top: 4px; font-size: 12px; color: rgba(255,255,255,0.6); margin-bottom: 0; }
+.dashboard-avatar-img { width: 56px; height: 56px; border-radius: 14px; object-fit: cover; border: 2px solid rgba(255,255,255,0.3); flex-shrink: 0; }
+</style>
 
 <?php require_once __DIR__ . '/../includes/footer.php'; ?>

@@ -1,22 +1,16 @@
 <?php
-require_once '../../../../config/db_connect.php';
+$page_title = 'Exam Schedule';
+require_once '../../config/db_connect.php';
 require_once '../models/ExamSchedule.php';
-include '../../includes/header.php';
-$showDashboardBackButton = true;
-$hideSidebarToggle = true;
-include '../../includes/navbar.php';
+include '../includes/header.php';
+include '../includes/sidebar.php';
 
 // Initialize the model
 $model = new ExamSchedule();
 $schedules = $model->getAll();
 ?>
 
-<!-- Main Container with Slideable Sidebar -->
-<div class="main-container">
-    
-    
-    <!-- Main Content Area -->
-    <div class="content-area" id="contentArea">
+<div class="content-area" id="contentArea">
         <div class="d-flex justify-content-between align-items-center mb-4">
             <h2> Exam Schedules</h2>
             <a href="add.php" class="btn btn-primary">
@@ -107,6 +101,5 @@ $schedules = $model->getAll();
             </div>
         </div>
     </div>
-</div>
 
-<?php include '../../includes/footer.php'; ?>
+<?php include '../includes/footer.php'; ?>

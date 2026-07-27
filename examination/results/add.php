@@ -1,6 +1,9 @@
 <?php
-session_start();
-require_once '../../../../config/db_connect.php';
+$page_title = 'Add Exam Result';
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+require_once '../../config/db_connect.php';
 require_once '../models/ExamResult.php';
 require_once '../models/ExamSchedule.php';
 
@@ -33,11 +36,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-// Include header and navbar - going up 4 levels to root includes
-include '../../../../includes/header.php';
-$hideSidebarToggle = true;
-$showDashboardBackButton = true;
-include '../../../../includes/navbar.php';
+include '../includes/header.php';
+include '../includes/sidebar.php';
 
 $conn = getConnection();
 $scheduleModel = new ExamSchedule();
@@ -59,7 +59,7 @@ if (!$students) {
 }
 ?>
 
-<div class="container-fluid mt-4">
+<div class="content-area" id="contentArea">
     <div class="row justify-content-center">
         <div class="col-md-8">
             <div class="card">
@@ -201,4 +201,4 @@ document.getElementById('total_marks').addEventListener('input', function() {
 });
 </script>
 
-<?php include '../../../../includes/footer.php'; ?>
+<?php include '../includes/footer.php'; ?>

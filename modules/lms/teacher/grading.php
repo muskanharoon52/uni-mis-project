@@ -17,11 +17,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (!teacher_owns_submission((int) $user['teacher_id'], $submissionId)) {
             throw new RuntimeException('You cannot grade this submission.');
         }
-        $grade = $_POST['grade'] === '' ? null : (float) $_POST['grade'];
+        $grade = $_POST['marks'] === '' ? null : (float) $_POST['marks'];
         if ($grade !== null && ($grade < 0 || $grade > 100)) {
             throw new RuntimeException('Grade must be between 0 and 100.');
         }
-        $stmt = db()->prepare('UPDATE lms_submissions SET grade = ?, feedback = ? WHERE submission_id = ?');
+        $stmt = db()->prepare('UPDATE lms_submissions SET marks = ?, feedback = ? WHERE submission_id = ?');
         $stmt->execute([$grade, trim((string) ($_POST['feedback'] ?? '')), $submissionId]);
         $message = 'Submission graded.';
     } catch (RuntimeException $exception) {
@@ -56,14 +56,13 @@ require_once __DIR__ . '/../includes/header.php';
                 <td><?= e($submission['title']) ?></td>
                 <td><?= e($submission['student_name']) ?></td>
                 <td>
-                    <?php if ($submission['submission_file']): ?><a href="<?= app_url($submission['submission_file']) ?>" target="_blank">Download file</a><?php else: ?><span class="muted">No file</span><?php endif; ?>
-                    <?php if ($submission['content']): ?><br><span class="muted"><?= e($submission['content']) ?></span><?php endif; ?>
+                    <?php if (!empty($submission['file_path'])): ?><a href="<?= app_url($submission['file_path']) ?>" target="_blank">Download file</a><?php else: ?><span class="muted">No file</span><?php endif; ?>
                 </td>
                 <td>
                     <form method="post">
                         <?= csrf_field() ?>
                         <input type="hidden" name="submission_id" value="<?= (int) $submission['submission_id'] ?>">
-                        <input name="grade" type="number" step="0.01" min="0" max="100" value="<?= e((string) $submission['grade']) ?>" placeholder="Grade">
+                        <input name="marks" type="number" step="0.01" min="0" max="100" value="<?= e((string) $submission['marks']) ?>" placeholder="Grade">
                         <input name="feedback" value="<?= e($submission['feedback']) ?>" placeholder="Feedback">
                         <button class="btn" type="submit">Save</button>
                     </form>

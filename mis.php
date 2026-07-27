@@ -38,7 +38,7 @@ session_start();
         <a href="index.php" class="navbar-brand">University MIS</a>
         <ul class="navbar-nav">
             <li><a href="index.php">Home</a></li>
-            <li><a href="modules/examination/login.php">Examination</a></li>
+            <li><a href="examination/index.php">Examination</a></li>
             <li><a href="modules/sso/login.php">SSO</a></li>
             <li><a href="modules/finance/login.php">Finance</a></li>
         </ul>
@@ -52,7 +52,7 @@ session_start();
                 <p>Single Sign-On login for all modules. Manage user roles and authentication.</p>
                 <span class="badge badge-active">Active</span>
             </a>
-            <a href="modules/examination/login.php" class="module-card">
+            <a href="examination/index.php" class="module-card">
                 <h2><span class="icon icon-exam">&#128202;</span> Examination</h2>
                 <p>Exam scheduling, result management, grading, and semester promotions.</p>
                 <span class="badge badge-active">Active</span>

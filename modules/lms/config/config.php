@@ -2,6 +2,10 @@
 
 declare(strict_types=1);
 
+ini_set('display_errors', '0');
+ini_set('log_errors', '1');
+error_reporting(E_ALL);
+
 define('APP_NAME', 'University LMS');
 define('APP_BASE_PATH', '/uni-mis-project/modules/lms');
 
@@ -55,7 +59,7 @@ function verify_csrf(): void
     $token = $_POST['_csrf_token'] ?? '';
     if (!hash_equals(csrf_token(), $token)) {
         http_response_code(403);
-        exit('CSRF token mismatch.');
+        exit('Access denied.');
     }
 }
 
@@ -79,16 +83,3 @@ function logout_user(): void
     require_once __DIR__ . '/../includes/auth.php';
     auth_logout();
 }
-
-$demo_auth = [
-    'teacher' => [
-        '5001' => ['password' => 'teacher123', 'display_name' => 'Dr. Sara Khan'],
-        '5002' => ['password' => 'teacher123', 'display_name' => 'Teacher 5002'],
-        'teacher' => ['password' => 'password123', 'display_name' => 'Teacher'],
-    ],
-    'student' => [
-        '9001' => ['password' => 'student123', 'display_name' => 'Ali Raza'],
-        '9002' => ['password' => 'student123', 'display_name' => 'Student 9002'],
-        'student' => ['password' => 'password123', 'display_name' => 'Student'],
-    ],
-];

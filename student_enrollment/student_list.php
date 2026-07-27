@@ -1,8 +1,8 @@
 <?php
 // student_enrollment/student_list.php - View Students in Section
 
-require_once __DIR__ . '../config/db_connect.php';
-require_once __DIR__ . '/../includes/auth.php';
+require_once __DIR__ . '/../config/db_connect.php';
+require_once __DIR__ . '/../modules/sso/includes/auth.php';
 
 if (!isLoggedIn()) {
     header('Location: ' . BASE_URL . 'login.php');
@@ -10,7 +10,7 @@ if (!isLoggedIn()) {
 }
 
 $user = getCurrentUser();
-$role = $user['role_name'] ?? 'User';
+$role = strtolower($user['role_name'] ?? 'user');
 
 if (!in_array($role, ['sso', 'admin'])) {
     header('Location: ' . BASE_URL . 'dashboard.php');

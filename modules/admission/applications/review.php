@@ -53,15 +53,42 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if (!$existing) {
                     // Generate student ID with new format
                     $student_id = generateStudentId();
-                    
-                    // Insert student record
+
+                    // --- 1. Create entry in `users` table (for SSO authentication) ---
+                    $default_password = 'student123';
+                    $password_hash = password_hash($default_password, PASSWORD_DEFAULT);
+                    $username = strtolower(preg_replace('/[^a-zA-Z0-9]/', '', explode(' ', $app['full_name'])[0])) . rand(100, 999);
+                    $login_id = strval(9000 + (int)date('Y') % 1000 + rand(100, 999));
+                    // Ensure login_id is unique
+                    while (true) {
+                        $check_uid = $pdo->prepare("SELECT user_id FROM users WHERE login_id = ?");
+                        $check_uid->execute([$login_id]);
+                        if (!$check_uid->fetch()) break;
+                        $login_id = strval(9000 + (int)date('Y') % 1000 + rand(100, 999));
+                    }
+
+                    $user_stmt = $pdo->prepare("
+                        INSERT INTO users (full_name, username, login_id, email, phone, password_hash, role_id, department_id, status)
+                        VALUES (?, ?, ?, ?, ?, ?, 4, ?, 'Active')
+                    ");
+                    $user_result = $user_stmt->execute([
+                        $app['full_name'],
+                        $username,
+                        $login_id,
+                        $app['email'] ?? $username . '@university.edu',
+                        $app['contact_no'] ?? null,
+                        $password_hash,
+                        $app['program_id'] ?? 1
+                    ]);
+                    $new_user_id = (int) $pdo->lastInsertId();
+
+                    // --- 2. Create entry in `admission_students` table (admission module) ---
                     $student_stmt = $pdo->prepare("
                         INSERT INTO admission_students 
                         (student_id, application_id, student_name, father_name, cnic_or_bform, 
-                         dob, gender, contact_no, email, address, program_id, enrollment_date, status) 
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active')
+                         dob, gender, contact_no, email, address, program_id, status) 
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active')
                     ");
-                    
                     $student_result = $student_stmt->execute([
                         $student_id,
                         $app['application_id'],
@@ -73,22 +100,62 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         $app['contact_no'],
                         $app['email'],
                         $app['address'],
+                        $app['program_id']
+                    ]);
+
+                    // --- 3. Create entry in `students` table (main table for examination/finance/LMS) ---
+                    $roll_no = strtoupper(substr(explode(' ', $app['full_name'])[0], 0, 3)) . '-' . date('Y') . '-' . str_pad(rand(1, 9999), 4, '0', STR_PAD_LEFT);
+                    $main_student_stmt = $pdo->prepare("
+                        INSERT INTO students 
+                        (application_id, roll_no, full_name, father_name, cnic_or_bform, 
+                         dob, gender, contact_no, email, address, program_id, 
+                         admission_session_id, current_session_id, current_semester_id, 
+                         batch_year, admission_date, status)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Active')
+                    ");
+                    $main_student_result = $main_student_stmt->execute([
+                        $app['application_id'],
+                        $roll_no,
+                        $app['full_name'],
+                        $app['father_name'],
+                        $app['cnic_or_bform'],
+                        $app['dob'],
+                        $app['gender'],
+                        $app['contact_no'],
+                        $app['email'],
+                        $app['address'],
                         $app['program_id'],
+                        $app['session_id'],
+                        $app['session_id'],
+                        $app['applied_semester_id'],
+                        date('Y'),
                         date('Y-m-d')
                     ]);
-                    
-                    if ($student_result) {
+
+                    if ($student_result && $user_result && $main_student_result) {
                         // Update application status to Admitted
                         $pdo->prepare("
                             UPDATE admission_applications 
                             SET application_status = 'Admitted' 
                             WHERE application_id = ?
                         ")->execute([$id]);
+
+                        // --- 4. Auto-enroll in LMS courses matching program ---
+                        try {
+                            $enroll_stmt = $pdo->prepare("
+                                INSERT IGNORE INTO lms_enrollments (student_user_id, course_id)
+                                SELECT ?, c.course_id FROM courses c 
+                                WHERE c.program_id = ? OR c.program_id IS NULL
+                            ");
+                            $enroll_stmt->execute([$new_user_id, $app['program_id']]);
+                        } catch (PDOException $e) {
+                            // LMS enrollment is best-effort, don't block admission
+                        }
                         
                         // Commit transaction
                         $pdo->commit();
                         
-                        setFlash('success', 'Application approved! Student created with ID: ' . $student_id);
+                        setFlash('success', 'Application approved! Student created (ID: ' . $student_id . ', Login: ' . $login_id . ', Password: ' . $default_password . ')');
                         header('Location: index.php');
                         exit();
                     } else {

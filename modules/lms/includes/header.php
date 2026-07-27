@@ -29,6 +29,8 @@ $studentLinks = [
     'attendance'   => ['Attendance', 'student/attendance.php', '&#128197;'],
     'marks'        => ['Internal Marks', 'student/marks.php', '&#128200;'],
     'fees'         => ['Fees', 'student/fees.php', '&#128176;'],
+    'announcements'=> ['Announcements', 'student/announcements.php', '&#128227;'],
+    'messages'     => ['Messages', 'student/messages.php', '&#128172;'],
     'queries'      => ['Queries', 'student/queries.php', '&#10067;'],
     'applications' => ['Applications', 'student/applications.php', '&#128203;'],
     'profile'      => ['Profile', 'student/profile.php', '&#128100;'],
@@ -45,7 +47,7 @@ $links = $role === 'teacher' ? $teacherLinks : ($role === 'student' ? $studentLi
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="<?= asset_url('style.css') ?>">
+    <link rel="stylesheet" href="<?= asset_url('style.css') ?>?v=<?= filemtime(__DIR__ . '/../public/assets/style.css') ?>">
 </head>
 <body>
 <button class="menu-toggle" id="menu-toggle">&#9776;</button>
@@ -78,6 +80,10 @@ $links = $role === 'teacher' ? $teacherLinks : ($role === 'student' ? $studentLi
                 </a>
                 <a class="<?= $active === 'assignments' ? 'active' : '' ?>" href="<?= app_url('teacher/assignments.php') ?>">
                     <span class="nav-icon">&#128221;</span> Assignments
+                </a>
+
+                <a class="<?= $active === 'timetable' ? 'active' : '' ?>" href="<?= app_url('teacher/timetable.php') ?>">
+                    <span class="nav-icon">&#128197;</span> Timetable
                 </a>
 
                 <span class="nav-section-label">Grading</span>
@@ -117,6 +123,9 @@ $links = $role === 'teacher' ? $teacherLinks : ($role === 'student' ? $studentLi
                 <a class="<?= $active === 'marks' ? 'active' : '' ?>" href="<?= app_url('student/marks.php') ?>">
                     <span class="nav-icon">&#128200;</span> Internal Marks
                 </a>
+                <a class="<?= $active === 'timetable' ? 'active' : '' ?>" href="<?= app_url('student/timetable.php') ?>">
+                    <span class="nav-icon">&#128197;</span> Timetable
+                </a>
 
                 <span class="nav-section-label">Finance</span>
                 <a class="<?= $active === 'fees' ? 'active' : '' ?>" href="<?= app_url('student/fees.php') ?>">
@@ -124,6 +133,12 @@ $links = $role === 'teacher' ? $teacherLinks : ($role === 'student' ? $studentLi
                 </a>
 
                 <span class="nav-section-label">Communication</span>
+                <a class="<?= $active === 'announcements' ? 'active' : '' ?>" href="<?= app_url('student/announcements.php') ?>">
+                    <span class="nav-icon">&#128227;</span> Announcements
+                </a>
+                <a class="<?= $active === 'messages' ? 'active' : '' ?>" href="<?= app_url('student/messages.php') ?>">
+                    <span class="nav-icon">&#128172;</span> Messages
+                </a>
                 <a class="<?= $active === 'queries' ? 'active' : '' ?>" href="<?= app_url('student/queries.php') ?>">
                     <span class="nav-icon">&#10067;</span> Queries
                 </a>
@@ -132,24 +147,6 @@ $links = $role === 'teacher' ? $teacherLinks : ($role === 'student' ? $studentLi
                 </a>
             <?php endif; ?>
         </nav>
-
-        <div class="sidebar-user">
-            <?php if ($user): ?>
-                <div class="user-strip">
-                    <div class="user-strip-avatar"><?= e($userInitial) ?></div>
-                    <div class="user-strip-info">
-                        <span class="user-strip-name"><?= e($user['name']) ?></span>
-                        <span class="user-strip-role"><?= e(ucfirst($role)) ?> &middot; <?= e($user['login_id'] ?? '') ?></span>
-                    </div>
-                </div>
-                <div class="actions">
-                    <a class="btn btn-ghost btn-sm" href="<?= app_url(($role === 'teacher' ? 'teacher' : 'student') . '/profile.php') ?>"><?= $role === 'teacher' ? '&#9881; Profile' : '&#128100; Profile' ?></a>
-                    <a class="btn btn-ghost btn-sm" href="/uni-mis-project/logout.php">Logout</a>
-                </div>
-            <?php else: ?>
-                <a class="btn btn-primary btn-sm" href="<?= app_url('public/login.php') ?>" style="width:100%;justify-content:center;">Sign In</a>
-            <?php endif; ?>
-        </div>
     </aside>
 
     <main class="content">
@@ -160,8 +157,30 @@ $links = $role === 'teacher' ? $teacherLinks : ($role === 'student' ? $studentLi
             </div>
             <div class="topbar-actions">
                 <?php if ($user): ?>
-                    <span class="badge badge-<?= e(strtolower($role)) ?>"><?= e(ucfirst($role)) ?></span>
-                    <span class="topbar-user"><?= e($user['name']) ?></span>
+                    <?php
+                        $msgCount = unread_notification_count((int) $user['id'], 'message');
+                        $annCount = unread_notification_count((int) $user['id'], 'announcement');
+                        $prefix = $role === 'teacher' ? 'teacher' : 'student';
+                    ?>
+                    <a class="topbar-icon-btn" href="<?= app_url($prefix . '/messages.php') ?>" title="Messages">
+                        &#128172;
+                        <?php if ($msgCount > 0): ?><span class="topbar-badge"><?= $msgCount ?></span><?php endif; ?>
+                    </a>
+                    <a class="topbar-icon-btn" href="<?= app_url($prefix . '/announcements.php') ?>" title="Announcements">
+                        &#128276;
+                        <?php if ($annCount > 0): ?><span class="topbar-badge"><?= $annCount ?></span><?php endif; ?>
+                    </a>
+                    <div class="topbar-user-dropdown">
+                        <button class="topbar-user-btn">
+                            <span class="topbar-user-avatar"><?= e($userInitial) ?></span>
+                            <span class="topbar-user-name"><?= e($user['name']) ?></span>
+                            <span class="topbar-chevron">&#9662;</span>
+                        </button>
+                        <div class="topbar-dropdown-menu">
+                            <a href="<?= app_url($prefix . '/profile.php') ?>">&#128100; Profile</a>
+                            <a href="/uni-mis-project/logout.php">&#x2192; Logout</a>
+                        </div>
+                    </div>
                 <?php endif; ?>
             </div>
         </div>

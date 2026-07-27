@@ -52,17 +52,18 @@ require_once __DIR__ . '/../includes/header.php';
         <div class="card-header"><h3>My Applications</h3></div>
         <div class="table-responsive">
         <table>
-            <tr><th>Type</th><th>Details</th><th>Status</th><th>Date</th></tr>
+            <tr><th>Type</th><th>Details</th><th>Status</th><th>Response</th><th>Date</th></tr>
             <?php foreach ($applications as $application): ?>
                 <tr>
                     <td><?= e($application['type']) ?></td>
                     <td><?= e($application['details']) ?></td>
                     <td><span class="badge badge-<?= $application['status'] === 'approved' ? 'active' : ($application['status'] === 'rejected' ? 'inactive' : 'draft') ?>"><?= e($application['status']) ?></span></td>
+                    <td><?= !empty($application['response_message']) ? '<div style="padding:6px 10px;background:#f8f9fa;border-radius:6px;font-size:13px;color:#555;">' . e($application['response_message']) . '</div>' : '<span class="muted">—</span>' ?></td>
                     <td><?= e($application['created_at']) ?></td>
                 </tr>
             <?php endforeach; ?>
             <?php if (!$applications): ?>
-                <tr><td colspan="4" class="muted">No applications submitted yet.</td></tr>
+                <tr><td colspan="5" class="muted">No applications submitted yet.</td></tr>
             <?php endif; ?>
             </table>
         </div>

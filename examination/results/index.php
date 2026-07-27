@@ -1,19 +1,12 @@
 <?php
-// Enable error reporting for debugging
+$page_title = 'Exam Results';
 error_reporting(E_ALL);
 ini_set('display_errors', 1);
 
-// Correct paths - going up 4 levels to reach root
-// From: modules/examination/examination/results/index.php
-// Go up: results -> examination -> examination -> modules -> root
-require_once '../../../../config/db_connect.php';
+require_once '../../config/db_connect.php';
 require_once '../models/ExamResult.php';
-
-// Include header and navbar - going up 4 levels to root includes
-include '../../../../includes/header.php';
-$hideSidebarToggle = true;
-$showDashboardBackButton = true;
-include '../../../../includes/navbar.php';
+include '../includes/header.php';
+include '../includes/sidebar.php';
 
 $model = new ExamResult();
 $results = $model->getAll();
@@ -24,7 +17,7 @@ if (!$results) {
 }
 ?>
 
-<div class="container-fluid mt-4">
+<div class="content-area" id="contentArea">
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h2>Exam Results</h2>
         <a href="add.php" class="btn btn-primary">
@@ -145,4 +138,4 @@ if (!$results) {
     </div>
 </div>
 
-<?php include '../../../../includes/footer.php'; ?>
+<?php include '../includes/footer.php'; ?>

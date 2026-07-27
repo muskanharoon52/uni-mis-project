@@ -26,7 +26,7 @@ require_once __DIR__ . '/../includes/header.php';
         <table>
             <tr><th>Course</th><th>Title</th><th>Date</th><th>File</th></tr>
             <?php foreach ($materials as $material): ?>
-                <tr><td><?= e($material['course_code']) ?></td><td><?= e($material['title']) ?></td><td><?= e($material['lecture_date']) ?></td><td><a href="<?= app_url($material['file_path']) ?>" target="_blank">Download</a></td></tr>
+                <tr><td><?= e($material['course_code']) ?></td><td><?= e($material['title']) ?></td><td><?= e($material['lecture_date']) ?></td><td><?= $material['file_path'] ? '<a href="' . e(app_url($material['file_path'])) . '" target="_blank">Download</a>' : '<span class="muted">No file</span>' ?></td></tr>
             <?php endforeach; ?>
         </table>
     </div>

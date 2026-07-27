@@ -1,5 +1,6 @@
 <?php
-require_once '../../../../config/db_connect.php';
+$page_title = 'Edit Exam Result';
+require_once '../../config/db_connect.php';
 require_once '../models/ExamResult.php';
 
 $model = new ExamResult();
@@ -22,8 +23,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_GET['id'])) {
     }
 }
 
-include '../../includes/header.php';
-include '../../includes/navbar.php';
+include '../includes/header.php';
+include '../includes/sidebar.php';
 
 $result = $model->getById($_GET['id']);
 
@@ -50,7 +51,7 @@ $exams = $conn->query("
 ");
 ?>
 
-<div class="container-fluid mt-4">
+<div class="content-area" id="contentArea">
     <div class="row justify-content-center">
         <div class="col-md-8">
             <div class="card">
@@ -141,4 +142,4 @@ function updateGrade() {
 }
 </script>
 
-<?php include '../../includes/footer.php'; ?>
+<?php include '../includes/footer.php'; ?>

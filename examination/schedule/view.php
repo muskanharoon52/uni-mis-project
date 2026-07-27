@@ -1,8 +1,9 @@
 <?php
-require_once '../../../../config/db_connect.php';
+$page_title = 'View Exam Schedule';
+require_once '../../config/db_connect.php';
 require_once '../models/ExamSchedule.php';
-include '../../includes/header.php';
-include '../../includes/navbar.php';
+include '../includes/header.php';
+include '../includes/sidebar.php';
 
 $model = new ExamSchedule();
 
@@ -25,11 +26,7 @@ if (!$schedule) {
 }
 ?>
 
-<!-- Main Container -->
-<div class="main-container">
-    
-    
-    <div class="content-area" id="contentArea">
+<div class="content-area" id="contentArea">
         <div class="card">
             <div class="card-header">
                 <h5><i class="bi bi-calendar-event"></i> Exam Schedule Details</h5>
@@ -107,6 +104,5 @@ if (!$schedule) {
             </div>
         </div>
     </div>
-</div>
 
-<?php include '../../includes/footer.php'; ?>
+<?php include '../includes/footer.php'; ?>

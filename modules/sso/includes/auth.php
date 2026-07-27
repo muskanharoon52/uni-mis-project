@@ -13,7 +13,7 @@ function isLoggedIn() {
 
 function isSSO() {
     if (!isLoggedIn()) return false;
-    $role = $_SESSION['role_name'] ?? '';
+    $role = strtolower($_SESSION['role_name'] ?? '');
     return $role == 'sso' || $role == 'admin';
 }
 
@@ -68,9 +68,39 @@ function loginUser($username, $password) {
         $_SESSION['role_id'] = $user['role_id'] ?? 0;
         $_SESSION['role_name'] = $user['role_name'] ?? 'user';
         $_SESSION['full_name'] = $user['full_name'] ?? 'User';
+        $_SESSION['username'] = $user['username'] ?? '';
+        $_SESSION['login_id'] = $user['login_id'] ?? '';
         return true;
     }
     
+    return false;
+}
+
+function loginUserById($loginId, $password) {
+    $conn = getConnection();
+    $loginId = mysqli_real_escape_string($conn, $loginId);
+    $password = mysqli_real_escape_string($conn, $password);
+
+    $query = "SELECT u.*, r.role_name FROM users u
+              LEFT JOIN roles r ON u.role_id = r.role_id
+              WHERE u.login_id = '$loginId' OR u.username = '$loginId'";
+    $result = mysqli_query($conn, $query);
+    $user = mysqli_fetch_assoc($result);
+
+    if (!$user) {
+        return false;
+    }
+
+    if (password_verify($password, $user['password_hash']) || $password === $user['password_hash']) {
+        $_SESSION['user_id'] = $user['user_id'];
+        $_SESSION['role_id'] = $user['role_id'] ?? 0;
+        $_SESSION['role_name'] = $user['role_name'] ?? 'user';
+        $_SESSION['full_name'] = $user['full_name'] ?? 'User';
+        $_SESSION['username'] = $user['username'] ?? '';
+        $_SESSION['login_id'] = $user['login_id'] ?? '';
+        return $user;
+    }
+
     return false;
 }
 

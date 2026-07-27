@@ -68,9 +68,14 @@ if (!defined('BASE_URL')) {
             <i class="fas fa-clipboard-check"></i> Attendance
         </a>
 
-        <!-- Applications -->
-        <a href="<?php echo BASE_URL; ?>applications/index.php" class="nav-link <?php echo basename(dirname($_SERVER['PHP_SELF'])) == 'applications' ? 'active' : ''; ?>">
-            <i class="fas fa-file-alt"></i> Applications
+        <!-- Admission Applications -->
+        <a href="<?php echo BASE_URL; ?>applications/index.php" class="nav-link <?php echo (basename($_SERVER['PHP_SELF']) == 'applications.php' && basename(dirname($_SERVER['PHP_SELF'])) == 'applications') ? 'active' : ''; ?>">
+            <i class="fas fa-file-alt"></i> Admission Apps
+        </a>
+
+        <!-- LMS Applications -->
+        <a href="<?php echo BASE_URL; ?>lms_applications.php" class="nav-link <?php echo basename($_SERVER['PHP_SELF']) == 'lms_applications.php' ? 'active' : ''; ?>">
+            <i class="fas fa-clipboard-list"></i> LMS Applications
         </a>
 
         <!-- REPORTS - REMOVED -->

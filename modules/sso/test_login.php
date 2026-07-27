@@ -1,7 +1,7 @@
 <?php
 // test_login.php - Debug login
 
-require_once __DIR__ . '../../config/db_connect.php';
+require_once __DIR__ . '/../..config/db_connect.php';
 
 $email = 'sso@university.edu';
 $password = 'password123';

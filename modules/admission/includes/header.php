@@ -75,7 +75,7 @@ $page_title = $page_title ?? 'Dashboard';
             </a>
         </nav>
         <div class="user-info">
-            <i class="fas fa-user-circle"></i> <?= $_SESSION['user_name'] ?? 'User' ?>
+            <i class="fas fa-user-circle"></i> <?= $_SESSION['full_name'] ?? $_SESSION['user_name'] ?? 'User' ?>
             <br><small><i class="fas fa-sign-out-alt"></i> <a href="/uni-mis-project/logout.php">Logout</a></small>
         </div>
     </div>
@@ -85,7 +85,7 @@ $page_title = $page_title ?? 'Dashboard';
         <div class="top-bar d-flex justify-content-between align-items-center">
             <h5 class="mb-0"><?= $page_title ?></h5>
             <div>
-                <span class="badge bg-primary"><?= $_SESSION['user_role'] ?? 'Staff' ?></span>
+                <span class="badge bg-primary"><?= $_SESSION['role_name'] ?? $_SESSION['user_role'] ?? 'Staff' ?></span>
                 <span class="ms-2 text-muted"><?= date('d M Y, h:i A') ?></span>
             </div>
         </div>

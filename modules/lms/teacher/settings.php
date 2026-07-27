@@ -17,6 +17,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         if ($action === 'profile') {
             $photoPath = save_uploaded_file('profile_photo', 'profiles', ['jpg', 'jpeg', 'png', 'webp']);
+            $deptId = (int) ($_POST['department'] ?? 0);
+            if ($deptId <= 0) $deptId = null;
             $stmt = db()->prepare(
                 'UPDATE users
                  SET full_name = ?, department_id = ?, profile_photo = COALESCE(?, profile_photo)
@@ -24,11 +26,22 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             );
             $stmt->execute([
                 trim((string) ($_POST['name'] ?? '')),
-                trim((string) ($_POST['department'] ?? '')),
+                $deptId,
                 $photoPath,
                 $user['id'],
             ]);
             $message = 'Profile settings updated.';
+            // Refresh session
+            $stmt = db()->prepare('SELECT u.*, d.department_name FROM users u LEFT JOIN departments d ON d.department_id = u.department_id WHERE u.user_id = ? LIMIT 1');
+            $stmt->execute([$user['id']]);
+            $updated = $stmt->fetch();
+            if ($updated) {
+                $_SESSION['lms_auth_user']['name'] = $updated['full_name'] ?? '';
+                $_SESSION['lms_auth_user']['department'] = $updated['department_name'] ?? '';
+                $_SESSION['lms_auth_user']['department_id'] = (int) ($updated['department_id'] ?? 0);
+                if (!empty($updated['profile_photo'])) $_SESSION['lms_auth_user']['profile_photo'] = $updated['profile_photo'];
+                $user = $_SESSION['lms_auth_user'];
+            }
         } elseif ($action === 'password') {
             $currentPassword = (string) ($_POST['current_password'] ?? '');
             $newPassword = (string) ($_POST['new_password'] ?? '');
@@ -75,6 +88,10 @@ $studentStmt->execute([$user['teacher_id']]);
 $studentCount = (int) $studentStmt->fetchColumn();
 
 $initials = strtoupper(substr((string) $user['name'], 0, 2));
+
+$departments = [];
+$deptStmt = db()->query('SELECT department_id, department_name FROM departments ORDER BY department_name');
+$departments = $deptStmt->fetchAll();
 
 require_once __DIR__ . '/../includes/header.php';
 ?>
@@ -124,7 +141,7 @@ require_once __DIR__ . '/../includes/header.php';
             </div>
             <div class="settings-meta-row">
                 <span class="settings-meta-key">Member since</span>
-                <span class="settings-meta-val"><?= e(date('M Y', strtotime((string) ($user['created_at'] ?? '')))) ?></span>
+                <span class="settings-meta-val"><?= e($user['created_at'] ? date('M Y', strtotime($user['created_at'])) : '—') ?></span>
             </div>
         </div>
     </aside>
@@ -178,7 +195,12 @@ require_once __DIR__ . '/../includes/header.php';
                     </div>
                     <div class="settings-field">
                         <label for="department">Department</label>
-                        <input id="department" name="department" value="<?= e((string) $user['department']) ?>" placeholder="e.g. Computer Science">
+                        <select id="department" name="department">
+                            <option value="">-- Select Department --</option>
+                            <?php foreach ($departments as $dept): ?>
+                                <option value="<?= (int) $dept['department_id'] ?>" <?= (int) ($user['department_id'] ?? 0) === (int) $dept['department_id'] ? 'selected' : '' ?>><?= e($dept['department_name']) ?></option>
+                            <?php endforeach; ?>
+                        </select>
                     </div>
                 </div>
 

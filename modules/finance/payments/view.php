@@ -1,15 +1,15 @@
 <?php
 session_start();
 if (!isset($_SESSION['user_id'])) {
-    header('Location: ../auth/login.php');
+    header('Location: /uni-mis-project/modules/sso/login.php');
     exit();
 }
 if ($_SESSION['role_id'] != 3 && $_SESSION['role_id'] != 1) {
-    header('Location: ../auth/login.php?error=Access denied. Finance Officer only.');
+    header('Location: /uni-mis-project/modules/sso/login.php?error=Access denied');
     exit();
 }
 
-include $_SERVER['DOCUMENT_ROOT'] . '/MIS/finance/includes/header.php';
+include_once __DIR__ . '/../includes/header.php';
 
 if (!isset($_GET['id']) || empty($_GET['id'])) {
     header("Location: index.php?error=Invalid payment ID");
@@ -76,4 +76,4 @@ $payment = mysqli_fetch_assoc($result);
     </div>
 </div>
 
-<?php include $_SERVER['DOCUMENT_ROOT'] . '/MIS/finance/includes/footer.php'; ?>
+<?php include_once __DIR__ . '/../includes/footer.php'; ?>

@@ -1,15 +1,8 @@
 
 <?php
-session_start();
-
-if (!isset($_SESSION['user_id'])) {
-    header('Location: ../login.php');
-    exit();
-}
-
-require_once '../../../config/db_connect.php';
-include '../includes/header.php';
-include '../includes/navbar.php';
+$page_title = 'Dashboard';
+include 'includes/header.php';
+include 'includes/sidebar.php';
 
 $conn = getConnection();
 
@@ -166,11 +159,7 @@ if ($programs_list) {
 $conn->close();
 ?>
 
-<!-- Main Container with Sidebar -->
-<div class="main-container">
-    <?php include '../includes/sidebar.php'; ?>
-    
-    <div class="content-area" id="contentArea">
+<div class="content-area" id="contentArea">
         <!-- Welcome Section -->
         <div class="d-flex justify-content-between align-items-center mb-4">
             <div>
@@ -466,6 +455,5 @@ $conn->close();
             </div>
         </div>
     </div>
-</div>
 
-<?php include '../includes/footer.php'; ?>
+<?php include 'includes/footer.php'; ?>

@@ -13,6 +13,7 @@ if ($user) {
 $error = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    verify_csrf();
     $name = trim((string) ($_POST['name'] ?? ''));
     $email = trim((string) ($_POST['email'] ?? ''));
     $password = (string) ($_POST['password'] ?? '');
@@ -104,6 +105,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <?php endif; ?>
 
         <form method="post" onsubmit="setLoading(this)">
+            <?= csrf_field() ?>
             <div class="field" style="margin-bottom:14px;">
                 <label style="font-size:.84rem;font-weight:600;color:var(--text-strong);display:block;margin-bottom:6px;">Full Name</label>
                 <input type="text" name="name" required value="<?= old('name') ?>" placeholder="Enter your full name" style="min-height:42px;border-radius:8px;">

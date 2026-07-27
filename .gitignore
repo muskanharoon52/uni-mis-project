@@ -1,0 +1,37 @@
+# Uploads (user data)
+modules/lms/uploads/profiles/*.jpg
+modules/lms/uploads/profiles/*.png
+modules/lms/uploads/profiles/*.gif
+modules/lms/uploads/assignments/*
+modules/lms/uploads/lectures/*
+modules/lms/uploads/submissions/*
+
+# Uploaded files
+**/uploads/assignments/*
+**/uploads/lectures/*
+**/uploads/submissions/*
+**/uploads/profiles/*.jpg
+**/uploads/profiles/*.png
+**/uploads/profiles/*.gif
+
+# Keep upload directories but not their contents
+!modules/lms/uploads/.htaccess
+!modules/lms/uploads/profiles/.gitkeep
+
+# IDE / Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Temp
+*.tmp
+*.bak

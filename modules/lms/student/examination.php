@@ -6,19 +6,62 @@ require_once __DIR__ . '/../includes/auth.php';
 
 $user = require_role('student');
 $active = 'examination';
-$pageTitle = 'Examination';
+$pageTitle = 'Examination Results';
+
+// Get student_id from the students table
+$studentStmt = db()->prepare('SELECT student_id FROM students WHERE user_id = ? LIMIT 1');
+$studentStmt->execute([(int) $user['id']]);
+$studentId = (int) ($studentStmt->fetchColumn() ?: 0);
+
+// Fetch published exam results for this student
+$results = [];
+if ($studentId > 0) {
+    $stmt = db()->prepare(
+        'SELECT er.*, es.exam_type, es.date AS exam_date, es.start_time, es.end_time, es.room,
+                c.course_code, c.course_title
+         FROM exam_results er
+         JOIN exam_schedules es ON es.exam_id = er.exam_id
+         JOIN courses c ON c.course_id = es.course_id
+         WHERE er.student_id = ? AND er.status = \'published\'
+         ORDER BY es.date DESC, c.course_code'
+    );
+    $stmt->execute([$studentId]);
+    $results = $stmt->fetchAll();
+}
 
 require_once __DIR__ . '/../includes/header.php';
 ?>
-<div class="coming-soon-card">
-    <div class="coming-soon-icon">
-        <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="animate-spin-slow"><circle cx="12" cy="12" r="10"></circle><path d="M12 6v6l4 2"></path></svg>
-    </div>
-    <h1><?= e($pageTitle) ?></h1>
-    <p class="muted">This section is currently under active development and will be connected in a future update.</p>
-    <div class="progress-bar-container">
-        <div class="progress-bar-fill animate-progress"></div>
-    </div>
-    <span class="status-badge">System Integration Pending</span>
+<div class="card">
+    <div class="card-header"><h3><?= e($pageTitle) ?></h3></div>
+    <?php if (!$results): ?>
+        <p class="muted" style="padding: 20px;">No published examination results found.</p>
+    <?php else: ?>
+        <div class="table-responsive">
+        <table>
+            <tr>
+                <th>Course</th>
+                <th>Exam Type</th>
+                <th>Date</th>
+                <th>Marks Obtained</th>
+                <th>Total Marks</th>
+                <th>Percentage</th>
+                <th>Grade</th>
+                <th>Remarks</th>
+            </tr>
+            <?php foreach ($results as $r): ?>
+                <tr>
+                    <td><?= e($r['course_code'] . ' - ' . $r['course_title']) ?></td>
+                    <td><?= e($r['exam_type']) ?></td>
+                    <td><?= e($r['exam_date']) ?></td>
+                    <td><?= e(number_format((float) $r['marks_obtained'], 2)) ?></td>
+                    <td><?= e(number_format((float) $r['total_marks'], 2)) ?></td>
+                    <td><?= e(number_format((float) $r['percentage'], 1)) ?>%</td>
+                    <td><strong><?= e($r['grade'] ?: '-') ?></strong></td>
+                    <td><?= e($r['remarks'] ?: '-') ?></td>
+                </tr>
+            <?php endforeach; ?>
+        </table>
+        </div>
+    <?php endif; ?>
 </div>
 <?php require_once __DIR__ . '/../includes/footer.php'; ?>

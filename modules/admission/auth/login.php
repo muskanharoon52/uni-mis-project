@@ -1,19 +1,18 @@
 <?php
 session_start();
-require_once __DIR__ . '/../config/database.php';
+require_once __DIR__ . '/../../sso/includes/auth.php';
 
 $error = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $username = $_POST['username'] ?? '';
     $password = $_POST['password'] ?? '';
-    
-    // Simple login - you can expand this
-    if ($username === 'admin' && $password === 'admin123') {
-        $_SESSION['user_id'] = 1;
-        $_SESSION['user_name'] = 'Admin User';
-        $_SESSION['user_role'] = 'Admin';
-        header('Location: /uni-mis-project/modules/admission/index.php');
+
+    if (loginUser($username, $password)) {
+        // Set admission-specific legacy session vars for backward compat
+        $_SESSION['user_name'] = $_SESSION['full_name'] ?? 'User';
+        $_SESSION['user_role'] = $_SESSION['role_name'] ?? 'Staff';
+        header('Location: ' . BASE_URL . 'modules/admission/index.php');
         exit();
     } else {
         $error = 'Invalid username or password';
@@ -36,7 +35,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     </div>
                     <div class="card-body">
                         <?php if ($error): ?>
-                            <div class="alert alert-danger"><?= $error ?></div>
+                            <div class="alert alert-danger"><?= htmlspecialchars($error) ?></div>
                         <?php endif; ?>
                         <form method="post">
                             <div class="mb-3">
@@ -49,6 +48,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             </div>
                             <button type="submit" class="btn btn-primary w-100">Login</button>
                         </form>
+                        <hr>
+                        <small class="text-muted">Demo: admin / admin123</small>
                     </div>
                 </div>
             </div>

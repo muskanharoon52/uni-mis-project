@@ -11,7 +11,7 @@ if (!isLoggedIn()) {
 }
 
 $user = getCurrentUser();
-$role = $user['role_name'] ?? 'User';
+$role = strtolower($user['role_name'] ?? 'user');
 
 // Only SSO and Admin can add students
 if (!in_array($role, ['sso', 'admin'])) {

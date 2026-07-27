@@ -1,7 +1,7 @@
 <?php
 // fee_management/course_add.php - Add Course Fee (SIMPLE - No Semester)
 
-require_once __DIR__ . '../../../config/db_connect.php';
+require_once __DIR__ . '/../../../config/db_connect.php';
 require_once __DIR__ . '/../includes/auth.php';
 
 if (!isLoggedIn()) {
@@ -10,7 +10,7 @@ if (!isLoggedIn()) {
 }
 
 $user = getCurrentUser();
-$role = $user['role_name'] ?? 'User';
+$role = strtolower($user['role_name'] ?? 'user');
 
 if (!in_array($role, ['sso', 'admin'])) {
     header('Location: ' . BASE_URL . 'dashboard.php');

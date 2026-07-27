@@ -1,19 +1,20 @@
 <?php
 session_start();
 if (!isset($_SESSION['user_id'])) {
-    header('Location: ../auth/login.php');
+    header('Location: /uni-mis-project/modules/sso/login.php');
     exit();
 }
 if ($_SESSION['role_id'] != 3 && $_SESSION['role_id'] != 1) {
-    header('Location: ../auth/login.php?error=Access denied. Finance Officer only.');
+    header('Location: /uni-mis-project/modules/sso/login.php?error=Access denied');
     exit();
 }
 
 // Include database connection
-include __DIR__ . '../../../config/db_connect.php';
+include __DIR__ . '/../../../config/db_connect.php';
 
 // Include header
 include __DIR__ . '/../includes/header.php';
+require_once __DIR__ . '/../includes/lms_sync.php';
 
 $error = '';
 $success = '';
@@ -82,6 +83,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['receive_payment'])) {
                           VALUES ('$student_fee_id', '$student_id', '$amount_paid', '$payment_method', '$transaction_ref', '$received_by')";
             
             if (mysqli_query($conn, $insert_sql)) {
+                syncPaymentToLMS($conn, intval($student_id), intval($student_fee_id));
                 $success = "Payment received successfully!";
                 header("refresh:2;url=index.php?msg=Payment received successfully!");
             } else {

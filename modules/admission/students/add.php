@@ -33,31 +33,64 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'status' => 'active'
         ];
         
-        // Add enrollment_date if column exists
-        $columns = $pdo->query("SHOW COLUMNS FROM admission_students")->fetchAll(PDO::FETCH_COLUMN);
-        if (in_array('enrollment_date', $columns)) {
-            $data['enrollment_date'] = date('Y-m-d');
+        $pdo->beginTransaction();
+
+        // 1. Create in `users` table for SSO authentication
+        $default_password = 'student123';
+        $password_hash = password_hash($default_password, PASSWORD_DEFAULT);
+        $username = strtolower(preg_replace('/[^a-zA-Z0-9]/', '', explode(' ', $data['student_name'])[0])) . rand(100, 999);
+        $login_id = strval(9000 + (int)date('Y') % 1000 + rand(100, 999));
+        while (true) {
+            $check_uid = $pdo->prepare("SELECT user_id FROM users WHERE login_id = ?");
+            $check_uid->execute([$login_id]);
+            if (!$check_uid->fetch()) break;
+            $login_id = strval(9000 + (int)date('Y') % 1000 + rand(100, 999));
         }
-        
+
+        $user_stmt = $pdo->prepare("
+            INSERT INTO users (full_name, username, login_id, email, phone, password_hash, role_id, department_id, status)
+            VALUES (?, ?, ?, ?, ?, ?, 4, ?, 'Active')
+        ");
+        $user_stmt->execute([$data['student_name'], $username, $login_id, $data['email'], $data['contact_no'], $password_hash, $data['program_id']]);
+
+        // 2. Create in `admission_students`
         $sql = "INSERT INTO admission_students SET ";
         $set_parts = [];
         foreach ($data as $key => $value) {
             $set_parts[] = "$key = :$key";
         }
         $sql .= implode(", ", $set_parts);
-        
         $stmt = $pdo->prepare($sql);
-        if ($stmt->execute($data)) {
-            // Update application status if linked
-            if (!empty($_POST['application_id'])) {
-                $pdo->prepare("UPDATE admission_applications SET application_status = 'Admitted' WHERE application_id = ?")
-                   ->execute([$_POST['application_id']]);
-            }
-            setFlash('success', 'Student added successfully! Student ID: ' . $student_id);
-            header('Location: index.php');
-            exit();
+        $stmt->execute($data);
+
+        // 3. Create in `students` (main table)
+        $roll_no = strtoupper(substr(explode(' ', $data['student_name'])[0], 0, 3)) . '-' . date('Y') . '-' . str_pad(rand(1, 9999), 4, '0', STR_PAD_LEFT);
+        $main_student_stmt = $pdo->prepare("
+            INSERT INTO students 
+            (application_id, roll_no, full_name, father_name, cnic_or_bform, 
+             dob, gender, contact_no, email, address, program_id, 
+             admission_session_id, current_session_id, current_semester_id, 
+             batch_year, admission_date, status)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 1, 1, ?, CURDATE(), 'Active')
+        ");
+        $main_student_stmt->execute([
+            $data['application_id'], $roll_no, $data['student_name'], $data['father_name'],
+            $data['cnic_or_bform'], $data['dob'], $data['gender'], $data['contact_no'],
+            $data['email'], $data['address'], $data['program_id'], date('Y')
+        ]);
+
+        // Update application status if linked
+        if (!empty($_POST['application_id'])) {
+            $pdo->prepare("UPDATE admission_applications SET application_status = 'Admitted' WHERE application_id = ?")
+               ->execute([$_POST['application_id']]);
         }
+
+        $pdo->commit();
+        setFlash('success', 'Student added! ID: ' . $student_id . ' | Login: ' . $login_id . ' | Password: ' . $default_password);
+        header('Location: index.php');
+        exit();
     } catch (PDOException $e) {
+        $pdo->rollBack();
         setFlash('error', 'Database Error: ' . $e->getMessage());
     }
 }

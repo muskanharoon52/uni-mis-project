@@ -1,8 +1,9 @@
 <?php
-require_once '../../../../config/db_connect.php';
+$page_title = 'View Exam Result';
+require_once '../../config/db_connect.php';
 require_once '../models/ExamResult.php';
-include '../../includes/header.php';
-include '../../includes/navbar.php';
+include '../includes/header.php';
+include '../includes/sidebar.php';
 
 $model = new ExamResult();
 $result = $model->getById($_GET['id']);
@@ -14,7 +15,7 @@ if (!$result) {
 }
 ?>
 
-<div class="container-fluid mt-4">
+<div class="content-area" id="contentArea">
     <div class="card">
         <div class="card-header">
             <h5>Exam Result Details</h5>
@@ -92,4 +93,4 @@ if (!$result) {
     </div>
 </div>
 
-<?php include '../../includes/footer.php'; ?>
+<?php include '../includes/footer.php'; ?>

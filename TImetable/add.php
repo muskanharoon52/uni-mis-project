@@ -15,7 +15,7 @@ if (!isLoggedIn()) {
 }
 
 $user = getCurrentUser();
-$role = $user['role_name'] ?? 'User';
+$role = strtolower($user['role_name'] ?? 'user');
 
 // Check if user has permission
 if (!in_array($role, ['sso', 'admin'])) {

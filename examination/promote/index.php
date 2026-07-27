@@ -1,11 +1,9 @@
 <?php
-require_once '../../../../config/db_connect.php';
+$page_title = 'Student Promotion';
+require_once '../../config/db_connect.php';
 require_once '../models/StudentPromotion.php';
-include '../../includes/header.php';
-$hideSidebarToggle = true;
-$showDashboardBackButton = true;
-include '../../includes/navbar.php';
-// ... rest of code
+include '../includes/header.php';
+include '../includes/sidebar.php';
 
 $promotion = new StudentPromotion();
 $conn = getConnection();
@@ -41,7 +39,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['promote_students'])) 
 }
 ?>
 
-<div class="container-fluid mt-4">
+<div class="content-area" id="contentArea">
     <h2>Student Promotion</h2>
     
     <?php if (isset($_SESSION['success'])): ?>
@@ -187,4 +185,4 @@ function deselectAll() {
 }
 </script>
 
-<?php include '../../includes/footer.php'; ?>
+<?php include '../includes/footer.php'; ?>

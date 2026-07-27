@@ -7,15 +7,15 @@ if (session_status() === PHP_SESSION_NONE) {
 // Include database connection - FIXED: 3 levels up (not 2)
 include_once __DIR__ . '/../../../config/db_connect.php';
 
-// Check if user is logged in
+// Check if user is logged in via SSO
 if (!isset($_SESSION['user_id'])) {
-    header('Location: ../../../auth/login.php');
+    header('Location: /uni-mis-project/modules/sso/login.php?error=Please login first');
     exit();
 }
 
 // Check if user is Finance Officer (role_id = 3) or Admin (role_id = 1)
 if ($_SESSION['role_id'] != 3 && $_SESSION['role_id'] != 1) {
-    header('Location: ../../../auth/login.php?error=Access denied. Finance Officer only.');
+    header('Location: /uni-mis-project/modules/sso/login.php?error=Access denied');
     exit();
 }
 
@@ -125,21 +125,21 @@ $current_folder = basename(dirname($_SERVER['PHP_SELF']));
     <ul class="nav flex-column mt-3">
         <!-- Dashboard -->
         <li class="nav-item">
-            <a class="nav-link <?php echo ($current_page == 'dashboard.php') ? 'active' : ''; ?>" href="../dashboard.php">
+            <a class="nav-link <?php echo ($current_page == 'dashboard.php') ? 'active' : ''; ?>" href="/uni-mis-project/modules/finance/dashboard.php">
                 <i class="fas fa-chart-pie"></i> Dashboard
             </a>
         </li>
         
         <!-- Fee Heads -->
         <li class="nav-item">
-            <a class="nav-link <?php echo ($current_folder == 'fee_heads') ? 'active' : ''; ?>" href="../fee_heads/index.php">
+            <a class="nav-link <?php echo ($current_folder == 'fee_heads') ? 'active' : ''; ?>" href="/uni-mis-project/modules/finance/fee_heads/index.php">
                 <i class="fas fa-tags"></i> Fee Heads
             </a>
         </li>
         
         <!-- Fee Structure -->
         <li class="nav-item">
-            <a class="nav-link <?php echo ($current_folder == 'fee_structure') ? 'active' : ''; ?>" href="../fee_structure/index.php">
+            <a class="nav-link <?php echo ($current_folder == 'fee_structure') ? 'active' : ''; ?>" href="/uni-mis-project/modules/finance/fee_structure/index.php">
                 <i class="fas fa-layer-group"></i> Fee Structure
             </a>
         </li>
@@ -151,29 +151,29 @@ $current_folder = basename(dirname($_SERVER['PHP_SELF']));
                 <span class="arrow <?php echo ($current_folder == 'student_fee') ? 'open' : ''; ?>"><i class="fas fa-chevron-right"></i></span>
             </a>
             <ul class="sub-menu <?php echo ($current_folder == 'student_fee') ? 'show' : ''; ?>" id="studentFeeSubMenu">
-                <li><a class="nav-link" href="../student_fee/generate.php"><i class="fas fa-plus-circle text-success"></i> Generate Fee</a></li>
-                <li><a class="nav-link" href="../student_fee/index.php"><i class="fas fa-list text-primary"></i> Fee Records</a></li>
-                <li><a class="nav-link" href="../student_fee/view.php"><i class="fas fa-eye text-info"></i> View Fee</a></li>
+                <li><a class="nav-link" href="/uni-mis-project/modules/finance/student_fee/generate.php"><i class="fas fa-plus-circle text-success"></i> Generate Fee</a></li>
+                <li><a class="nav-link" href="/uni-mis-project/modules/finance/student_fee/index.php"><i class="fas fa-list text-primary"></i> Fee Records</a></li>
+                <li><a class="nav-link" href="/uni-mis-project/modules/finance/student_fee/view.php"><i class="fas fa-eye text-info"></i> View Fee</a></li>
             </ul>
         </li>
         
         <!-- Payments -->
         <li class="nav-item">
-            <a class="nav-link <?php echo ($current_folder == 'payments') ? 'active' : ''; ?>" href="../payments/index.php">
+            <a class="nav-link <?php echo ($current_folder == 'payments') ? 'active' : ''; ?>" href="/uni-mis-project/modules/finance/payments/index.php">
                 <i class="fas fa-money-bill-wave"></i> Payments
             </a>
         </li>
         
         <!-- Receipts -->
         <li class="nav-item">
-            <a class="nav-link <?php echo ($current_folder == 'receipts') ? 'active' : ''; ?>" href="../receipts/index.php">
+            <a class="nav-link <?php echo ($current_folder == 'receipts') ? 'active' : ''; ?>" href="/uni-mis-project/modules/finance/receipts/index.php">
                 <i class="fas fa-receipt"></i> Receipts
             </a>
         </li>
         
         <!-- Activity Logs -->
         <li class="nav-item">
-            <a class="nav-link <?php echo ($current_folder == 'logs') ? 'active' : ''; ?>" href="../logs/index.php">
+            <a class="nav-link <?php echo ($current_folder == 'logs') ? 'active' : ''; ?>" href="/uni-mis-project/modules/finance/logs/index.php">
                 <i class="fas fa-history"></i> Activity Logs
             </a>
         </li>

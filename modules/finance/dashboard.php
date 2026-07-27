@@ -3,13 +3,13 @@ session_start();
 
 // Check if user is logged in
 if (!isset($_SESSION['user_id'])) {
-    header('Location: ../sso/login.php?error=Please login first');
+    header('Location: /uni-mis-project/modules/sso/login.php?error=Please login first');
     exit();
 }
 
 // Check if user has finance role (role_id = 3) or admin (role_id = 1)
 if ($_SESSION['role_id'] != 3 && $_SESSION['role_id'] != 1) {
-    header('Location: ../sso/login.php?error=Access denied. Finance Officer only.');
+    header('Location: /uni-mis-project/modules/sso/login.php?error=Access denied');
     exit();
 }
 

@@ -11,6 +11,35 @@ if (session_status() === PHP_SESSION_NONE) {
 function current_user(): ?array
 {
     $user = $_SESSION['lms_auth_user'] ?? null;
+
+    // If no LMS session but SSO session exists, build LMS user from SSO
+    if ($user === null && isset($_SESSION['user_id'])) {
+        try {
+            $stmt = db()->prepare('SELECT u.*, r.role_name AS role, t.teacher_id, d.department_name FROM users u JOIN roles r ON r.role_id = u.role_id LEFT JOIN teachers t ON t.user_id = u.user_id LEFT JOIN departments d ON d.department_id = u.department_id WHERE u.user_id = ? LIMIT 1');
+            $stmt->execute([(int) $_SESSION['user_id']]);
+            $dbUser = $stmt->fetch();
+            if ($dbUser) {
+                $lmsRole = strtolower($dbUser['role']);
+                $user = [
+                    'id'           => (int) $dbUser['user_id'],
+                    'login_id'     => (string) ($dbUser['login_id'] ?? $dbUser['username']),
+                    'role'         => $lmsRole,
+                    'name'         => $dbUser['full_name'] ?? '',
+                    'department'   => (string) ($dbUser['department_name'] ?? ''),
+                    'department_id'=> (int) ($dbUser['department_id'] ?? 0),
+                    'program'      => '',
+                    'profile_photo'=> (string) ($dbUser['profile_photo'] ?? ''),
+                    'teacher_id'   => (int) ($dbUser['teacher_id'] ?? 0),
+                    'created_at'   => (string) ($dbUser['created_at'] ?? ''),
+                    'status'       => (string) ($dbUser['status'] ?? 'Active'),
+                ];
+                $_SESSION['lms_auth_user'] = $user;
+            }
+        } catch (Throwable $e) {
+            return null;
+        }
+    }
+
     if ($user !== null && empty($user['teacher_id'])) {
         try {
             $stmt = db()->prepare('SELECT teacher_id FROM teachers WHERE user_id = ? LIMIT 1');
@@ -21,6 +50,22 @@ function current_user(): ?array
             $user['teacher_id'] = 0;
         }
     }
+
+    if ($user !== null && (!isset($user['status']) || !isset($user['department']) || $user['department'] === '' || !isset($user['department_id']))) {
+        try {
+            $stmt = db()->prepare('SELECT u.profile_photo, u.department_id, u.status, d.department_name FROM users u LEFT JOIN departments d ON d.department_id = u.department_id WHERE u.user_id = ? LIMIT 1');
+            $stmt->execute([(int) $user['id']]);
+            $fresh = $stmt->fetch();
+            if ($fresh) {
+                $user['department'] = (string) ($fresh['department_name'] ?? '');
+                $user['department_id'] = (int) ($fresh['department_id'] ?? 0);
+                $user['status'] = (string) ($fresh['status'] ?? 'Active');
+                if (!empty($fresh['profile_photo'])) $user['profile_photo'] = $fresh['profile_photo'];
+                $_SESSION['lms_auth_user'] = $user;
+            }
+        } catch (Throwable $e) {}
+    }
+
     return $user;
 }
 
@@ -33,15 +78,19 @@ function auth_login(array $user): void
         'role'         => strtolower((string) ($user['role'] ?? '')),
         'name'         => (string) ($user['name'] ?? $user['full_name'] ?? ''),
         'department'   => (string) ($user['department'] ?? ''),
+        'department_id'=> (int) ($user['department_id'] ?? 0),
         'program'      => (string) ($user['program'] ?? ''),
         'profile_photo'=> (string) ($user['profile_photo'] ?? ''),
         'teacher_id'   => (int) ($user['teacher_id'] ?? 0),
+        'created_at'   => (string) ($user['created_at'] ?? ''),
+        'status'       => (string) ($user['status'] ?? 'Active'),
     ];
 }
 
 function auth_logout(): void
 {
-    $_SESSION = [];
+    unset($_SESSION['lms_auth_user']);
+    unset($_SESSION['user_id'], $_SESSION['role_id'], $_SESSION['role_name'], $_SESSION['full_name'], $_SESSION['username'], $_SESSION['login_id']);
     if (session_status() === PHP_SESSION_ACTIVE) {
         session_regenerate_id(true);
     }
@@ -101,7 +150,7 @@ function teacher_owns_submission(int $teacherId, int $submissionId): bool
     return (int) $stmt->fetchColumn() > 0;
 }
 
-function save_uploaded_file(string $field, string $folder, array $allowedExtensions): ?string
+function save_uploaded_file(string $field, string $folder, array $allowedExtensions, array $allowedMimes = []): ?string
 {
     if (empty($_FILES[$field]) || $_FILES[$field]['error'] === UPLOAD_ERR_NO_FILE) {
         return null;
@@ -117,6 +166,15 @@ function save_uploaded_file(string $field, string $folder, array $allowedExtensi
     $extension = strtolower(pathinfo($originalName, PATHINFO_EXTENSION));
     if (!in_array($extension, $allowedExtensions, true)) {
         throw new RuntimeException('Invalid file type. Allowed: ' . implode(', ', $allowedExtensions));
+    }
+
+    if (!empty($allowedMimes) && function_exists('finfo_open')) {
+        $finfo = finfo_open(FILEINFO_MIME_TYPE);
+        $mime = finfo_file($finfo, $_FILES[$field]['tmp_name']);
+        finfo_close($finfo);
+        if (!in_array($mime, $allowedMimes, true)) {
+            throw new RuntimeException('Invalid file content type.');
+        }
     }
 
     $uploadRoot = dirname(__DIR__) . DIRECTORY_SEPARATOR . 'uploads' . DIRECTORY_SEPARATOR . $folder;

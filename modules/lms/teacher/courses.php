@@ -74,16 +74,26 @@ require_once __DIR__ . '/../includes/header.php';
     <div class="card-header"><h3>Your Courses</h3></div>
     <div class="table-responsive">
         <table>
-            <tr><th>Code</th><th>Title</th><th>Students</th><th>Assignments</th><th>Lectures</th></tr>
+            <thead>
+                <tr>
+                    <th>Code</th>
+                    <th>Title</th>
+                    <th>Students</th>
+                    <th>Assignments</th>
+                    <th>Lectures</th>
+                </tr>
+            </thead>
+            <tbody>
             <?php foreach ($courses as $course): ?>
                 <tr>
                     <td><a href="<?= app_url('teacher/courses.php?course_id=' . (int) $course['course_id']) ?>"><?= e($course['course_code']) ?></a></td>
-                    <td><?= e($course['course_title']) ?></td>
+                    <td style="font-weight:500; color: var(--text-strong);"><?= e($course['course_title']) ?></td>
                     <td><?= (int) $course['student_count'] ?></td>
                     <td><?= (int) $course['assignment_count'] ?></td>
                     <td><?= (int) $course['lecture_count'] ?></td>
                 </tr>
             <?php endforeach; ?>
+            </tbody>
         </table>
     </div>
 </div>
@@ -142,10 +152,14 @@ require_once __DIR__ . '/../includes/header.php';
                         <div class="table-responsive">
                         <?php $assignmentStmt = db()->prepare('SELECT * FROM lms_assignments WHERE course_id = ? ORDER BY due_date DESC'); $assignmentStmt->execute([(int) $selectedCourse['course_id']]); ?>
                         <table>
-                            <tr><th>Title</th><th>Due</th><th>File</th></tr>
+                            <thead>
+                                <tr><th>Title</th><th>Due</th><th>File</th></tr>
+                            </thead>
+                            <tbody>
                             <?php foreach ($assignmentStmt->fetchAll() as $assignment): ?>
-                                <tr><td><?= e($assignment['title']) ?></td><td><?= e($assignment['due_date']) ?></td><td><?php if ($assignment['file_path']): ?><a href="<?= app_url($assignment['file_path']) ?>" target="_blank">Download</a><?php endif; ?></td></tr>
+                                <tr><td style="font-weight:500; color: var(--text-strong);"><?= e($assignment['title']) ?></td><td><?= e($assignment['due_date']) ?></td><td><?php if (!empty($assignment['file_path'])): ?><a href="<?= app_url($assignment['file_path']) ?>" target="_blank">Download</a><?php endif; ?></td></tr>
                             <?php endforeach; ?>
+                            </tbody>
                         </table>
                         </div>
                     </div>
@@ -170,10 +184,14 @@ require_once __DIR__ . '/../includes/header.php';
                         <div class="table-responsive">
                         <?php $lectureStmt = db()->prepare('SELECT * FROM lms_lectures WHERE course_id = ? ORDER BY lecture_id DESC'); $lectureStmt->execute([(int) $selectedCourse['course_id']]); ?>
                         <table>
-                            <tr><th>Title</th><th>Date</th><th>File</th></tr>
+                            <thead>
+                                <tr><th>Title</th><th>Date</th><th>File</th></tr>
+                            </thead>
+                            <tbody>
                             <?php foreach ($lectureStmt->fetchAll() as $lecture): ?>
-                                <tr><td><?= e($lecture['title']) ?></td><td><?= e($lecture['lecture_date']) ?></td><td><a href="<?= app_url($lecture['file_path']) ?>" target="_blank">Download</a></td></tr>
+                                <tr><td style="font-weight:500; color: var(--text-strong);"><?= e($lecture['title']) ?></td><td><?= e($lecture['lecture_date']) ?></td><td><a href="<?= app_url($lecture['file_path']) ?>" target="_blank">Download</a></td></tr>
                             <?php endforeach; ?>
+                            </tbody>
                         </table>
                         </div>
                     </div>

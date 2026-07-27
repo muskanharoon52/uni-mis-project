@@ -1,7 +1,7 @@
 <?php
 // fee_management/structure_edit.php - Edit Fee Structure
 
-require_once __DIR__ . '../../../config/db_connect.php';
+require_once __DIR__ . '/../../../config/db_connect.php';
 require_once __DIR__ . '/../includes/auth.php';
 
 if (!isLoggedIn()) {
@@ -10,7 +10,7 @@ if (!isLoggedIn()) {
 }
 
 $user = getCurrentUser();
-$role = $user['role_name'] ?? 'User';
+$role = strtolower($user['role_name'] ?? 'user');
 
 if (!in_array($role, ['sso', 'admin'])) {
     header('Location: ' . BASE_URL . 'dashboard.php');

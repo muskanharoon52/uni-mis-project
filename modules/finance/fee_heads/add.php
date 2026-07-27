@@ -2,12 +2,12 @@
 session_start();
 
 if (!isset($_SESSION['user_id'])) {
-    header('Location: ../../../auth/login.php');
+    header('Location: /uni-mis-project/modules/sso/login.php');
     exit();
 }
 
 if ($_SESSION['role_id'] != 3 && $_SESSION['role_id'] != 1) {
-    header('Location: ../../../auth/login.php?error=Access denied. Finance Officer only.');
+    header('Location: /uni-mis-project/modules/sso/login.php?error=Access denied');
     exit();
 }
 
@@ -24,8 +24,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $fee_head_name = mysqli_real_escape_string($conn, $_POST['fee_head_name']);
     $description = mysqli_real_escape_string($conn, $_POST['description']);
     $status = mysqli_real_escape_string($conn, $_POST['status']);
-    $created_by = $_SESSION['user_id'] ?? 1;
-
     if (empty($fee_head_name)) {
         $error = "Fee Head Name is required!";
     } else {
@@ -35,8 +33,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         if (mysqli_num_rows($check_result) > 0) {
             $error = "Fee head '$fee_head_name' already exists!";
         } else {
-            $sql = "INSERT INTO fee_heads (fee_head_name, description, status, created_by) 
-                    VALUES ('$fee_head_name', '$description', '$status', '$created_by')";
+            $sql = "INSERT INTO fee_heads (fee_head_name, description, status) 
+                    VALUES ('$fee_head_name', '$description', '$status')";
             
             if (mysqli_query($conn, $sql)) {
                 $success = "Fee head added successfully!";

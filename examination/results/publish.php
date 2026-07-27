@@ -1,9 +1,8 @@
 <?php
-require_once '../../../../config/db_connect.php';
-include '../../includes/header.php';
-$hideSidebarToggle = true;
-$showDashboardBackButton = true;
-include '../../includes/navbar.php';
+$page_title = 'Publish Results';
+require_once '../../config/db_connect.php';
+include '../includes/header.php';
+include '../includes/sidebar.php';
 
 $conn = getConnection();
 
@@ -38,7 +37,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['publish'])) {
 }
 ?>
 
-<div class="container-fluid mt-4">
+<div class="content-area" id="contentArea">
     <h2>Publish Results</h2>
     
     <?php if (isset($_SESSION['success'])): ?>
@@ -131,4 +130,4 @@ function toggleAll() {
 }
 </script>
 
-<?php include '../../includes/footer.php'; ?>
+<?php include '../includes/footer.php'; ?>

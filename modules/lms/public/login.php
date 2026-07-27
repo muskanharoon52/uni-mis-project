@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../includes/auth.php';
 
+// Also load SSO auth for unified authentication
+require_once __DIR__ . '/../../sso/includes/auth.php';
+
 $user = current_user();
 if ($user) {
     $redirect = strtolower($user['role']) === 'teacher' ? app_url('teacher/dashboard.php') : app_url('student/dashboard.php');
@@ -11,17 +14,49 @@ if ($user) {
     exit;
 }
 
-$config_demo_auth = $demo_auth ?? [];
-
 $error = null;
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    verify_csrf();
     $role     = (string) ($_POST['role'] ?? 'teacher');
     $loginId  = trim((string) ($_POST['login_id'] ?? ''));
     $password = (string) ($_POST['password'] ?? '');
 
-    $dbUser = null;
+    // Try SSO unified auth first (works with username or login_id)
+    $ssoUser = loginUserById($loginId, $password);
 
+    if ($ssoUser && is_array($ssoUser)) {
+        $lmsRole = strtolower($ssoUser['role_name'] ?? '');
+        if (in_array($lmsRole, ['student', 'admin', 'examiner', 'finance officer'])) {
+            $lmsRole = 'student';
+        }
+
+        $teacherId = 0;
+        try {
+            $tStmt = db()->prepare('SELECT teacher_id FROM teachers WHERE user_id = ? LIMIT 1');
+            $tStmt->execute([(int) $ssoUser['user_id']]);
+            $teacherId = (int) ($tStmt->fetchColumn() ?: 0);
+        } catch (Throwable $e) {
+            $teacherId = 0;
+        }
+
+        auth_login([
+            'id'           => (int) $ssoUser['user_id'],
+            'login_id'     => (string) ($ssoUser['login_id'] ?: $ssoUser['username']),
+            'role'         => $lmsRole,
+            'name'         => $ssoUser['full_name'] ?? 'User',
+            'department'   => (string) ($ssoUser['department'] ?? ''),
+            'program'      => (string) ($ssoUser['program'] ?? ''),
+            'profile_photo'=> (string) ($ssoUser['profile_photo'] ?? ''),
+            'teacher_id'   => $teacherId,
+        ]);
+
+        header('Location: ' . ($lmsRole === 'teacher' ? app_url('teacher/dashboard.php') : app_url('student/dashboard.php')));
+        exit;
+    }
+
+    // Direct DB lookup
+    $dbUser = null;
     try {
         $stmt = db()->prepare('SELECT u.*, r.role_name AS role, t.teacher_id FROM users u JOIN roles r ON r.role_id = u.role_id LEFT JOIN teachers t ON t.user_id = u.user_id WHERE r.role_name = ? AND (u.login_id = ? OR u.username = ?) LIMIT 1');
         $stmt->execute([$role, $loginId, $loginId]);
@@ -30,40 +65,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $dbUser = null;
     }
 
-    $fallback = $config_demo_auth[$role][$loginId] ?? null;
-    $fallbackValid = $fallback && hash_equals((string) $fallback['password'], $password);
-
     if ($dbUser && password_verify($password, $dbUser['password_hash'])) {
-        auth_login($dbUser);
-        header('Location: ' . ($role === 'teacher' ? app_url('teacher/dashboard.php') : app_url('student/dashboard.php')));
-        exit;
-    }
+        $_SESSION['user_id'] = (int) $dbUser['user_id'];
+        $_SESSION['role_id'] = (int) ($dbUser['role_id'] ?? 0);
+        $_SESSION['role_name'] = $dbUser['role'] ?? $role;
+        $_SESSION['full_name'] = $dbUser['full_name'] ?? '';
+        $_SESSION['username'] = $dbUser['username'] ?? '';
+        $_SESSION['login_id'] = $dbUser['login_id'] ?? '';
 
-    if ($fallbackValid) {
-        $fbTeacherId = 0;
-        $fbUserId = 0;
-        try {
-            $fbUserStmt = db()->prepare('SELECT user_id FROM users WHERE login_id = ? LIMIT 1');
-            $fbUserStmt->execute([$loginId]);
-            $fbUserId = (int) ($fbUserStmt->fetchColumn() ?: 0);
-            if ($fbUserId > 0 && $role === 'teacher') {
-                $fbTStmt = db()->prepare('SELECT teacher_id FROM teachers WHERE user_id = ? LIMIT 1');
-                $fbTStmt->execute([$fbUserId]);
-                $fbTeacherId = (int) ($fbTStmt->fetchColumn() ?: 0);
-            }
-        } catch (Throwable $e) {
-            $fbTeacherId = 0;
-        }
-        auth_login([
-            'id' => $fbUserId,
-            'login_id' => $loginId,
-            'role' => $role,
-            'name' => $fallback['display_name'],
-            'department' => 'Computer Science',
-            'program' => null,
-            'profile_photo' => null,
-            'teacher_id' => $fbTeacherId,
-        ]);
+        auth_login($dbUser);
         header('Location: ' . ($role === 'teacher' ? app_url('teacher/dashboard.php') : app_url('student/dashboard.php')));
         exit;
     }
@@ -128,6 +138,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <?php endif; ?>
 
         <form method="post" onsubmit="setLoading(this)">
+            <?= csrf_field() ?>
             <div class="login-tabs">
                 <button class="login-tab active" type="button" onclick="setRole('teacher', this)">Faculty / Teacher</button>
                 <button class="login-tab" type="button" onclick="setRole('student', this)">Student</button>
@@ -148,9 +159,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <button class="btn btn-primary" type="submit" style="width:100%;min-height:44px;border-radius:8px;font-size:.9rem;">Get Started</button>
         </form>
 
-        <div class="login-footer">
-            <p class="small">Demo: 5001 / teacher123 &nbsp;or&nbsp; 9001 / student123</p>
-        </div>
     </aside>
 </div>
 

@@ -1,15 +1,15 @@
 <?php
 session_start();
 if (!isset($_SESSION['user_id'])) {
-    header('Location: ../auth/login.php');
+    header('Location: /uni-mis-project/modules/sso/login.php');
     exit();
 }
 if ($_SESSION['role_id'] != 3 && $_SESSION['role_id'] != 1) {
-    header('Location: ../auth/login.php?error=Access denied. Finance Officer only.');
+    header('Location: /uni-mis-project/modules/sso/login.php?error=Access denied');
     exit();
 }
 
-include $_SERVER['DOCUMENT_ROOT'] . '/MIS/finance/includes/header.php';
+include_once __DIR__ . '/../includes/header.php';
 
 $sql = "SELECT 
         fs.fee_structure_id,
@@ -115,4 +115,4 @@ while ($row = mysqli_fetch_assoc($result)) {
     </a>
 </div>
 
-<?php include $_SERVER['DOCUMENT_ROOT'] . '/MIS/finance/includes/footer.php'; ?>
+<?php include_once __DIR__ . '/../includes/footer.php'; ?>
