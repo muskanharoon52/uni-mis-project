@@ -27,10 +27,12 @@ session_start();
         .icon-sso { background: #ede9fe; color: #7c3aed; }
         .icon-exam { background: #ecfdf5; color: #059669; }
         .icon-finance { background: #fef3c7; color: #d97706; }
+        .icon-admission { background: #dbeafe; color: #2563eb; }
         .module-card p { color: #6b7280; font-size: 0.9rem; line-height: 1.5; }
         .badge { font-size: 0.7rem; padding: 2px 8px; border-radius: 99px; font-weight: 600; display: inline-block; margin-top: 8px; }
         .badge-active { background: #dcfce7; color: #16a34a; }
         .badge-disabled { background: #fee2e2; color: #dc2626; }
+        .badge-coming { background: #fef3c7; color: #d97706; }
     </style>
 </head>
 <body>
@@ -41,6 +43,7 @@ session_start();
             <li><a href="examination/index.php">Examination</a></li>
             <li><a href="modules/sso/login.php">SSO</a></li>
             <li><a href="modules/finance/login.php">Finance</a></li>
+            <li><a href="modules/admission/index.php">Admission</a></li>
         </ul>
     </nav>
     <div class="container">
@@ -62,11 +65,12 @@ session_start();
                 <p>Fee management, payment tracking, receipts, scholarship handling.</p>
                 <span class="badge badge-active">Active</span>
             </a>
-            <div class="module-card disabled">
-                <h2><span class="icon" style="background:#fee2e2;color:#dc2626;">&#128203;</span> Admission</h2>
+            <!-- Admission Module - NOW ENABLED -->
+            <a href="modules/admission/index.php" class="module-card">
+                <h2><span class="icon icon-admission">&#128203;</span> Admission</h2>
                 <p>Student admission applications and enrollment management.</p>
-                <span class="badge badge-disabled">Coming Soon</span>
-            </div>
+                <span class="badge badge-active">Active</span>
+            </a>
         </div>
     </div>
 </body>
