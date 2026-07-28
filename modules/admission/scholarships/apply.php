@@ -3,25 +3,58 @@ require_once __DIR__ . '/../config/database.php';
 $page_title = 'Apply Scholarship';
 include __DIR__ . '/../includes/header.php';
 
+// ============================================
+// FIX: Updated queries to match actual table structure
+// ============================================
+
+// Get students - using correct table name and columns
 $students = $pdo->query("
-    SELECT s.*, d.department_name 
-    FROM admission_students s 
+    SELECT s.student_id, s.full_name, s.program_id, s.batch_year,
+           d.department_name 
+    FROM students s 
     LEFT JOIN departments d ON s.program_id = d.department_id 
-    WHERE s.status='active' 
-    ORDER BY s.student_name
+    WHERE s.status = 'active' 
+    ORDER BY s.full_name
 ")->fetchAll();
 
-$scholarships = $pdo->query("SELECT * FROM admission_scholarships WHERE status='active' ORDER BY deadline ASC")->fetchAll();
+// Get scholarships - removed 'deadline' column and used correct column names
+$scholarships = $pdo->query("
+    SELECT scholarship_id, scholarship_name, scholarship_type, 
+           percentage, amount, status 
+    FROM admission_scholarships 
+    WHERE status IN ('Active', 'Pending')
+    ORDER BY scholarship_name
+")->fetchAll();
+
+// ============================================
+// FIX: Check if fee_amount column exists in departments
+// ============================================
+$check_column = $pdo->query("SHOW COLUMNS FROM departments LIKE 'fee_amount'");
+$has_fee_amount = $check_column->rowCount() > 0;
+
+// If no fee_amount, check for other possible column names
+if (!$has_fee_amount) {
+    // Try to find any fee-related column
+    $columns = $pdo->query("SHOW COLUMNS FROM departments")->fetchAll(PDO::FETCH_COLUMN);
+    $fee_column = null;
+    foreach ($columns as $col) {
+        if (stripos($col, 'fee') !== false || stripos($col, 'amount') !== false || stripos($col, 'cost') !== false) {
+            $fee_column = $col;
+            break;
+        }
+    }
+}
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     try {
         $student_id = $_POST['student_id'];
         $scholarship_id = $_POST['scholarship_id'];
-        $marks_obtained = $_POST['marks_obtained'];
-        $total_marks = $_POST['total_marks'];
+        $marks_obtained = floatval($_POST['marks_obtained']);
+        $total_marks = floatval($_POST['total_marks']);
         $percentage = ($total_marks > 0) ? ($marks_obtained / $total_marks) * 100 : 0;
         
-        $check = $pdo->prepare("SELECT id FROM admission_scholarship_applications WHERE student_id = ? AND scholarship_id = ?");
+        // Check if already applied
+        $check = $pdo->prepare("SELECT * FROM admission_scholarship_applications WHERE student_id = ? AND scholarship_id = ?");
         $check->execute([$student_id, $scholarship_id]);
         if ($check->fetch()) {
             setFlash('error', 'Student has already applied for this scholarship');
@@ -29,15 +62,37 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             exit();
         }
         
-        $student = $pdo->prepare("SELECT program_id FROM admission_students WHERE id = ?");
+        // Get student program
+        $student = $pdo->prepare("SELECT program_id, full_name FROM students WHERE student_id = ?");
         $student->execute([$student_id]);
         $student_data = $student->fetch();
         
-        $fee = $pdo->prepare("SELECT fee_amount FROM departments WHERE department_id = ?");
-        $fee->execute([$student_data['program_id'] ?? 0]);
-        $fee_data = $fee->fetch();
-        $fee_amount = $fee_data['fee_amount'] ?? 0;
+        // ============================================
+        // FIX: Get fee amount dynamically
+        // ============================================
+        $fee_amount = 50000; // Default fee
         
+        if ($student_data && $student_data['program_id']) {
+            if ($has_fee_amount) {
+                // If fee_amount column exists
+                $fee = $pdo->prepare("SELECT fee_amount FROM departments WHERE department_id = ?");
+                $fee->execute([$student_data['program_id']]);
+                $fee_data = $fee->fetch();
+                if ($fee_data && isset($fee_data['fee_amount'])) {
+                    $fee_amount = $fee_data['fee_amount'];
+                }
+            } elseif ($fee_column) {
+                // If another fee-related column exists
+                $fee = $pdo->prepare("SELECT $fee_column FROM departments WHERE department_id = ?");
+                $fee->execute([$student_data['program_id']]);
+                $fee_data = $fee->fetch();
+                if ($fee_data && isset($fee_data[$fee_column])) {
+                    $fee_amount = $fee_data[$fee_column];
+                }
+            }
+        }
+        
+        // Calculate scholarship using the function from database.php
         $scholarship_result = calculateScholarship($percentage, $fee_amount);
         
         $data = [
@@ -49,7 +104,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'scholarship_percentage' => $scholarship_result['percentage'],
             'scholarship_amount' => $scholarship_result['amount'],
             'fee_after_scholarship' => $scholarship_result['fee_after_scholarship'],
-            'status' => 'pending'
+            'status' => 'Pending'
         ];
         
         $sql = "INSERT INTO admission_scholarship_applications SET ";
@@ -71,6 +126,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         setFlash('error', 'Database Error: ' . $e->getMessage());
     }
 }
+
 ?>
 
 <div class="page-header">
@@ -109,8 +165,8 @@ if ($flash): ?>
                     <select name="student_id" required>
                         <option value="">-- Select Student --</option>
                         <?php foreach($students as $s): ?>
-                        <option value="<?= $s['id'] ?>">
-                            <?= htmlspecialchars($s['student_name']) ?> (<?= htmlspecialchars($s['student_id']) ?>) - <?= htmlspecialchars($s['department_name'] ?? 'N/A') ?>
+                        <option value="<?= $s['student_id'] ?>">
+                            <?= htmlspecialchars($s['full_name']) ?> (<?= htmlspecialchars($s['student_id']) ?>) - <?= htmlspecialchars($s['department_name'] ?? 'N/A') ?>
                         </option>
                         <?php endforeach; ?>
                     </select>
@@ -121,8 +177,12 @@ if ($flash): ?>
                     <select name="scholarship_id" required id="scholarshipSelect">
                         <option value="">-- Select Scholarship --</option>
                         <?php foreach($scholarships as $s): ?>
-                        <option value="<?= $s['id'] ?>">
-                            <?= htmlspecialchars($s['scholarship_name']) ?> - <?= htmlspecialchars($s['scholarship_type'] ?? 'Merit') ?>
+                        <option value="<?= $s['scholarship_id'] ?>">
+                            <?= htmlspecialchars($s['scholarship_name']) ?> 
+                            (<?= htmlspecialchars($s['scholarship_type'] ?? 'Merit') ?>)
+                            <?php if($s['percentage'] > 0): ?>
+                                - <?= $s['percentage'] ?>%
+                            <?php endif; ?>
                         </option>
                         <?php endforeach; ?>
                     </select>
@@ -206,7 +266,7 @@ function calculateScholarship() {
     let label = 'No Scholarship';
     let amount = 0;
     
-    if (percentage >= 90) { scholarshipPercentage = 100; label = 'Full Scholarship'; amount = 100000; }
+    if (percentage >= 90) { scholarshipPercentage = 100; label = 'Full Scholarship (100%)'; amount = 100000; }
     else if (percentage >= 80) { scholarshipPercentage = 75; label = '75% Scholarship'; amount = 75000; }
     else if (percentage >= 70) { scholarshipPercentage = 50; label = '50% Scholarship'; amount = 50000; }
     else if (percentage >= 60) { scholarshipPercentage = 25; label = '25% Scholarship'; amount = 25000; }
@@ -217,9 +277,9 @@ function calculateScholarship() {
     
     const eligibilityDiv = document.getElementById('eligibilityDisplay');
     if (scholarshipPercentage > 0) {
-        eligibilityDiv.innerHTML = '<span style="color:var(--success);">Eligible for ' + label + '</span>';
+        eligibilityDiv.innerHTML = '<span style="color:var(--success);">✅ Eligible for ' + label + '</span>';
     } else {
-        eligibilityDiv.innerHTML = '<span style="color:var(--danger);">Not eligible (Need 60% minimum)</span>';
+        eligibilityDiv.innerHTML = '<span style="color:var(--danger);">❌ Not eligible (Need 60% minimum)</span>';
     }
 }
 </script>

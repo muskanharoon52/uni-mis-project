@@ -204,32 +204,48 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
             }
             
-            $student_fields = ['student_id', 'roll_no', 'user_id', 'program_id', 'batch_year', 'semester', 'status', 'father_name'];
-            $student_values = ['?', '?', '?', '?', '?', '?', '?', '?'];
-            $student_params = [$student_id, $roll_no, $user_id, $program_id, $batch_year, $semester, $status, $father_name];
+            // ============================================
+            // FIX 1: Check if semester column exists
+            // FIX 2: Handle application_id foreign key
+            // ============================================
             
-            // Check if section exists
+            // Base fields that are always required
+            $student_fields = ['student_id', 'roll_no', 'user_id', 'program_id', 'batch_year', 'status', 'father_name'];
+            $student_values = ['?', '?', '?', '?', '?', '?', '?'];
+            $student_params = [$student_id, $roll_no, $user_id, $program_id, $batch_year, $status, $father_name];
+            
+            // Check and add optional columns if they exist
+            if (in_array('semester', $student_columns)) {
+                $student_fields[] = 'semester';
+                $student_values[] = '?';
+                $student_params[] = $semester;
+            }
+            
             if (in_array('section', $student_columns)) {
                 $student_fields[] = 'section';
                 $student_values[] = '?';
                 $student_params[] = $section;
             }
             
-            // Check if session exists
             if (in_array('session', $student_columns)) {
                 $student_fields[] = 'session';
                 $student_values[] = '?';
                 $student_params[] = $session;
             }
             
-            // Check if enrollment_date exists
             if (in_array('enrollment_date', $student_columns)) {
                 $student_fields[] = 'enrollment_date';
                 $student_values[] = '?';
                 $student_params[] = $enrollment_date;
             }
             
-            // Check if created_at exists
+            // Handle application_id - set to NULL if column exists
+            if (in_array('application_id', $student_columns)) {
+                $student_fields[] = 'application_id';
+                $student_values[] = '?';
+                $student_params[] = NULL; // Set to NULL to avoid foreign key constraint
+            }
+            
             if (in_array('created_at', $student_columns)) {
                 $student_fields[] = 'created_at';
                 $student_values[] = 'NOW()';
@@ -248,6 +264,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             foreach ($student_params as $param) {
                 if (is_int($param)) {
                     $student_types .= 'i';
+                } elseif (is_null($param)) {
+                    $student_types .= 's'; // NULL is treated as string
                 } else {
                     $student_types .= 's';
                 }
