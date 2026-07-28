@@ -1,0 +1,66 @@
+<?php
+$pageTitle = 'Fee Structures';
+include __DIR__ . '/../includes/header.php';
+
+$sql = "SELECT fs.*, d.department_name, s.session_name, sm.semester_name
+        FROM fee_structures fs
+        JOIN departments d ON d.department_id = fs.program_id
+        JOIN sessions s ON s.session_id = fs.session_id
+        JOIN semesters sm ON sm.semester_id = fs.semester_id
+        WHERE fs.status = 'Active'
+        ORDER BY fs.fee_structure_id DESC";
+$result = mysqli_query($conn, $sql);
+?>
+
+<?php if (isset($_GET['msg'])): ?>
+    <div class="alert alert-success"><?= htmlspecialchars($_GET['msg']) ?></div>
+<?php endif; ?>
+<?php if (isset($_GET['error'])): ?>
+    <div class="alert alert-error"><?= htmlspecialchars($_GET['error']) ?></div>
+<?php endif; ?>
+
+<div class="card">
+    <div class="card-header">
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+            <h3>Fee Structures</h3>
+            <span class="badge badge-outline">&#128274; Read-Only</span>
+        </div>
+    </div>
+    <div class="table-responsive">
+        <table>
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Program</th>
+                    <th>Session</th>
+                    <th>Semester</th>
+                    <th style="text-align:right">Total Amount</th>
+                    <th>Status</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                <?php $count = 1; if (mysqli_num_rows($result) > 0): ?>
+                    <?php while ($row = mysqli_fetch_assoc($result)): ?>
+                        <tr>
+                            <td><?= $count++ ?></td>
+                            <td style="font-weight:600;"><?= htmlspecialchars($row['department_name']) ?></td>
+                            <td><?= htmlspecialchars($row['session_name']) ?></td>
+                            <td><?= htmlspecialchars($row['semester_name']) ?></td>
+                            <td style="text-align:right;font-weight:700;">PKR <?= number_format($row['total_amount'], 2) ?></td>
+                            <td><span class="badge <?= $row['status'] === 'Active' ? 'badge-active' : 'badge-outline' ?>"><?= $row['status'] ?></span></td>
+                            <td><a href="view.php?id=<?= $row['fee_structure_id'] ?>" class="btn btn-sm btn-outline">View</a></td>
+                        </tr>
+                    <?php endwhile; ?>
+                <?php else: ?>
+                    <tr><td colspan="7" class="muted text-center" style="padding:24px;">No fee structures found. SSO module creates them.</td></tr>
+                <?php endif; ?>
+            </tbody>
+        </table>
+    </div>
+    <div style="padding:14px 20px; border-top:1px solid var(--border); font-size:.8rem; color:var(--muted);">
+        Note: Fee structures are created by the SSO module. Finance has read-only access.
+    </div>
+</div>
+
+<?php include_once __DIR__ . '/../includes/footer.php'; ?>

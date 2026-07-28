@@ -1,0 +1,202 @@
+<?php
+$page_title = 'Add Exam Result';
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+require_once '../../config/db_connect.php';
+require_once '../models/ExamResult.php';
+require_once '../models/ExamSchedule.php';
+
+$formError = '';
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $marksObtained = (float) ($_POST['marks_obtained'] ?? 0);
+    $totalMarks = (float) ($_POST['total_marks'] ?? 0);
+
+    if (empty($_POST['student_id']) || empty($_POST['exam_id']) || empty($_POST['grade'])) {
+        $formError = 'Please complete all fields.';
+    } elseif ($totalMarks <= 0 || $marksObtained < 0 || $marksObtained > $totalMarks) {
+        $formError = 'Marks obtained must be between 0 and the total marks.';
+    } else {
+        $resultModel = new ExamResult();
+        $resultAdded = $resultModel->add([
+            'student_id' => $_POST['student_id'],
+            'exam_id' => $_POST['exam_id'],
+            'marks_obtained' => $marksObtained,
+            'total_marks' => $totalMarks,
+            'grade' => $_POST['grade']
+        ]);
+
+        if ($resultAdded) {
+            $_SESSION['success'] = 'Result added successfully!';
+            header('Location: index.php');
+            exit;
+        }
+
+        $formError = 'This result already exists, or it could not be added.';
+    }
+}
+
+include '../includes/header.php';
+include '../includes/sidebar.php';
+
+$conn = getConnection();
+$scheduleModel = new ExamSchedule();
+$schedules = $scheduleModel->getUpcoming();
+
+// Get students - FIXED: Removed join with users table
+$students = $conn->query("
+    SELECT s.student_id, s.full_name, p.program_name 
+    FROM students s
+    JOIN programs p ON s.program_id = p.program_id
+    WHERE s.status = 'Active'
+    ORDER BY s.full_name
+");
+
+// Check if query failed
+if (!$students) {
+    $students = [];
+    $formError = 'Error loading students: ' . $conn->error;
+}
+?>
+
+<div class="content-area" id="contentArea">
+    <div class="page-header">
+        <div class="page-header-left">
+            <h4>Add Exam Results</h4>
+        </div>
+    </div>
+
+    <div class="form-container">
+        <form method="POST">
+            <?php if ($formError): ?>
+                <div class="alert alert-error"><?php echo htmlspecialchars($formError); ?></div>
+            <?php endif; ?>
+
+            <div class="form-group">
+                <label for="student_id">Student</label>
+                <select id="student_id" name="student_id" required>
+                    <option value="">Select Student</option>
+                    <?php if ($students && $students->num_rows > 0): ?>
+                        <?php while($student = $students->fetch_assoc()): ?>
+                            <option value="<?php echo $student['student_id']; ?>">
+                                <?php echo htmlspecialchars($student['full_name'] . ' (ID: ' . $student['student_id'] . ') - ' . $student['program_name']); ?>
+                            </option>
+                        <?php endwhile; ?>
+                    <?php else: ?>
+                        <option value="">No students available</option>
+                    <?php endif; ?>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label for="exam_id">Exam Schedule</label>
+                <select id="exam_id" name="exam_id" required>
+                    <option value="">Select Exam</option>
+                    <?php if ($schedules && count($schedules) > 0): ?>
+                        <?php foreach($schedules as $schedule): ?>
+                            <option value="<?php echo $schedule['exam_id']; ?>">
+                                <?php echo htmlspecialchars($schedule['course_code'] . ' - ' . $schedule['exam_type'] . ' (' . date('M d', strtotime($schedule['date'])) . ')'); ?>
+                            </option>
+                        <?php endforeach; ?>
+                    <?php else: ?>
+                        <option value="">No exams available</option>
+                    <?php endif; ?>
+                </select>
+            </div>
+            
+            <div class="form-row">
+                <div class="form-group">
+                    <label for="marks_obtained">Marks Obtained</label>
+                    <input type="number" step="0.01" id="marks_obtained" name="marks_obtained" required min="0">
+                </div>
+                <div class="form-group">
+                    <label for="total_marks">Total Marks</label>
+                    <input type="number" step="0.01" id="total_marks" name="total_marks" required min="1">
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label for="grade">Grade</label>
+                <select id="grade" name="grade" required>
+                    <option value="">Select Grade</option>
+                    <option value="A">A (Excellent)</option>
+                    <option value="B">B (Good)</option>
+                    <option value="C">C (Average)</option>
+                    <option value="D">D (Poor)</option>
+                    <option value="F">F (Fail)</option>
+                </select>
+            </div>
+            
+            <div class="form-actions">
+                <a href="index.php" class="btn btn-ghost">Cancel</a>
+                <button type="submit" class="btn btn-primary">Add Result</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+// Auto-calculate grade based on marks
+document.getElementById('marks_obtained').addEventListener('change', function() {
+    const marks = parseFloat(this.value);
+    const total = parseFloat(document.getElementById('total_marks').value);
+    if (marks && total && marks > 0 && total > 0) {
+        const percentage = (marks / total) * 100;
+        let grade = '';
+        if (percentage >= 90) grade = 'A';
+        else if (percentage >= 80) grade = 'B';
+        else if (percentage >= 70) grade = 'C';
+        else if (percentage >= 60) grade = 'D';
+        else grade = 'F';
+        document.getElementById('grade').value = grade;
+    }
+});
+
+document.getElementById('total_marks').addEventListener('change', function() {
+    const marks = parseFloat(document.getElementById('marks_obtained').value);
+    const total = parseFloat(this.value);
+    if (marks && total && marks > 0 && total > 0) {
+        const percentage = (marks / total) * 100;
+        let grade = '';
+        if (percentage >= 90) grade = 'A';
+        else if (percentage >= 80) grade = 'B';
+        else if (percentage >= 70) grade = 'C';
+        else if (percentage >= 60) grade = 'D';
+        else grade = 'F';
+        document.getElementById('grade').value = grade;
+    }
+});
+
+// Auto-calculate when both fields have values
+document.getElementById('marks_obtained').addEventListener('input', function() {
+    const marks = parseFloat(this.value);
+    const total = parseFloat(document.getElementById('total_marks').value);
+    if (marks && total && marks > 0 && total > 0) {
+        const percentage = (marks / total) * 100;
+        let grade = '';
+        if (percentage >= 90) grade = 'A';
+        else if (percentage >= 80) grade = 'B';
+        else if (percentage >= 70) grade = 'C';
+        else if (percentage >= 60) grade = 'D';
+        else grade = 'F';
+        document.getElementById('grade').value = grade;
+    }
+});
+
+document.getElementById('total_marks').addEventListener('input', function() {
+    const marks = parseFloat(document.getElementById('marks_obtained').value);
+    const total = parseFloat(this.value);
+    if (marks && total && marks > 0 && total > 0) {
+        const percentage = (marks / total) * 100;
+        let grade = '';
+        if (percentage >= 90) grade = 'A';
+        else if (percentage >= 80) grade = 'B';
+        else if (percentage >= 70) grade = 'C';
+        else if (percentage >= 60) grade = 'D';
+        else grade = 'F';
+        document.getElementById('grade').value = grade;
+    }
+});
+</script>
+
+<?php include '../includes/footer.php'; ?>
