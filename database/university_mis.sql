@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: Jul 28, 2026 at 04:39 AM
+-- Generation Time: Jul 28, 2026 at 05:08 AM
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.2.12
 
@@ -155,7 +155,8 @@ INSERT INTO `admission_applications` (`application_id`, `temp_application_no`, `
 (111, 'APP-0111', 'Nida Butt', 'Father of Nida Butt', '42101-1234567-111', '2003-05-15', 'Male', '0300-1000111', 'stu111@uni.edu', 'Lahore', 3, 5, 4, 'Approved', '2026-08-15 10:00:00', NULL, NULL, NULL, '2026-07-26 07:00:00', '2026-07-27 19:54:08'),
 (112, 'APP-0112', 'Student 37', 'Father of Student 37', '42101-1234567-112', '2003-05-15', 'Male', '0300-1000112', 'stu112@uni.edu', 'Lahore', 4, 6, 5, 'Approved', '2026-08-15 10:00:00', NULL, NULL, NULL, '2026-07-26 07:00:00', '2026-07-27 19:54:08'),
 (113, 'APP-2026-45877', 'Ali', 'khan', '63871357817132', '2003-02-10', 'Male', '6157351656152', 'ali@gmail.com', 'peshawar', 1, 5, 1, 'Admitted', '2026-07-27 21:29:01', 14, '2026-07-28 00:36:26', '', '2026-07-27 19:29:01', '2026-07-27 19:36:26'),
-(114, 'APP-2026-58915', 'Sajjal', 'Khan', '7823728832273', '2000-02-01', 'Female', '62736268283', 'sajjal@gmail.com', '..', 1, 5, 14, 'Submitted', '2026-07-27 22:46:59', NULL, NULL, NULL, '2026-07-27 20:46:59', '2026-07-27 20:46:59');
+(114, 'APP-2026-58915', 'Sajjal', 'Khan', '7823728832273', '2000-02-01', 'Female', '62736268283', 'sajjal@gmail.com', '..', 1, 5, 14, 'Submitted', '2026-07-27 22:46:59', NULL, NULL, NULL, '2026-07-27 20:46:59', '2026-07-27 20:46:59'),
+(115, 'APP-2026-35145', 'Maryam', 'Ahmed', '67131526612618', '2000-10-10', 'Female', '6127617263782', 'maryam@gmail.com', 'Pakistan', 2, 6, 2, 'Submitted', '2026-07-28 04:55:26', NULL, NULL, NULL, '2026-07-28 02:55:26', '2026-07-28 02:55:26');
 
 -- --------------------------------------------------------
 
@@ -218,6 +219,7 @@ CREATE TABLE `admission_scholarships` (
   `student_id` int(11) NOT NULL,
   `application_id` int(11) DEFAULT NULL,
   `scholarship_type` enum('Merit','Need-based','Sports','Talent','Special','Other') NOT NULL DEFAULT 'Merit',
+  `description` text DEFAULT NULL,
   `scholarship_name` varchar(200) NOT NULL,
   `percentage` decimal(5,2) NOT NULL DEFAULT 0.00,
   `amount` decimal(12,2) DEFAULT NULL,
@@ -238,22 +240,23 @@ CREATE TABLE `admission_scholarships` (
 -- Dumping data for table `admission_scholarships`
 --
 
-INSERT INTO `admission_scholarships` (`scholarship_id`, `student_id`, `application_id`, `scholarship_type`, `scholarship_name`, `percentage`, `amount`, `duration`, `semester_id`, `session_id`, `status`, `application_status`, `approved_by`, `approved_date`, `rejection_reason`, `remarks`, `created_at`, `updated_at`) VALUES
-(1, 25, NULL, 'Merit', 'Merit Scholarship - 50%', 50.00, NULL, 'Full Program', 1, 5, 'Active', 'Approved', NULL, '2026-01-20', NULL, 'Outstanding academic performance', '2026-07-27 18:16:12', '2026-07-27 18:16:12'),
-(2, 26, NULL, 'Merit', 'Merit Scholarship - 40%', 40.00, NULL, 'Full Program', 1, 5, 'Active', 'Approved', NULL, '2026-01-20', NULL, 'Excellent grades in entrance test', '2026-07-27 18:16:12', '2026-07-27 18:16:12'),
-(3, 27, NULL, 'Need-based', 'Need-based Financial Aid', 30.00, NULL, 'One Semester', 9, 5, 'Active', 'Approved', NULL, '2026-01-25', NULL, 'Based on financial need assessment', '2026-07-27 18:16:12', '2026-07-27 18:16:12'),
-(4, 28, NULL, 'Need-based', 'Need-based Financial Aid - 25%', 25.00, NULL, 'One Semester', 9, 5, 'Active', 'Approved', NULL, '2026-01-25', NULL, 'Financial need verified', '2026-07-27 18:16:12', '2026-07-27 18:16:12'),
-(5, 29, NULL, 'Sports', 'Sports Excellence Scholarship', 25.00, NULL, 'One Year', 17, 5, 'Active', 'Approved', NULL, '2026-01-30', NULL, 'Represented university in national sports', '2026-07-27 18:16:12', '2026-07-27 18:16:12'),
-(6, 30, NULL, 'Sports', 'Sports Excellence - 20%', 20.00, NULL, 'One Year', 17, 5, 'Active', 'Approved', NULL, '2026-01-30', NULL, 'Represented university in athletics', '2026-07-27 18:16:12', '2026-07-27 18:16:12'),
-(7, 31, NULL, 'Talent', 'Talent Scholarship - 20%', 20.00, NULL, 'Full Program', 25, 5, 'Pending', 'Under Review', NULL, NULL, NULL, 'Under review by scholarship committee', '2026-07-27 18:16:12', '2026-07-27 18:16:12'),
-(8, 32, NULL, 'Talent', 'Talent Scholarship - 15%', 15.00, NULL, 'Full Program', 25, 5, 'Pending', 'Under Review', NULL, NULL, NULL, 'Waiting for additional documentation', '2026-07-27 18:16:12', '2026-07-27 18:16:12'),
-(9, 33, NULL, 'Merit', 'Merit Scholarship - 30%', 30.00, NULL, 'Full Program', 33, 5, 'Pending', 'Submitted', NULL, NULL, NULL, 'Awaiting verification of academic records', '2026-07-27 18:16:12', '2026-07-27 18:16:12'),
-(10, 34, NULL, 'Merit', 'Merit Scholarship - 25%', 25.00, NULL, 'Full Program', 33, 5, 'Pending', 'Submitted', NULL, NULL, NULL, 'Application received - Under initial review', '2026-07-27 18:16:12', '2026-07-27 18:16:12'),
-(11, 35, NULL, 'Special', 'Special Scholarship - 35%', 35.00, NULL, 'One Semester', 2, 5, 'Active', 'Approved', NULL, '2026-02-01', NULL, 'Special consideration - Orphan student', '2026-07-27 18:16:12', '2026-07-27 18:16:12'),
-(12, 36, NULL, 'Special', 'Special Scholarship - 30%', 30.00, NULL, 'One Semester', 2, 5, 'Approved', 'Approved', NULL, '2026-02-01', NULL, 'Special consideration - Disabled student', '2026-07-27 18:16:12', '2026-07-27 18:16:12'),
-(13, 37, NULL, 'Merit', 'Merit Scholarship - 30%', 30.00, 30000.00, 'Full Program', 34, 5, 'Approved', 'Approved', NULL, '2026-02-10', NULL, 'Approved - Outstanding academic record', '2026-07-27 18:16:12', '2026-07-27 18:16:12'),
-(14, 25, NULL, 'Merit', 'Merit Scholarship Renewal - 50%', 50.00, 50000.00, 'Full Program', 2, 5, 'Pending', 'Under Review', NULL, NULL, NULL, 'Renewal application for Semester 2', '2026-07-27 18:16:12', '2026-07-27 18:16:12'),
-(15, 29, NULL, 'Sports', 'Sports Scholarship Renewal', 25.00, 25000.00, 'One Year', 18, 5, 'Pending', 'Submitted', NULL, NULL, NULL, 'Renewal for second year', '2026-07-27 18:16:12', '2026-07-27 18:16:12');
+INSERT INTO `admission_scholarships` (`scholarship_id`, `student_id`, `application_id`, `scholarship_type`, `description`, `scholarship_name`, `percentage`, `amount`, `duration`, `semester_id`, `session_id`, `status`, `application_status`, `approved_by`, `approved_date`, `rejection_reason`, `remarks`, `created_at`, `updated_at`) VALUES
+(1, 25, NULL, 'Merit', NULL, 'Merit Scholarship - 50%', 50.00, NULL, 'Full Program', 1, 5, 'Active', 'Approved', NULL, '2026-01-20', NULL, 'Outstanding academic performance', '2026-07-27 18:16:12', '2026-07-27 18:16:12'),
+(2, 26, NULL, 'Merit', NULL, 'Merit Scholarship - 40%', 40.00, NULL, 'Full Program', 1, 5, 'Active', 'Approved', NULL, '2026-01-20', NULL, 'Excellent grades in entrance test', '2026-07-27 18:16:12', '2026-07-27 18:16:12'),
+(3, 27, NULL, 'Need-based', NULL, 'Need-based Financial Aid', 30.00, NULL, 'One Semester', 9, 5, 'Active', 'Approved', NULL, '2026-01-25', NULL, 'Based on financial need assessment', '2026-07-27 18:16:12', '2026-07-27 18:16:12'),
+(4, 28, NULL, 'Need-based', NULL, 'Need-based Financial Aid - 25%', 25.00, NULL, 'One Semester', 9, 5, 'Active', 'Approved', NULL, '2026-01-25', NULL, 'Financial need verified', '2026-07-27 18:16:12', '2026-07-27 18:16:12'),
+(5, 29, NULL, 'Sports', NULL, 'Sports Excellence Scholarship', 25.00, NULL, 'One Year', 17, 5, 'Active', 'Approved', NULL, '2026-01-30', NULL, 'Represented university in national sports', '2026-07-27 18:16:12', '2026-07-27 18:16:12'),
+(6, 30, NULL, 'Sports', NULL, 'Sports Excellence - 20%', 20.00, NULL, 'One Year', 17, 5, 'Active', 'Approved', NULL, '2026-01-30', NULL, 'Represented university in athletics', '2026-07-27 18:16:12', '2026-07-27 18:16:12'),
+(7, 31, NULL, 'Talent', NULL, 'Talent Scholarship - 20%', 20.00, NULL, 'Full Program', 25, 5, 'Pending', 'Under Review', NULL, NULL, NULL, 'Under review by scholarship committee', '2026-07-27 18:16:12', '2026-07-27 18:16:12'),
+(8, 32, NULL, 'Talent', NULL, 'Talent Scholarship - 15%', 15.00, NULL, 'Full Program', 25, 5, 'Pending', 'Under Review', NULL, NULL, NULL, 'Waiting for additional documentation', '2026-07-27 18:16:12', '2026-07-27 18:16:12'),
+(9, 33, NULL, 'Merit', NULL, 'Merit Scholarship - 30%', 30.00, NULL, 'Full Program', 33, 5, 'Pending', 'Submitted', NULL, NULL, NULL, 'Awaiting verification of academic records', '2026-07-27 18:16:12', '2026-07-27 18:16:12'),
+(10, 34, NULL, 'Merit', NULL, 'Merit Scholarship - 25%', 25.00, NULL, 'Full Program', 33, 5, 'Pending', 'Submitted', NULL, NULL, NULL, 'Application received - Under initial review', '2026-07-27 18:16:12', '2026-07-27 18:16:12'),
+(11, 35, NULL, 'Special', NULL, 'Special Scholarship - 35%', 35.00, NULL, 'One Semester', 2, 5, 'Active', 'Approved', NULL, '2026-02-01', NULL, 'Special consideration - Orphan student', '2026-07-27 18:16:12', '2026-07-27 18:16:12'),
+(12, 36, NULL, 'Special', NULL, 'Special Scholarship - 30%', 30.00, NULL, 'One Semester', 2, 5, 'Approved', 'Approved', NULL, '2026-02-01', NULL, 'Special consideration - Disabled student', '2026-07-27 18:16:12', '2026-07-27 18:16:12'),
+(13, 37, NULL, 'Merit', NULL, 'Merit Scholarship - 30%', 30.00, 30000.00, 'Full Program', 34, 5, 'Approved', 'Approved', NULL, '2026-02-10', NULL, 'Approved - Outstanding academic record', '2026-07-27 18:16:12', '2026-07-27 18:16:12'),
+(14, 25, NULL, 'Merit', NULL, 'Merit Scholarship Renewal - 50%', 50.00, 50000.00, 'Full Program', 2, 5, 'Pending', 'Under Review', NULL, NULL, NULL, 'Renewal application for Semester 2', '2026-07-27 18:16:12', '2026-07-27 18:16:12'),
+(15, 29, NULL, 'Sports', NULL, 'Sports Scholarship Renewal', 25.00, 25000.00, 'One Year', 18, 5, 'Pending', 'Submitted', NULL, NULL, NULL, 'Renewal for second year', '2026-07-27 18:16:12', '2026-07-27 18:16:12'),
+(17, 34, 6712, 'Merit', '..', 'Scholarship1', 999.99, 500.00, '1 year', NULL, NULL, 'Pending', 'Submitted', NULL, '2026-02-02', 'dcalnkalncl', 'acsnjncanc', '2026-07-28 03:02:04', '2026-07-28 03:02:04');
 
 -- --------------------------------------------------------
 
@@ -288,7 +291,8 @@ INSERT INTO `admission_scholarship_applications` (`id`, `scholarship_id`, `stude
 (4, 4, 28, NULL, NULL, 65.00, 0.00, 0.00, 0.00, 'rejected', NULL, '2026-07-27 18:20:35', '2026-07-27 18:20:35'),
 (5, 5, 29, NULL, NULL, 70.00, 0.00, 0.00, 0.00, 'pending', NULL, '2026-07-27 18:20:35', '2026-07-27 18:20:35'),
 (7, 1, 25, 850.00, 1100.00, 77.27, 50.00, 50000.00, 50000.00, 'pending', NULL, '2026-07-27 19:47:39', '2026-07-27 19:47:39'),
-(9, 6, 25, 700.00, 1000.00, 70.00, 50.00, 50000.00, 50000.00, 'pending', NULL, '2026-07-27 19:49:00', '2026-07-27 19:49:00');
+(9, 6, 25, 700.00, 1000.00, 70.00, 50.00, 50000.00, 50000.00, 'pending', NULL, '2026-07-27 19:49:00', '2026-07-27 19:49:00'),
+(10, 17, 25, 940.00, 1000.00, 94.00, 100.00, 50000.00, 0.00, 'pending', NULL, '2026-07-28 03:05:11', '2026-07-28 03:05:11');
 
 -- --------------------------------------------------------
 
@@ -1295,54 +1299,55 @@ CREATE TABLE `lms_marks` (
   `course_id` int(11) NOT NULL,
   `student_user_id` int(11) NOT NULL,
   `component` varchar(50) NOT NULL,
-  `marks_obtained` decimal(5,2) DEFAULT 0.00
+  `marks_obtained` decimal(5,2) DEFAULT 0.00,
+  `total_marks` decimal(10,2) DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
 -- Dumping data for table `lms_marks`
 --
 
-INSERT INTO `lms_marks` (`id`, `course_id`, `student_user_id`, `component`, `marks_obtained`) VALUES
-(1, 14, 2, 'value_1', 100.00),
-(2, 15, 3, 'value_2', 100.00),
-(3, 16, 4, 'value_3', 100.00),
-(4, 17, 5, 'value_4', 100.00),
-(5, 18, 6, 'value_5', 100.00),
-(6, 19, 7, 'value_6', 100.00),
-(7, 20, 8, 'value_7', 100.00),
-(8, 21, 9, 'value_8', 100.00),
-(9, 22, 10, 'value_9', 100.00),
-(10, 13, 11, 'value_10', 100.00),
-(11, 14, 1, 'value_11', 100.00),
-(12, 15, 2, 'value_12', 100.00),
-(13, 16, 3, 'value_13', 100.00),
-(14, 17, 4, 'value_14', 100.00),
-(15, 18, 5, 'value_15', 100.00),
-(16, 19, 6, 'value_16', 100.00),
-(17, 20, 7, 'value_17', 100.00),
-(18, 21, 8, 'value_18', 100.00),
-(19, 22, 9, 'value_19', 100.00),
-(20, 13, 10, 'value_20', 100.00),
-(21, 14, 2, 'value_1', 100.00),
-(22, 15, 3, 'value_2', 100.00),
-(23, 16, 4, 'value_3', 100.00),
-(24, 17, 5, 'value_4', 100.00),
-(25, 18, 6, 'value_5', 100.00),
-(26, 19, 7, 'value_6', 100.00),
-(27, 20, 8, 'value_7', 100.00),
-(28, 21, 9, 'value_8', 100.00),
-(29, 22, 10, 'value_9', 100.00),
-(30, 13, 11, 'value_10', 100.00),
-(31, 14, 1, 'value_11', 100.00),
-(32, 15, 2, 'value_12', 100.00),
-(33, 16, 3, 'value_13', 100.00),
-(34, 17, 4, 'value_14', 100.00),
-(35, 18, 5, 'value_15', 100.00),
-(36, 19, 6, 'value_16', 100.00),
-(37, 20, 7, 'value_17', 100.00),
-(38, 21, 8, 'value_18', 100.00),
-(39, 22, 9, 'value_19', 100.00),
-(40, 13, 10, 'value_20', 100.00);
+INSERT INTO `lms_marks` (`id`, `course_id`, `student_user_id`, `component`, `marks_obtained`, `total_marks`) VALUES
+(1, 14, 2, 'value_1', 100.00, NULL),
+(2, 15, 3, 'value_2', 100.00, NULL),
+(3, 16, 4, 'value_3', 100.00, NULL),
+(4, 17, 5, 'value_4', 100.00, NULL),
+(5, 18, 6, 'value_5', 100.00, NULL),
+(6, 19, 7, 'value_6', 100.00, NULL),
+(7, 20, 8, 'value_7', 100.00, NULL),
+(8, 21, 9, 'value_8', 100.00, NULL),
+(9, 22, 10, 'value_9', 100.00, NULL),
+(10, 13, 11, 'value_10', 100.00, NULL),
+(11, 14, 1, 'value_11', 100.00, NULL),
+(12, 15, 2, 'value_12', 100.00, NULL),
+(13, 16, 3, 'value_13', 100.00, NULL),
+(14, 17, 4, 'value_14', 100.00, NULL),
+(15, 18, 5, 'value_15', 100.00, NULL),
+(16, 19, 6, 'value_16', 100.00, NULL),
+(17, 20, 7, 'value_17', 100.00, NULL),
+(18, 21, 8, 'value_18', 100.00, NULL),
+(19, 22, 9, 'value_19', 100.00, NULL),
+(20, 13, 10, 'value_20', 100.00, NULL),
+(21, 14, 2, 'value_1', 100.00, NULL),
+(22, 15, 3, 'value_2', 100.00, NULL),
+(23, 16, 4, 'value_3', 100.00, NULL),
+(24, 17, 5, 'value_4', 100.00, NULL),
+(25, 18, 6, 'value_5', 100.00, NULL),
+(26, 19, 7, 'value_6', 100.00, NULL),
+(27, 20, 8, 'value_7', 100.00, NULL),
+(28, 21, 9, 'value_8', 100.00, NULL),
+(29, 22, 10, 'value_9', 100.00, NULL),
+(30, 13, 11, 'value_10', 100.00, NULL),
+(31, 14, 1, 'value_11', 100.00, NULL),
+(32, 15, 2, 'value_12', 100.00, NULL),
+(33, 16, 3, 'value_13', 100.00, NULL),
+(34, 17, 4, 'value_14', 100.00, NULL),
+(35, 18, 5, 'value_15', 100.00, NULL),
+(36, 19, 6, 'value_16', 100.00, NULL),
+(37, 20, 7, 'value_17', 100.00, NULL),
+(38, 21, 8, 'value_18', 100.00, NULL),
+(39, 22, 9, 'value_19', 100.00, NULL),
+(40, 13, 10, 'value_20', 100.00, NULL);
 
 -- --------------------------------------------------------
 
@@ -2606,28 +2611,28 @@ CREATE TABLE `students` (
   `status` enum('Active','Freeze','Graduated','Dropped','Suspended') NOT NULL DEFAULT 'Active',
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp(),
-  `user_id` int(11) DEFAULT NULL
+  `user_id` int(11) DEFAULT NULL,
+  `semester` int(11) DEFAULT 1
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 --
 -- Dumping data for table `students`
 --
 
-INSERT INTO `students` (`student_id`, `application_id`, `roll_no`, `full_name`, `father_name`, `cnic_or_bform`, `dob`, `gender`, `contact_no`, `email`, `address`, `program_id`, `admission_session_id`, `current_session_id`, `current_semester_id`, `batch_year`, `admission_date`, `status`, `created_at`, `updated_at`, `user_id`) VALUES
-(25, 100, '2024-2-025', 'Ahmed Ali', 'Father of Ahmed Ali', '42101-1234567-25', '2003-05-15', 'Male', '0300-1000025', 'stu100@uni.edu', 'Lahore', 2, 6, 6, 9, 2024, '2003-05-15', 'Active', '2026-07-27 16:42:35', '2026-07-27 16:42:35', NULL),
-(26, 101, '2024-3-026', 'Sara Butt', 'Father of Sara Butt', '42101-1234567-26', '2003-05-15', 'Male', '0300-1000026', 'stu101@uni.edu', 'Lahore', 3, 5, 5, 10, 2024, '2003-05-15', 'Active', '2026-07-27 16:42:35', '2026-07-27 16:42:35', NULL),
-(27, 102, '2024-4-027', 'Usman Khan', 'Father of Usman Khan', '42101-1234567-27', '2003-05-15', 'Male', '0300-1000027', 'stu102@uni.edu', 'Lahore', 4, 6, 6, 11, 2024, '2003-05-15', 'Active', '2026-07-27 16:42:35', '2026-07-27 16:42:35', NULL),
-(28, 103, '2024-5-028', 'Hira Ahmed', 'Father of Hira Ahmed', '42101-1234567-28', '2003-05-15', 'Male', '0300-1000028', 'stu103@uni.edu', 'Lahore', 5, 5, 5, 12, 2024, '2003-05-15', 'Active', '2026-07-27 16:42:35', '2026-07-27 16:42:35', NULL),
-(29, 104, '2024-6-029', 'Bilal Hussain', 'Father of Bilal Hussain', '42101-1234567-29', '2003-05-15', 'Male', '0300-1000029', 'stu104@uni.edu', 'Lahore', 6, 6, 6, 13, 2024, '2003-05-15', 'Active', '2026-07-27 16:42:35', '2026-07-27 16:42:35', NULL),
-(30, 105, '2024-2-030', 'Zainab Noor', 'Father of Zainab Noor', '42101-1234567-30', '2003-05-15', 'Male', '0300-1000030', 'stu105@uni.edu', 'Lahore', 2, 5, 5, 14, 2024, '2003-05-15', 'Active', '2026-07-27 16:42:35', '2026-07-27 16:42:35', NULL),
-(31, 106, '2024-3-031', 'Muhammad Umer', 'Father of Muhammad Umer', '42101-1234567-31', '2003-05-15', 'Male', '0300-1000031', 'stu106@uni.edu', 'Lahore', 3, 6, 6, 15, 2024, '2003-05-15', 'Active', '2026-07-27 16:42:35', '2026-07-27 16:42:35', NULL),
-(32, 107, '2024-4-032', 'Ayesha Siddiqui', 'Father of Ayesha Siddiqui', '42101-1234567-32', '2003-05-15', 'Male', '0300-1000032', 'stu107@uni.edu', 'Lahore', 4, 5, 5, 16, 2024, '2003-05-15', 'Active', '2026-07-27 16:42:35', '2026-07-27 16:42:35', NULL),
-(33, 108, '2024-5-033', 'Farhan Iqbal', 'Father of Farhan Iqbal', '42101-1234567-33', '2003-05-15', 'Male', '0300-1000033', 'stu108@uni.edu', 'Lahore', 5, 6, 6, 9, 2024, '2003-05-15', 'Active', '2026-07-27 16:42:35', '2026-07-27 16:42:35', NULL),
-(34, 109, '2024-6-034', 'Maryam Khalid', 'Father of Maryam Khalid', '42101-1234567-34', '2003-05-15', 'Male', '0300-1000034', 'stu109@uni.edu', 'Lahore', 6, 5, 5, 10, 2024, '2003-05-15', 'Active', '2026-07-27 16:42:35', '2026-07-27 16:42:35', NULL),
-(35, 110, '2024-2-035', 'Waleed Aslam', 'Father of Waleed Aslam', '42101-1234567-35', '2003-05-15', 'Male', '0300-1000035', 'stu110@uni.edu', 'Lahore', 2, 6, 6, 11, 2024, '2003-05-15', 'Active', '2026-07-27 16:42:35', '2026-07-27 16:42:35', NULL),
-(36, 111, '2024-3-036', 'Nida Butt', 'Father of Nida Butt', '42101-1234567-36', '2003-05-15', 'Male', '0300-1000036', 'stu111@uni.edu', 'Lahore', 3, 5, 5, 12, 2024, '2003-05-15', 'Active', '2026-07-27 16:42:35', '2026-07-27 16:42:35', NULL),
-(37, 112, '2024-4-037', 'Student 37', 'Father of Student 37', '42101-1234567-37', '2003-05-15', 'Male', '0300-1000037', 'stu112@uni.edu', 'Lahore', 4, 6, 6, 13, 2024, '2003-05-15', 'Active', '2026-07-27 16:42:35', '2026-07-27 16:42:35', NULL),
-(38, 113, 'ALI-2026-4458', 'Ali', 'khan', '63871357817132', '2003-02-10', 'Male', '6157351656152', 'ali@gmail.com', 'peshawar', 1, 5, 5, 1, 2026, '2026-07-27', 'Active', '2026-07-27 19:36:26', '2026-07-27 19:36:26', NULL);
+INSERT INTO `students` (`student_id`, `application_id`, `roll_no`, `full_name`, `father_name`, `cnic_or_bform`, `dob`, `gender`, `contact_no`, `email`, `address`, `program_id`, `admission_session_id`, `current_session_id`, `current_semester_id`, `batch_year`, `admission_date`, `status`, `created_at`, `updated_at`, `user_id`, `semester`) VALUES
+(25, 100, '2024-2-025', 'Ahmed Ali', 'Father of Ahmed Ali', '42101-1234567-25', '2003-05-15', 'Male', '0300-1000025', 'stu100@uni.edu', 'Lahore', 2, 6, 6, 9, 2024, '2003-05-15', 'Active', '2026-07-27 16:42:35', '2026-07-27 16:42:35', NULL, 1),
+(26, 101, '2024-3-026', 'Sara Butt', 'Father of Sara Butt', '42101-1234567-26', '2003-05-15', 'Male', '0300-1000026', 'stu101@uni.edu', 'Lahore', 3, 5, 5, 10, 2024, '2003-05-15', 'Active', '2026-07-27 16:42:35', '2026-07-27 16:42:35', NULL, 1),
+(27, 102, '2024-4-027', 'Usman Khan', 'Father of Usman Khan', '42101-1234567-27', '2003-05-15', 'Male', '0300-1000027', 'stu102@uni.edu', 'Lahore', 4, 6, 6, 11, 2024, '2003-05-15', 'Active', '2026-07-27 16:42:35', '2026-07-27 16:42:35', NULL, 1),
+(28, 103, '2024-5-028', 'Hira Ahmed', 'Father of Hira Ahmed', '42101-1234567-28', '2003-05-15', 'Male', '0300-1000028', 'stu103@uni.edu', 'Lahore', 5, 5, 5, 12, 2024, '2003-05-15', 'Active', '2026-07-27 16:42:35', '2026-07-27 16:42:35', NULL, 1),
+(29, 104, '2024-6-029', 'Bilal Hussain', 'Father of Bilal Hussain', '42101-1234567-29', '2003-05-15', 'Male', '0300-1000029', 'stu104@uni.edu', 'Lahore', 6, 6, 6, 13, 2024, '2003-05-15', 'Active', '2026-07-27 16:42:35', '2026-07-27 16:42:35', NULL, 1),
+(30, 105, '2024-2-030', 'Zainab Noor', 'Father of Zainab Noor', '42101-1234567-30', '2003-05-15', 'Male', '0300-1000030', 'stu105@uni.edu', 'Lahore', 2, 5, 5, 14, 2024, '2003-05-15', 'Active', '2026-07-27 16:42:35', '2026-07-27 16:42:35', NULL, 1),
+(31, 106, '2024-3-031', 'Muhammad Umer', 'Father of Muhammad Umer', '42101-1234567-31', '2003-05-15', 'Male', '0300-1000031', 'stu106@uni.edu', 'Lahore', 3, 6, 6, 15, 2024, '2003-05-15', 'Active', '2026-07-27 16:42:35', '2026-07-27 16:42:35', NULL, 1),
+(32, 107, '2024-4-032', 'Ayesha Siddiqui', 'Father of Ayesha Siddiqui', '42101-1234567-32', '2003-05-15', 'Male', '0300-1000032', 'stu107@uni.edu', 'Lahore', 4, 5, 5, 16, 2024, '2003-05-15', 'Active', '2026-07-27 16:42:35', '2026-07-27 16:42:35', NULL, 1),
+(33, 108, '2024-5-033', 'Farhan Iqbal', 'Father of Farhan Iqbal', '42101-1234567-33', '2003-05-15', 'Male', '0300-1000033', 'stu108@uni.edu', 'Lahore', 5, 6, 6, 9, 2024, '2003-05-15', 'Active', '2026-07-27 16:42:35', '2026-07-27 16:42:35', NULL, 1),
+(34, 109, '2024-6-034', 'Maryam Khalid', 'Father of Maryam Khalid', '42101-1234567-34', '2003-05-15', 'Male', '0300-1000034', 'stu109@uni.edu', 'Lahore', 6, 5, 5, 10, 2024, '2003-05-15', 'Active', '2026-07-27 16:42:35', '2026-07-27 16:42:35', NULL, 1),
+(35, 110, '2024-2-035', 'Waleed Aslam', 'Father of Waleed Aslam', '42101-1234567-35', '2003-05-15', 'Male', '0300-1000035', 'stu110@uni.edu', 'Lahore', 2, 6, 6, 11, 2024, '2003-05-15', 'Active', '2026-07-27 16:42:35', '2026-07-27 16:42:35', NULL, 1),
+(36, 111, '2024-3-036', 'Nida Butt', 'Father of Nida Butt', '42101-1234567-36', '2003-05-15', 'Male', '0300-1000036', 'stu111@uni.edu', 'Lahore', 3, 5, 5, 12, 2024, '2003-05-15', 'Active', '2026-07-27 16:42:35', '2026-07-27 16:42:35', NULL, 1),
+(37, 112, '2024-4-037', 'Student 37', 'Father of Student 37', '42101-1234567-37', '2003-05-15', 'Male', '0300-1000037', 'stu112@uni.edu', 'Lahore', 4, 6, 6, 13, 2024, '2003-05-15', 'Active', '2026-07-27 16:42:35', '2026-07-27 16:42:35', NULL, 1);
 
 -- --------------------------------------------------------
 
@@ -3778,19 +3783,19 @@ ALTER TABLE `activity_logs`
 -- AUTO_INCREMENT for table `admission_applications`
 --
 ALTER TABLE `admission_applications`
-  MODIFY `application_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=115;
+  MODIFY `application_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=116;
 
 --
 -- AUTO_INCREMENT for table `admission_scholarships`
 --
 ALTER TABLE `admission_scholarships`
-  MODIFY `scholarship_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=16;
+  MODIFY `scholarship_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=18;
 
 --
 -- AUTO_INCREMENT for table `admission_scholarship_applications`
 --
 ALTER TABLE `admission_scholarship_applications`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=10;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=11;
 
 --
 -- AUTO_INCREMENT for table `admission_scholarship_programs`
@@ -4174,7 +4179,7 @@ ALTER TABLE `sso_applications`
 -- AUTO_INCREMENT for table `students`
 --
 ALTER TABLE `students`
-  MODIFY `student_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=40;
+  MODIFY `student_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=41;
 
 --
 -- AUTO_INCREMENT for table `student_courses`
@@ -4246,7 +4251,7 @@ ALTER TABLE `timetable`
 -- AUTO_INCREMENT for table `users`
 --
 ALTER TABLE `users`
-  MODIFY `user_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=43;
+  MODIFY `user_id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=47;
 
 --
 -- Constraints for dumped tables
