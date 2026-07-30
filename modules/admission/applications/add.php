@@ -10,22 +10,9 @@ $departments = $pdo->query("SELECT * FROM departments WHERE status='active' ORDE
 $sessions = $pdo->query("SELECT * FROM sessions ORDER BY session_id DESC")->fetchAll();
 
 // ============================================
-// FIX: Get unique semesters using GROUP BY
+// Get unique semesters
 // ============================================
 $semesters = $pdo->query("SELECT semester_id, semester_name FROM semesters GROUP BY semester_name ORDER BY CAST(SUBSTRING_INDEX(semester_name, ' ', -1) AS UNSIGNED)")->fetchAll();
-
-// Alternative: If the above doesn't work, use this:
-/*
-$semesters_raw = $pdo->query("SELECT semester_id, semester_name FROM semesters ORDER BY semester_id")->fetchAll();
-$seen = [];
-$semesters = [];
-foreach ($semesters_raw as $sem) {
-    if (!in_array($sem['semester_name'], $seen)) {
-        $seen[] = $sem['semester_name'];
-        $semesters[] = $sem;
-    }
-}
-*/
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     try {
@@ -42,10 +29,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($existing['count'] > 0) {
             setFlash('warning', 'An application already exists with this email or CNIC/B-Form!');
         } else {
+            // Generate readable Application Number for the user
             $application_no = generateApplicationNo();
             
             $data = [
-                'temp_application_no' => $application_no,
+                'application_id' => $application_no,
                 'full_name' => sanitize($_POST['full_name']),
                 'father_name' => sanitize($_POST['father_name']),
                 'cnic_or_bform' => sanitize($_POST['cnic_or_bform']),
@@ -56,13 +44,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'address' => sanitize($_POST['address']),
                 'program_id' => $_POST['department_id'],
                 'session_id' => $_POST['session_id'],
-                'applied_semester_id' => $_POST['semester_id'],
+                // FIXED: Use 'applied_semester_id' because 'semester_id' does not exist in your admission_applications table
+                'applied_semester_id' => $_POST['semester_id'], 
                 'application_status' => 'Submitted',
                 'submitted_at' => date('Y-m-d H:i:s')
             ];
             
+            // ================================================
+            // FIXED SQL: Uses 'applied_semester_id' instead of 'semester_id'
+            // ================================================
             $sql = "INSERT INTO admission_applications SET 
-                    temp_application_no = :temp_application_no,
+                    application_id = :application_id,
                     full_name = :full_name,
                     father_name = :father_name,
                     cnic_or_bform = :cnic_or_bform,

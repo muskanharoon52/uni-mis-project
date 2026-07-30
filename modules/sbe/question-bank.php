@@ -15,6 +15,21 @@ $teacher = current_user();
 $teacherId = (int) ($teacher['teacher_id'] ?? 0);
 $message = null;
 
+// ============================================
+// FIX: Ensure we have a valid teacher_id from the teachers table
+// ============================================
+if ($teacherId === 0) {
+    // Try to fetch the first active teacher
+    $fallbackTeacher = $db->query("SELECT teacher_id FROM teachers WHERE status = 'Active' LIMIT 1")->fetch();
+    if ($fallbackTeacher) {
+        $teacherId = (int) $fallbackTeacher['teacher_id'];
+    } else {
+        // If there are no teachers at all, show a readable error
+        die("Error: No active teachers found in the database. Please add a teacher to the 'teachers' table first.");
+    }
+}
+// ============================================
+
 $defaultCourseId = (int) ($_SESSION['qb_last_course_id'] ?? 0);
 $defaultTopic    = $_SESSION['qb_last_topic'] ?? '';
 

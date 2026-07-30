@@ -7,7 +7,7 @@ require_once __DIR__ . '/../config/db_connect.php';
 require_once __DIR__ . '/../modules/sso/includes/auth.php';
 
 if (!isLoggedIn()) {
-    header('Location: /uni-mis-project/modules/sso/login.php');
+    header('Location: /uni-mis-project/');
     exit();
 }
 
@@ -76,14 +76,23 @@ $roleName = ucfirst($_SESSION['role_name'] ?? 'User');
             <a class="<?= $currentFolder === 'attendance' ? 'active' : '' ?>" href="/uni-mis-project/attendance/index.php">
                 Attendance
             </a>
-            <a class="<?= $currentFolder === 'applications' ? 'active' : '' ?>" href="/uni-mis-project/applications/index.php">
-                Admission Apps
-            </a>
+            
             <a class="<?= $currentPage === 'lms_applications.php' ? 'active' : '' ?>" href="/uni-mis-project/lms_applications.php">
-                LMS Applications
+                Application
             </a>
 
             <div class="spacer"></div>
+
+            <?php
+            $isSuper = strtolower($_SESSION['role_name'] ?? '') === 'super admin';
+            $isAdmin = strtolower($_SESSION['role_name'] ?? '') === 'admin';
+            if ($isSuper || $isAdmin):
+            ?>
+            <span class="nav-section-label">Administration</span>
+            <a class="<?= $currentFolder === 'admin' ? 'active' : '' ?>" href="/uni-mis-project/modules/admin/users.php">
+                User Management
+            </a>
+            <?php endif; ?>
 
             <a href="/uni-mis-project/logout.php" class="sidebar-logout-btn">
                 Logout

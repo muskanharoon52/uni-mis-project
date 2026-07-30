@@ -13,7 +13,7 @@ function fin_isLoggedIn() {
 
 function fin_requireLogin() {
     if (!fin_isLoggedIn()) {
-        header('Location: ' . BASE_URL . 'modules/sso/login.php');
+        header('Location: /uni-mis-project/');
         exit();
     }
 }
@@ -25,7 +25,7 @@ function fin_isFinanceOrAdmin() {
 function fin_requireFinance() {
     fin_requireLogin();
     if (!fin_isFinanceOrAdmin()) {
-        header('Location: ' . BASE_URL . 'modules/sso/login.php?error=Access denied');
+        header('Location: /uni-mis-project/');
         exit();
     }
 }

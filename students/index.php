@@ -4,7 +4,7 @@ require_once __DIR__ . '/../modules/sso/includes/auth.php';
 
 // Check if logged in
 if (!isLoggedIn()) {
-    header('Location: ' . BASE_URL . 'modules/sso/login.php');
+    header('Location: /uni-mis-project/');
     exit;
 }
 
@@ -66,6 +66,15 @@ $hasStudentSemester = in_array('semester', $studentColumns);
 $hasStudentStatus = in_array('status', $studentColumns);
 $hasStudentUserId = in_array('user_id', $studentColumns);
 
+// Determine which column to use for student name
+$studentNameColumn = 'student_name'; // Most likely column in 'students'
+if (!in_array($studentNameColumn, $studentColumns)) {
+    $studentNameColumn = 'name'; // Fallback
+}
+if (!in_array($studentNameColumn, $studentColumns)) {
+    $studentNameColumn = 'full_name'; // Final fallback
+}
+
 // Build query with all joins - only include columns that exist
 $query = "SELECT s.*";
 
@@ -74,10 +83,17 @@ $query .= ", p.program_name, p.program_code";
 
 // Add user fields - only if they exist AND if students table has user_id column
 if ($hasStudentUserId) {
-    if ($hasUserFullName) {
-        $query .= ", u.full_name";
+    // IMPORTANT: We prioritize the name from the students table first
+    if (in_array($studentNameColumn, $studentColumns)) {
+        $query .= ", s.$studentNameColumn as display_name";
     } else {
-        $query .= ", NULL as full_name";
+        $query .= ", NULL as display_name";
+    }
+
+    if ($hasUserFullName) {
+        $query .= ", u.full_name as user_full_name";
+    } else {
+        $query .= ", NULL as user_full_name";
     }
 
     if ($hasUserEmail) {
@@ -93,7 +109,7 @@ if ($hasStudentUserId) {
     }
 } else {
     // If no user_id column, set user fields to NULL
-    $query .= ", NULL as full_name, NULL as email, NULL as phone";
+    $query .= ", NULL as display_name, NULL as user_full_name, NULL as email, NULL as phone";
 }
 
 $query .= " FROM students s
@@ -111,6 +127,11 @@ $types = "";
 
 if (!empty($search)) {
     $searchConditions = [];
+    
+    // Search using the correct name column from students
+    if (in_array($studentNameColumn, $studentColumns)) {
+        $searchConditions[] = "s.$studentNameColumn LIKE ?";
+    }
     
     if ($hasUserFullName && $hasStudentUserId) {
         $searchConditions[] = "u.full_name LIKE ?";
@@ -271,10 +292,19 @@ include __DIR__ . '/../includes/sidebar.php';
                                         <td>
                                             <div class="d-flex align-items-center">
                                                 <div class="student-avatar me-2">
-                                                    <?php echo strtoupper(substr($student['full_name'] ?? 'U', 0, 1)); ?>
+                                                    <?php 
+                                                    // Display the first letter of the student's actual name
+                                                    $name = $student['display_name'] ?? 'U';
+                                                    echo strtoupper(substr($name, 0, 1)); 
+                                                    ?>
                                                 </div>
                                                 <div>
-                                                    <div><?php echo htmlspecialchars($student['full_name'] ?? 'N/A'); ?></div>
+                                                    <div>
+                                                        <?php 
+                                                        // Show name from the students table first
+                                                        echo htmlspecialchars($student['display_name'] ?? 'N/A'); 
+                                                        ?>
+                                                    </div>
                                                     <?php if (!empty($student['email']) && $student['email'] != 'N/A'): ?>
                                                         <small class="text-muted"><?php echo htmlspecialchars($student['email']); ?></small>
                                                     <?php endif; ?>

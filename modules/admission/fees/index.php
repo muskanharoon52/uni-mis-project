@@ -3,53 +3,89 @@ require_once __DIR__ . '/../config/database.php';
 $page_title = 'Fee Management';
 include __DIR__ . '/../includes/header.php';
 
+$message = '';
+$error = '';
+
 try {
-    $tables = $pdo->query("SHOW TABLES LIKE 'fee_structures'")->fetchAll();
-    if (empty($tables)) {
+    // ============================================
+    // 1. CREATE TABLES IF NOT EXIST
+    //    (Other modules depend on fee_structures,
+    //     so we never drop it here.)
+    // ============================================
+    $pdo->exec("
+        CREATE TABLE IF NOT EXISTS fee_structures (
+            fee_structure_id INT PRIMARY KEY AUTO_INCREMENT,
+            department_id INT,
+            fee_type VARCHAR(50) NOT NULL,
+            amount DECIMAL(10,2) NOT NULL,
+            academic_year VARCHAR(20),
+            status VARCHAR(20) DEFAULT 'active'
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    ");
+
+    $pdo->exec("
+        CREATE TABLE IF NOT EXISTS fee_payments (
+            id INT PRIMARY KEY AUTO_INCREMENT,
+            student_id INT,
+            fee_type VARCHAR(50) NOT NULL,
+            amount DECIMAL(10,2) NOT NULL,
+            payment_date DATE NOT NULL,
+            payment_method VARCHAR(20) DEFAULT 'cash',
+            status VARCHAR(20) DEFAULT 'pending'
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    ");
+
+    // ============================================
+    // 2. INSERT DEMO DATA (only if empty)
+    // ============================================
+    $fsCount = $pdo->query("SELECT COUNT(*) FROM fee_structures")->fetchColumn();
+    if ($fsCount == 0) {
         $pdo->exec("
-            CREATE TABLE IF NOT EXISTS fee_structures (
-                id INT PRIMARY KEY AUTO_INCREMENT,
-                department_id INT,
-                fee_type VARCHAR(50) NOT NULL,
-                amount DECIMAL(10,2) NOT NULL,
-                academic_year VARCHAR(20),
-                status VARCHAR(20) DEFAULT 'active',
-                FOREIGN KEY (department_id) REFERENCES departments(department_id)
-            )
+            INSERT INTO fee_structures (department_id, fee_type, amount, academic_year, status) VALUES
+            (1, 'Tuition Fee', 45000.00, '2026', 'active'),
+            (1, 'Admission Fee', 15000.00, '2026', 'active'),
+            (1, 'Library Fee', 5000.00, '2026', 'active'),
+            (2, 'Tuition Fee', 55000.00, '2026', 'active'),
+            (2, 'Admission Fee', 20000.00, '2026', 'active'),
+            (2, 'Lab Fee', 8000.00, '2026', 'active'),
+            (3, 'Tuition Fee', 40000.00, '2026', 'active'),
+            (3, 'Sports Fee', 3000.00, '2026', 'inactive')
         ");
     }
-    
-    $tables = $pdo->query("SHOW TABLES LIKE 'fee_payments'")->fetchAll();
-    if (empty($tables)) {
+
+    $fpCount = $pdo->query("SELECT COUNT(*) FROM fee_payments")->fetchColumn();
+    if ($fpCount == 0) {
         $pdo->exec("
-            CREATE TABLE IF NOT EXISTS fee_payments (
-                id INT PRIMARY KEY AUTO_INCREMENT,
-                student_id INT,
-                fee_type VARCHAR(50) NOT NULL,
-                amount DECIMAL(10,2) NOT NULL,
-                payment_date DATE NOT NULL,
-                payment_method VARCHAR(20) DEFAULT 'cash',
-                status VARCHAR(20) DEFAULT 'pending',
-                FOREIGN KEY (student_id) REFERENCES admission_students(id)
-            )
+            INSERT INTO fee_payments (student_id, fee_type, amount, payment_date, payment_method, status) VALUES
+            (25, 'Tuition Fee', 45000.00, '2026-01-15', 'bank_transfer', 'completed'),
+            (26, 'Tuition Fee', 55000.00, '2026-01-20', 'cash', 'completed'),
+            (27, 'Admission Fee', 15000.00, '2026-02-01', 'cheque', 'pending'),
+            (25, 'Library Fee', 5000.00, '2026-02-10', 'cash', 'completed'),
+            (28, 'Tuition Fee', 40000.00, '2026-02-15', 'bank_transfer', 'completed'),
+            (26, 'Lab Fee', 8000.00, '2026-03-01', 'online', 'completed'),
+            (27, 'Tuition Fee', 45000.00, '2026-03-10', 'bank_transfer', 'pending'),
+            (29, 'Admission Fee', 20000.00, '2026-03-15', 'cash', 'completed')
         ");
     }
-    
+
     $structures = $pdo->query("
-        SELECT fs.*, d.department_name 
-        FROM fee_structures fs 
-        LEFT JOIN departments d ON fs.department_id = d.department_id 
-        ORDER BY fs.id DESC
+        SELECT fs.*, d.department_name
+        FROM fee_structures fs
+        LEFT JOIN departments d ON fs.department_id = d.department_id
+        ORDER BY fs.fee_structure_id DESC
     ")->fetchAll();
-    
+
     $payments = $pdo->query("
-        SELECT fp.*, s.student_name, s.student_id 
-        FROM fee_payments fp 
-        LEFT JOIN admission_students s ON fp.student_id = s.id 
+        SELECT fp.*, s.full_name AS student_name, s.student_id
+        FROM fee_payments fp
+        LEFT JOIN students s ON fp.student_id = s.student_id
         ORDER BY fp.payment_date DESC LIMIT 10
     ")->fetchAll();
-    
+
+    $message = "Fee structures loaded successfully!";
+
 } catch (PDOException $e) {
+    $error = "Database Error: " . $e->getMessage();
     $structures = [];
     $payments = [];
 }
@@ -59,7 +95,19 @@ try {
     <div class="page-header-left">
         <h4><i class="fas fa-money-bill"></i> Fee Management</h4>
     </div>
+    <div class="page-header-actions">
+        <a href="?add_demo=1" class="btn btn-primary" onclick="return confirm('Reset database and add demo data?')">
+            <i class="fas fa-database"></i> Reset & Add Demo Data
+        </a>
+    </div>
 </div>
+
+<?php if ($error): ?>
+    <div class="alert alert-error"><?= htmlspecialchars($error) ?></div>
+<?php endif; ?>
+<?php if ($message): ?>
+    <div class="alert alert-success"><?= htmlspecialchars($message) ?></div>
+<?php endif; ?>
 
 <div class="card" style="margin-bottom:24px;">
     <div class="card-header">
@@ -73,7 +121,7 @@ try {
             <div class="empty-state">
                 <i class="fas fa-coins"></i>
                 <h5>No Fee Structures Found</h5>
-                <p>No program fee structures configured yet.</p>
+                <p>No program fee structures configured yet. Click <strong>"Reset & Add Demo Data"</strong> above.</p>
             </div>
         <?php else: ?>
             <div class="table-responsive">

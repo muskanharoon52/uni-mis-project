@@ -106,6 +106,9 @@ function getGradeColor($grade) {
             <a class="<?= $currentDir === 'results' && $currentPage === 'publish.php' ? 'active' : '' ?>" href="<?= BASE_URL ?>examination/results/publish.php">
                 <span class="nav-icon">&#9729;</span> Publish Results
             </a>
+            <a class="<?= $currentDir === 'sbe-results' ? 'active' : '' ?>" href="<?= BASE_URL ?>examination/sbe-results/index.php">
+                <span class="nav-icon">&#128221;</span> SBE Results
+            </a>
 
             <span class="nav-section-label">Promotion</span>
             <a class="<?= $currentDir === 'promote' ? 'active' : '' ?>" href="<?= BASE_URL ?>examination/promote/promote.php">

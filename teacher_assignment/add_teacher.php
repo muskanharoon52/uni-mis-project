@@ -1,6 +1,5 @@
 <?php
-error_reporting(E_ALL);
-ini_set('display_errors', 1);
+// teacher_assignment/add_teacher.php
 require_once __DIR__ . '/../config/db_connect.php';
 require_once __DIR__ . '/../modules/sso/includes/auth.php';
 requireLogin();
@@ -9,148 +8,189 @@ $conn = getConnection();
 $error = '';
 $success = '';
 
-$dept_query = "SELECT department_id, department_name FROM departments ORDER BY department_name";
-$dept_result = $conn->query($dept_query);
-$departments = $dept_result ? $dept_result->fetch_all(MYSQLI_ASSOC) : [];
+// ============================================
+// 1. DYNAMIC COLUMN DETECTION (Fixes the errors)
+// ============================================
+$teacher_id_column = 'teacher_id';
+$teacher_name_column = 'full_name';
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $teacher_code = trim($_POST['teacher_code'] ?? '');
-    $teacher_name = trim($_POST['teacher_name'] ?? '');
-    $email = trim($_POST['email'] ?? '');
-    $phone = trim($_POST['phone'] ?? '');
-    $department_id = (int)($_POST['department_id'] ?? 0);
-    $specialization = trim($_POST['specialization'] ?? '');
-    $status = $_POST['status'] ?? 'Active';
-
-    if (empty($teacher_code) || empty($teacher_name)) {
-        $error = 'Teacher code and name are required.';
-    } elseif ($department_id <= 0) {
-        $error = 'Please select a department.';
-    } else {
-        $check_sql = "SELECT teacher_id FROM teachers WHERE teacher_code = ?";
-        $check_stmt = $conn->prepare($check_sql);
-        $check_stmt->bind_param("s", $teacher_code);
-        $check_stmt->execute();
-        $check_result = $check_stmt->get_result();
-        
-        if ($check_result->num_rows > 0) {
-            $error = 'Teacher code already exists. Please use a unique code.';
-        } else {
-            if (!empty($email)) {
-                $email_check_sql = "SELECT teacher_id FROM teachers WHERE email = ?";
-                $email_check_stmt = $conn->prepare($email_check_sql);
-                $email_check_stmt->bind_param("s", $email);
-                $email_check_stmt->execute();
-                $email_check_result = $email_check_stmt->get_result();
-                
-                if ($email_check_result->num_rows > 0) {
-                    $error = 'Email already exists. Please use a unique email.';
-                }
-                $email_check_stmt->close();
-            }
-            
-            if (empty($error)) {
-                $insert_sql = "INSERT INTO teachers (teacher_code, teacher_name, email, phone, department_id, specialization, status) 
-                               VALUES (?, ?, ?, ?, ?, ?, ?)";
-                $insert_stmt = $conn->prepare($insert_sql);
-                $insert_stmt->bind_param("ssssiss", $teacher_code, $teacher_name, $email, $phone, $department_id, $specialization, $status);
-                
-                if ($insert_stmt->execute()) {
-                    header("Location: index.php?success=Teacher added successfully!");
-                    exit();
-                } else {
-                    $error = "Error adding teacher: " . $conn->error;
-                }
-                $insert_stmt->close();
-            }
-        }
-        $check_stmt->close();
+// Check the actual columns in the teachers table
+$check_cols = $conn->query("SHOW COLUMNS FROM teachers");
+if ($check_cols) {
+    $cols = [];
+    while($col = $check_cols->fetch_assoc()) {
+        $cols[] = $col['Field'];
+    }
+    
+    // Detect the ID column
+    if (in_array('teacher_id', $cols)) {
+        $teacher_id_column = 'teacher_id';
+    } elseif (in_array('id', $cols)) {
+        $teacher_id_column = 'id';
+    } elseif (in_array('employee_id', $cols)) {
+        $teacher_id_column = 'employee_id';
+    }
+    
+    // Detect the Name column
+    if (in_array('full_name', $cols)) {
+        $teacher_name_column = 'full_name';
+    } elseif (in_array('name', $cols)) {
+        $teacher_name_column = 'name';
+    } elseif (in_array('teacher_name', $cols)) {
+        $teacher_name_column = 'teacher_name';
     }
 }
 
+// ============================================
+// 2. FETCH TEACHERS (Using the detected columns)
+// ============================================
+// NOTE: We escape the column names with backticks ` ` to be safe!
+$teachers_sql = "SELECT `$teacher_id_column` as id, `$teacher_name_column` as name, email 
+                 FROM teachers 
+                 WHERE status = 'Active' 
+                 ORDER BY `$teacher_name_column`";
+$teachers_result = $conn->query($teachers_sql);
+
+if ($teachers_result === false) {
+    die("Database Error fetching teachers: " . $conn->error);
+}
+$teachers = $teachers_result->fetch_all(MYSQLI_ASSOC);
+
+// ============================================
+// 3. GET COURSES
+// ============================================
+$courses_sql = "SELECT c.course_id as id, c.course_code, c.course_name, p.program_name 
+                FROM courses c 
+                LEFT JOIN programs p ON c.program_id = p.program_id 
+                ORDER BY c.course_code";
+$courses_result = $conn->query($courses_sql);
+$courses = $courses_result ? $courses_result->fetch_all(MYSQLI_ASSOC) : [];
+
+// ============================================
+// 4. HANDLE FORM SUBMISSION
+// ============================================
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $teacher_id = isset($_POST['teacher_id']) ? intval($_POST['teacher_id']) : 0;
+    $course_id = isset($_POST['course_id']) ? intval($_POST['course_id']) : 0;
+    $semester_id = isset($_POST['semester_id']) ? intval($_POST['semester_id']) : 0;
+    $assigned_date = date('Y-m-d');
+
+    if ($teacher_id == 0 || $course_id == 0 || $semester_id == 0) {
+        $error = "Please select a Teacher, Course, and Semester.";
+    } else {
+        // Check if already assigned
+        $check_sql = "SELECT * FROM teacher_assignments WHERE teacher_id = ? AND course_id = ? AND semester_id = ?";
+        $check_stmt = $conn->prepare($check_sql);
+        if ($check_stmt === false) {
+            $error = "Database error preparing check: " . $conn->error;
+        } else {
+            $check_stmt->bind_param("iii", $teacher_id, $course_id, $semester_id);
+            $check_stmt->execute();
+            $check_result = $check_stmt->get_result();
+
+            if ($check_result->num_rows > 0) {
+                $error = "This teacher is already assigned to this course for the selected semester.";
+            } else {
+                // Insert the assignment
+                $insert_sql = "INSERT INTO teacher_assignments (teacher_id, course_id, semester_id, assigned_date) VALUES (?, ?, ?, ?)";
+                $insert_stmt = $conn->prepare($insert_sql);
+                if ($insert_stmt === false) {
+                    $error = "Database error preparing insert: " . $conn->error;
+                } else {
+                    $insert_stmt->bind_param("iiis", $teacher_id, $course_id, $semester_id, $assigned_date);
+                    if ($insert_stmt->execute()) {
+                        $success = "Teacher successfully assigned to course!";
+                        // Reset form
+                        $teacher_id = 0; $course_id = 0; $semester_id = 0;
+                    } else {
+                        $error = "Error assigning teacher: " . $insert_stmt->error;
+                    }
+                    $insert_stmt->close();
+                }
+            }
+            $check_stmt->close();
+        }
+    }
+}
+
+// ============================================
+// HEADER & SIDEBAR
+// ============================================
 require_once __DIR__ . '/../includes/header.php';
-$page_title = 'Add Teacher';
+$page_title = 'Assign Teacher to Course';
 include __DIR__ . '/../includes/sidebar.php';
 ?>
 
-<div class="page-header">
-    <h4>Add New Teacher</h4>
-    <div class="page-header-actions">
-        <a href="index.php" class="btn btn-outline">Back to List</a>
+<div class="container-fluid">
+    <div class="page-header">
+        <h4><i class="fas fa-user-tie"></i> Assign Teacher to Course</h4>
+        <div class="page-header-actions">
+            <a href="index.php" class="btn btn-outline"><i class="fas fa-arrow-left"></i> Back</a>
+        </div>
     </div>
-</div>
 
-<?php if ($error): ?>
-    <div class="alert alert-error"><?= htmlspecialchars($error) ?></div>
-<?php endif; ?>
+    <?php if ($error): ?>
+        <div class="alert alert-error"><i class="fas fa-exclamation-circle"></i> <?= htmlspecialchars($error) ?></div>
+    <?php endif; ?>
+    <?php if ($success): ?>
+        <div class="alert alert-success"><i class="fas fa-check-circle"></i> <?= htmlspecialchars($success) ?></div>
+    <?php endif; ?>
 
-<?php if ($success): ?>
-    <div class="alert alert-success"><?= htmlspecialchars($success) ?></div>
-<?php endif; ?>
+    <div class="card">
+        <div class="card-body">
+            <form method="POST" action="">
+                <div class="row">
+                    <div class="col-md-4 mb-3">
+                        <label class="required-field">Select Teacher</label>
+                        <select name="teacher_id" class="form-select" required>
+                            <option value="0">-- Select Teacher --</option>
+                            <?php foreach ($teachers as $teacher): ?>
+                                <option value="<?= $teacher['id'] ?>" <?= (isset($teacher_id) && $teacher_id == $teacher['id']) ? 'selected' : '' ?>>
+                                    <!-- USING THE DETECTED NAME COLUMN HERE -->
+                                    <?= htmlspecialchars($teacher['name']) ?> 
+                                    <?= !empty($teacher['email']) ? '(' . htmlspecialchars($teacher['email']) . ')' : '' ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
 
-<div class="form-container">
-    <form method="POST" action="">
-        <div class="form-row">
-            <div class="form-group">
-                <label>Teacher Code <span class="required-star">*</span></label>
-                <input type="text" name="teacher_code" placeholder="e.g., TCH001" required value="<?= htmlspecialchars($_POST['teacher_code'] ?? '') ?>">
-                <div class="hint">Unique code for the teacher</div>
-            </div>
-            <div class="form-group">
-                <label>Teacher Name <span class="required-star">*</span></label>
-                <input type="text" name="teacher_name" placeholder="Full name" required value="<?= htmlspecialchars($_POST['teacher_name'] ?? '') ?>">
-            </div>
+                    <div class="col-md-4 mb-3">
+                        <label class="required-field">Select Course</label>
+                        <select name="course_id" class="form-select" required>
+                            <option value="0">-- Select Course --</option>
+                            <?php foreach ($courses as $course): ?>
+                                <option value="<?= $course['id'] ?>" <?= (isset($course_id) && $course_id == $course['id']) ? 'selected' : '' ?>>
+                                    <?= htmlspecialchars($course['course_code']) ?> - <?= htmlspecialchars($course['course_name']) ?>
+                                    <?= !empty($course['program_name']) ? '('.htmlspecialchars($course['program_name']).')' : '' ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+
+                    <div class="col-md-4 mb-3">
+                        <label class="required-field">Select Semester</label>
+                        <select name="semester_id" class="form-select" required>
+                            <option value="0">-- Select Semester --</option>
+                            <?php 
+                            // Fetch semesters dynamically
+                            $sem_sql = "SELECT semester_id as id, semester_name FROM semesters GROUP BY semester_name ORDER BY semester_name";
+                            $sem_res = $conn->query($sem_sql);
+                            if ($sem_res) {
+                                while($sem = $sem_res->fetch_assoc()) {
+                                    echo '<option value="' . $sem['id'] . '" ' . ((isset($semester_id) && $semester_id == $sem['id']) ? 'selected' : '') . '>' . htmlspecialchars($sem['semester_name']) . '</option>';
+                                }
+                            }
+                            ?>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary"><i class="fas fa-save"></i> Assign Teacher</button>
+                </div>
+            </form>
         </div>
-
-        <div class="form-row">
-            <div class="form-group">
-                <label>Email</label>
-                <input type="email" name="email" placeholder="teacher@example.com" value="<?= htmlspecialchars($_POST['email'] ?? '') ?>">
-                <div class="hint">Must be unique</div>
-            </div>
-            <div class="form-group">
-                <label>Phone</label>
-                <input type="text" name="phone" placeholder="e.g., 0300-1234567" value="<?= htmlspecialchars($_POST['phone'] ?? '') ?>">
-            </div>
-        </div>
-
-        <div class="form-row">
-            <div class="form-group">
-                <label>Department <span class="required-star">*</span></label>
-                <select name="department_id" required>
-                    <option value="">Select Department</option>
-                    <?php if (!empty($departments)): ?>
-                        <?php foreach($departments as $dept): ?>
-                            <option value="<?= $dept['department_id'] ?>" <?= (isset($_POST['department_id']) && $_POST['department_id'] == $dept['department_id']) ? 'selected' : '' ?>>
-                                <?= htmlspecialchars($dept['department_name']) ?>
-                            </option>
-                        <?php endforeach; ?>
-                    <?php else: ?>
-                        <option value="" disabled>No departments found</option>
-                    <?php endif; ?>
-                </select>
-            </div>
-            <div class="form-group">
-                <label>Specialization</label>
-                <input type="text" name="specialization" placeholder="e.g., Computer Science, Mathematics" value="<?= htmlspecialchars($_POST['specialization'] ?? '') ?>">
-                <div class="hint">Area of expertise</div>
-            </div>
-        </div>
-
-        <div class="form-group" style="max-width:280px;">
-            <label>Status</label>
-            <select name="status">
-                <option value="Active" <?= (isset($_POST['status']) && $_POST['status'] == 'Active') ? 'selected' : '' ?>>Active</option>
-                <option value="Inactive" <?= (isset($_POST['status']) && $_POST['status'] == 'Inactive') ? 'selected' : '' ?>>Inactive</option>
-            </select>
-        </div>
-
-        <div class="form-actions">
-            <button type="submit" class="btn btn-primary">Add Teacher</button>
-            <button type="reset" class="btn btn-outline">Reset</button>
-            <a href="index.php" class="btn btn-ghost">Cancel</a>
-        </div>
-    </form>
+    </div>
 </div>
 
 <?php include __DIR__ . '/../includes/footer.php'; ?>

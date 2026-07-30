@@ -1,6 +1,6 @@
 <?php
 if (!isset($_SESSION['user_id']) || empty($_SESSION['user_id'])) {
-    header('Location: /uni-mis-project/modules/admission/auth/login.php');
+    header('Location: /uni-mis-project/');
     exit();
 }
 
@@ -52,9 +52,6 @@ $userInitial = strtoupper(substr($userName, 0, 1));
             </a>
 
             <span class="nav-section-label">Finance & Awards</span>
-            <a class="<?= $current_folder === 'fees' ? 'active' : '' ?>" href="/uni-mis-project/modules/admission/fees/index.php">
-                Fees
-            </a>
             <a class="<?= $current_folder === 'scholarships' ? 'active' : '' ?>" href="/uni-mis-project/modules/admission/scholarships/index.php">
                 Scholarships
             </a>

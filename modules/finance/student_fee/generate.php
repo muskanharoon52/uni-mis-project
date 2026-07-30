@@ -3,8 +3,8 @@ $pageTitle = 'Generate Student Fee';
 include_once __DIR__ . '/../includes/header.php';
 require_once __DIR__ . '/../includes/lms_sync.php';
 
-if (!isset($_SESSION['user_id'])) { header('Location: /uni-mis-project/modules/sso/login.php'); exit(); }
-if ($_SESSION['role_id'] != 3 && $_SESSION['role_id'] != 1) { header('Location: /uni-mis-project/modules/sso/login.php?error=Access denied'); exit(); }
+if (!isset($_SESSION['user_id'])) { header('Location: /uni-mis-project/'); exit(); }
+if ($_SESSION['role_id'] != 3 && $_SESSION['role_id'] != 1) { header('Location: /uni-mis-project/'); exit(); }
 
 $error = '';
 $success = '';
@@ -36,7 +36,11 @@ if (isset($_GET['student_id']) && !empty($_GET['student_id'])) {
     }
 }
 
-$semester_result = mysqli_query($conn, "SELECT * FROM semesters ORDER BY semester_number");
+// ============================================
+// FIX: Remove duplicate semesters using GROUP BY
+// ============================================
+$semester_result = mysqli_query($conn, "SELECT * FROM semesters GROUP BY semester_name ORDER BY CAST(SUBSTRING_INDEX(semester_name, ' ', -1) AS UNSIGNED)");
+
 $session_result = mysqli_query($conn, "SELECT * FROM sessions WHERE status = 'Active' ORDER BY session_name");
 $fee_heads_result = mysqli_query($conn, "SELECT fee_head_id, fee_head_name, description FROM fee_heads WHERE status = 'Active' AND deleted_at IS NULL ORDER BY fee_head_name");
 
@@ -242,7 +246,11 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['generate_fee'])) {
                     <label>Semester <span style="color:var(--danger);">*</span></label>
                     <select name="semester_id" required>
                         <option value="">Select Semester</option>
-                        <?php while ($row = mysqli_fetch_assoc($semester_result)): ?>
+                        <?php 
+                        // Reset the result pointer
+                        mysqli_data_seek($semester_result, 0);
+                        while ($row = mysqli_fetch_assoc($semester_result)): 
+                        ?>
                             <option value="<?= $row['semester_id'] ?>"><?= htmlspecialchars($row['semester_name']) ?></option>
                         <?php endwhile; ?>
                     </select>

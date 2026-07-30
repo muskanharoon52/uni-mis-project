@@ -19,7 +19,7 @@ function isSSO() {
 
 function requireLogin() {
     if (!isLoggedIn()) {
-        header('Location: ' . BASE_URL . 'modules/sso/login.php');
+        header('Location: /uni-mis-project/');
         exit;
     }
 }
@@ -91,6 +91,37 @@ function loginUser($username, $password) {
     return false;
 }
 
+// ============================================
+// ROLE-BASED REDIRECTION
+// ============================================
+function dashboardUrlForRole() {
+    $role = strtolower($_SESSION['role_name'] ?? '');
+    $base = '/uni-mis-project/';
+
+    switch ($role) {
+        case 'super admin':
+        case 'admin':
+            return $base . 'dashboard.php';
+        case 'admission officer':
+            return $base . 'modules/admission/index.php';
+        case 'finance officer':
+            return $base . 'modules/finance/dashboard.php';
+        case 'examiner':
+            return $base . 'examination/dashboard.php';
+        case 'teacher':
+            return $base . 'modules/lms/public/dashboard.php';
+        case 'student':
+            return $base . 'modules/lms/student/dashboard.php';
+        default:
+            return $base . 'dashboard.php';
+    }
+}
+
+function redirectToDashboard() {
+    header('Location: ' . dashboardUrlForRole());
+    exit;
+}
+
 function loginUserById($loginId, $password) {
     $conn = getConnection();
     $loginId = mysqli_real_escape_string($conn, $loginId);
@@ -136,7 +167,7 @@ function loginUserById($loginId, $password) {
 
 function logoutUser() {
     session_destroy();
-    header('Location: ' . BASE_URL . 'modules/sso/login.php');
+    header('Location: /uni-mis-project/');
     exit;
 }
 ?>

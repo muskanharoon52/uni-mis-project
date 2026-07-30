@@ -12,7 +12,7 @@ require_once __DIR__ . '/config/db_connect.php';
 require_once __DIR__ . '/modules/sso/includes/auth.php';
 
 if (!isLoggedIn()) {
-    header('Location: modules/sso/login.php');
+    header('Location: /uni-mis-project/');
     exit;
 }
 
@@ -136,6 +136,148 @@ $displayName = $user['full_name'] ?? 'SSO Admin';
     <div style="text-align:right;">
         <div style="font-size:.78rem;color:#fff;opacity:.85;"><?= date('l') ?></div>
         <div style="font-size:1.1rem;font-weight:600;color:#fff;"><?= date('d M Y') ?></div>
+    </div>
+</div>
+
+<!-- Internals Marks -->
+<div class="panel" style="margin-bottom:24px;">
+    <h3 style="margin-bottom:16px;font-size:15px;font-weight:600;color:var(--navy);">Internals Marks (Published)</h3>
+    <div class="table-responsive">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Student</th>
+                    <th>Course</th>
+                    <th>Exam</th>
+                    <th>Marks</th>
+                    <th>Grade</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                <?php
+                $internalsQuery = "SELECT er.student_id, s.full_name AS student_name, er.exam_id, es.exam_type, c.course_code, er.marks_obtained, er.total_marks, er.grade, er.status
+                                   FROM exam_results er
+                                   JOIN students s ON er.student_id = s.student_id
+                                   LEFT JOIN exam_schedules es ON er.exam_id = es.exam_id
+                                   LEFT JOIN courses c ON es.course_id = c.course_id
+                                   WHERE er.status = 'published'
+                                   ORDER BY er.result_id DESC LIMIT 10";
+                $internalsResult = mysqli_query($conn, $internalsQuery);
+                if ($internalsResult && mysqli_num_rows($internalsResult) > 0):
+                    while ($row = mysqli_fetch_assoc($internalsResult)):
+                ?>
+                <tr>
+                    <td><strong><?= htmlspecialchars($row['student_name'] ?? 'N/A') ?></strong><br><small style="color:var(--text-secondary);">ID: <?= $row['student_id'] ?></small></td>
+                    <td><?= htmlspecialchars($row['course_code'] ?? 'N/A') ?></td>
+                    <td><span class="status-badge" style="background:var(--warning-bg);color:var(--warning);border:1px solid var(--warning-border);"><?= ucfirst($row['exam_type'] ?? 'N/A') ?></span></td>
+                    <td><strong><?= $row['marks_obtained'] ?></strong> / <?= $row['total_marks'] ?></td>
+                    <td><span class="status-badge badge-grade-<?= $row['grade'] ?? 'F' ?>"><?= $row['grade'] ?? 'N/A' ?></span></td>
+                    <td><span class="status-badge" style="background:var(--success-bg);color:var(--success);border:1px solid var(--success-border);">Published</span></td>
+                </tr>
+                <?php
+                    endwhile;
+                else:
+                ?>
+                <tr><td colspan="6" style="text-align:center;padding:20px;color:var(--text-secondary);">No published exam results found.</td></tr>
+                <?php endif; ?>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Attendance Summary -->
+<div class="panel" style="margin-bottom:24px;">
+    <h3 style="margin-bottom:16px;font-size:15px;font-weight:600;color:var(--navy);">Recent Attendance</h3>
+    <div class="table-responsive">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Student</th>
+                    <th>Course</th>
+                    <th>Date</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                <?php
+                $attQuery = "SELECT a.student_id, s.full_name AS student_name, c.course_code, a.class_date, a.status
+                             FROM attendance a
+                             JOIN students s ON a.student_id = s.student_id
+                             LEFT JOIN courses c ON a.course_id = c.course_id
+                             ORDER BY a.class_date DESC, a.student_id
+                             LIMIT 15";
+                $attResult = mysqli_query($conn, $attQuery);
+                if ($attResult && mysqli_num_rows($attResult) > 0):
+                    while ($row = mysqli_fetch_assoc($attResult)):
+                        $statusColor = $row['status'] === 'Present' ? 'var(--success)' : ($row['status'] === 'Absent' ? 'var(--danger)' : 'var(--warning)');
+                        $statusBg = $row['status'] === 'Present' ? 'var(--success-bg)' : ($row['status'] === 'Absent' ? 'var(--danger-bg)' : 'var(--warning-bg)');
+                        $statusBorder = $row['status'] === 'Present' ? 'var(--success-border)' : ($row['status'] === 'Absent' ? 'var(--danger-border)' : 'var(--warning-border)');
+                ?>
+                <tr>
+                    <td><strong><?= htmlspecialchars($row['student_name'] ?? 'N/A') ?></strong><br><small style="color:var(--text-secondary);">ID: <?= $row['student_id'] ?></small></td>
+                    <td><?= htmlspecialchars($row['course_code'] ?? 'N/A') ?></td>
+                    <td><?= $row['class_date'] ?></td>
+                    <td><span class="status-badge" style="background:<?= $statusBg ?>;color:<?= $statusColor ?>;border:1px solid <?= $statusBorder ?>;"><?= $row['status'] ?></span></td>
+                </tr>
+                <?php
+                    endwhile;
+                else:
+                ?>
+                <tr><td colspan="4" style="text-align:center;padding:20px;color:var(--text-secondary);">No attendance records found.</td></tr>
+                <?php endif; ?>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Fee Records -->
+<div class="panel" style="margin-bottom:24px;">
+    <h3 style="margin-bottom:16px;font-size:15px;font-weight:600;color:var(--navy);">Fee Records</h3>
+    <div class="table-responsive">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Student</th>
+                    <th>Total Fee</th>
+                    <th>Paid</th>
+                    <th>Remaining</th>
+                    <th>Method</th>
+                    <th>Date</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                <?php
+                $feeQuery = "SELECT fr.student_id, fr.total_fee, fr.paid_amount, fr.remaining_amount, fr.payment_method, fr.payment_date, fr.status
+                             FROM fee_records fr
+                             ORDER BY fr.fee_id DESC
+                             LIMIT 10";
+                $feeResult = mysqli_query($conn, $feeQuery);
+                if ($feeResult && mysqli_num_rows($feeResult) > 0):
+                    while ($row = mysqli_fetch_assoc($feeResult)):
+                        $payStatus = !empty($row['status']) ? ucfirst($row['status']) : (($row['remaining_amount'] <= 0) ? 'Paid' : (($row['paid_amount'] > 0) ? 'Partial' : 'Unpaid'));
+                        $payColor = $payStatus === 'Paid' ? 'var(--success)' : ($payStatus === 'Partial' ? 'var(--warning)' : 'var(--danger)');
+                        $payBg = $payStatus === 'Paid' ? 'var(--success-bg)' : ($payStatus === 'Partial' ? 'var(--warning-bg)' : 'var(--danger-bg)');
+                        $payBorder = $payStatus === 'Paid' ? 'var(--success-border)' : ($payStatus === 'Partial' ? 'var(--warning-border)' : 'var(--danger-border)');
+                ?>
+                <tr>
+                    <td><strong><?= htmlspecialchars($row['student_id'] ?? 'N/A') ?></strong></td>
+                    <td>PKR <?= number_format((float)$row['total_fee']) ?></td>
+                    <td>PKR <?= number_format((float)$row['paid_amount']) ?></td>
+                    <td>PKR <?= number_format((float)$row['remaining_amount']) ?></td>
+                    <td><?= htmlspecialchars($row['payment_method'] ?? 'N/A') ?></td>
+                    <td><?= $row['payment_date'] ?? 'N/A' ?></td>
+                    <td><span class="status-badge" style="background:<?= $payBg ?>;color:<?= $payColor ?>;border:1px solid <?= $payBorder ?>;"><?= $payStatus ?></span></td>
+                </tr>
+                <?php
+                    endwhile;
+                else:
+                ?>
+                <tr><td colspan="7" style="text-align:center;padding:20px;color:var(--text-secondary);">No fee records found.</td></tr>
+                <?php endif; ?>
+            </tbody>
+        </table>
     </div>
 </div>
 

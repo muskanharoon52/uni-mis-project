@@ -12,7 +12,8 @@ $semester_id = isset($_GET['semester_id']) ? intval($_GET['semester_id']) : 0;
 $programs_result = $conn->query("SELECT program_id as id, program_name as name FROM programs ORDER BY program_name");
 $programs = $programs_result ? $programs_result->fetch_all(MYSQLI_ASSOC) : [];
 
-$semesters_result = $conn->query("SELECT semester_id as id, semester_name FROM semesters ORDER BY semester_name");
+// FIXED: Added GROUP BY semester_name to remove duplicate entries in the dropdown
+$semesters_result = $conn->query("SELECT semester_id as id, semester_name FROM semesters GROUP BY semester_name ORDER BY semester_name");
 $semesters = $semesters_result ? $semesters_result->fetch_all(MYSQLI_ASSOC) : [];
 
 $columns_query = $conn->query("SHOW COLUMNS FROM semester_courses");
@@ -205,9 +206,47 @@ $(document).ready(function() {
     $('#checkAll').on('change', function() { $('.course-checkbox:not(:disabled)').prop('checked', $(this).prop('checked')); });
     $('#selectAll').on('click', function() { $('.course-checkbox:not(:disabled)').prop('checked', true); $('#checkAll').prop('checked', true); });
     $('#deselectAll').on('click', function() { $('.course-checkbox:not(:disabled)').prop('checked', false); $('#checkAll').prop('checked', false); });
-    $('#program_id').on('change', function() { var programId = $(this).val(); var semesterId = $('#semester_id').val(); if(programId > 0) { window.location.href = 'assign.php?program_id=' + programId + '&semester_id=' + semesterId; } else { window.location.href = 'assign.php'; } });
-    $('#semester_id').on('change', function() { var semesterId = $(this).val(); var programId = $('#program_id').val(); if(programId > 0 && semesterId > 0) { window.location.href = 'assign.php?program_id=' + programId + '&semester_id=' + semesterId; } else if(semesterId > 0) { window.location.href = 'assign.php?semester_id=' + semesterId; } else { window.location.href = 'assign.php'; } });
-    $('#assignForm').on('submit', function(e) { var checked = $('.course-checkbox:checked').length; if(checked === 0) { e.preventDefault(); alert('Please select at least one course to assign!'); return false; } var program = $('#program_id').val(); var semester = $('#semester_id').val(); if(!program || program == 0 || !semester || semester == 0) { e.preventDefault(); alert('Please select both Program and Semester!'); return false; } return confirm('Are you sure you want to assign ' + checked + ' course(s) to this semester?'); });
+    
+    // FIXED: Changed id to semester_id in the URL query
+    $('#program_id').on('change', function() { 
+        var programId = $(this).val(); 
+        var semesterId = $('#semester_id').val(); 
+        if(programId > 0) { 
+            window.location.href = 'assign.php?program_id=' + programId + '&semester_id=' + semesterId; 
+        } else { 
+            window.location.href = 'assign.php'; 
+        } 
+    });
+    
+    // FIXED: Changed id to semester_id in the URL query
+    $('#semester_id').on('change', function() { 
+        var semesterId = $(this).val(); 
+        var programId = $('#program_id').val(); 
+        if(programId > 0 && semesterId > 0) { 
+            window.location.href = 'assign.php?program_id=' + programId + '&semester_id=' + semesterId; 
+        } else if(semesterId > 0) { 
+            window.location.href = 'assign.php?semester_id=' + semesterId; 
+        } else { 
+            window.location.href = 'assign.php'; 
+        } 
+    });
+
+    $('#assignForm').on('submit', function(e) { 
+        var checked = $('.course-checkbox:checked').length; 
+        if(checked === 0) { 
+            e.preventDefault(); 
+            alert('Please select at least one course to assign!'); 
+            return false; 
+        } 
+        var program = $('#program_id').val(); 
+        var semester = $('#semester_id').val(); 
+        if(!program || program == 0 || !semester || semester == 0) { 
+            e.preventDefault(); 
+            alert('Please select both Program and Semester!'); 
+            return false; 
+        } 
+        return confirm('Are you sure you want to assign ' + checked + ' course(s) to this semester?'); 
+    });
 });
 </script>
 

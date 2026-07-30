@@ -14,6 +14,21 @@ $activePage = 'exams';
 $teacher = current_user();
 $teacherId = (int) ($teacher['teacher_id'] ?? 0);
 
+// ============================================
+// FIX: Ensure we have a valid teacher_id from the teachers table
+// ============================================
+if ($teacherId === 0) {
+    // If the logged-in user isn't linked to a teacher, try to fetch the first active teacher
+    $fallbackTeacher = $db->query("SELECT teacher_id FROM teachers WHERE status = 'Active' LIMIT 1")->fetch();
+    if ($fallbackTeacher) {
+        $teacherId = (int) $fallbackTeacher['teacher_id'];
+    } else {
+        // If there are no teachers at all, show a readable error instead of a crash
+        die("Error: No active teachers found in the database. Please add a teacher to the 'teachers' table first.");
+    }
+}
+// ============================================
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = $_POST['action'] ?? 'create';
 
@@ -152,195 +167,222 @@ require __DIR__ . '/includes/header.php';
         <div class="alert alert-success" style="margin-bottom:18px;"><?= e($message) ?></div>
     <?php endif; ?>
 
-    <div class="card" style="margin-bottom: 24px;">
-        <form method="post">
-            <input type="hidden" name="action" value="create">
-            <input type="hidden" name="exam_id" value="<?= e((string) old($form, 'exam_id', '')) ?>">
+    <div class="grid-2">
 
-            <h3 style="margin:0 0 4px;"><?= $form['exam_id'] ? 'Edit Exam' : 'Register New Exam' ?></h3>
-            <p class="small" style="margin:0 0 16px;">Define the exam structure, marks, and behaviour.</p>
+        <div class="form-card">
+            <h3 style="margin:0 0 4px;"><?= $form['exam_id'] ? 'Edit Exam' : 'Create Exam' ?></h3>
+            <p class="small" style="margin:0 0 4px;">Define the exam structure. After saving, map questions and schedule it for students.</p>
 
-            <div class="form-group-title">Basic Info</div>
-            <div class="form-grid">
-                <div class="field">
-                    <label>Exam Code <span class="small">(auto-generated)</span></label>
-                    <input type="text" name="exam_code" required value="<?= e((string) old($form, 'exam_code')) ?>" placeholder="Auto-generated">
-                </div>
-                <div class="field">
-                    <label>Title</label>
-                    <input type="text" name="title" required value="<?= e((string) old($form, 'title')) ?>" placeholder="e.g. Midterm Quiz - OS">
-                </div>
-                <div class="field">
-                    <label>Course</label>
-                    <select name="course_id" required>
-                        <option value="">Select course</option>
-                        <?php foreach ($courses as $course): ?>
-                            <option value="<?= (int) $course['course_id'] ?>" <?= (string) old($form, 'course_id') === (string) $course['course_id'] ? 'selected' : '' ?>>
+            <form method="post">
+                <input type="hidden" name="exam_id" value="<?= e((string) old($form, 'exam_id', '')) ?>">
+
+                <div class="form-group-title">Basic Info</div>
+                <div class="form-grid">
+                    <div class="field">
+                        <label>Exam Code</label>
+                        <input type="text" name="exam_code" required value="<?= e((string) old($form, 'exam_code')) ?>" placeholder="Auto-generated if empty">
+                    </div>
+                    <div class="field">
+                        <label>Title</label>
+                        <input type="text" name="title" required value="<?= e((string) old($form, 'title')) ?>" placeholder="e.g. Midterm CS101">
+                    </div>
+                    <div class="field">
+                        <label>Course</label>
+                        <select name="course_id" required>
+                            <option value="">Select course</option>
+                            <?php foreach ($courses as $course): ?>
+                                <option value="<?= (int) $course['course_id'] ?>" <?= (string) old($form, 'course_id') === (string) $course['course_id'] ? 'selected' : '' ?>>
                                     <?= e($course['course_code']) ?> &mdash; <?= e($course['course_title']) ?>
-                            </option>
-                        <?php endforeach; ?>
-                        <?php if (empty($courses)): ?>
-                            <option value="" disabled>No courses available. Please add courses first.</option>
-                        <?php endif; ?>
-                    </select>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
+                    <div class="field">
+                        <label>Type</label>
+                        <select name="exam_type" required>
+                            <?php foreach (['Quiz','Mid','Final','Practice','Assignment Test'] as $t): ?>
+                                <option value="<?= $t ?>" <?= (string) old($form, 'exam_type') === $t ? 'selected' : '' ?>><?= $t ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
                 </div>
-                <div class="field">
-                    <label>Exam Type</label>
-                    <select name="exam_type" required>
-                        <?php foreach (['Quiz', 'Mid', 'Final', 'Practice', 'Assignment Test'] as $type): ?>
-                            <option value="<?= e($type) ?>" <?= old($form, 'exam_type') === $type ? 'selected' : '' ?>><?= e($type) ?></option>
-                        <?php endforeach; ?>
-                    </select>
-                </div>
-                <div class="field">
-                    <label>Status</label>
-                    <select name="status" required>
-                        <?php foreach (['Draft', 'Published', 'Closed', 'Archived'] as $status): ?>
-                            <option value="<?= e($status) ?>" <?= old($form, 'status') === $status ? 'selected' : '' ?>><?= e($status) ?></option>
-                        <?php endforeach; ?>
-                    </select>
-                </div>
-            </div>
 
-            <div class="form-group-title">Marks & Time</div>
-            <div class="form-grid">
-                <div class="field">
-                    <label>Duration (minutes)</label>
-                    <input type="number" min="1" name="duration_minutes" required value="<?= e((string) old($form, 'duration_minutes')) ?>">
+                <div class="form-group-title">Structure</div>
+                <div class="form-grid">
+                    <div class="field">
+                        <label>Duration (min)</label>
+                        <input type="number" name="duration_minutes" required min="1" value="<?= e((string) old($form, 'duration_minutes', '60')) ?>">
+                    </div>
+                    <div class="field">
+                        <label>Total Questions</label>
+                        <input type="number" name="total_questions" required min="1" value="<?= e((string) old($form, 'total_questions', '20')) ?>">
+                    </div>
+                    <div class="field">
+                        <label>Total Marks</label>
+                        <input type="number" name="total_marks" required min="1" step="0.5" value="<?= e((string) old($form, 'total_marks', '20')) ?>">
+                    </div>
+                    <div class="field">
+                        <label>Passing Marks</label>
+                        <input type="number" name="passing_marks" required min="0" step="0.5" value="<?= e((string) old($form, 'passing_marks', '10')) ?>">
+                    </div>
+                    <div class="field">
+                        <label>Selection Mode</label>
+                        <select name="selection_mode" required>
+                            <option value="Manual" <?= (string) old($form, 'selection_mode') === 'Manual' ? 'selected' : '' ?>>Manual</option>
+                            <option value="Random" <?= (string) old($form, 'selection_mode') === 'Random' ? 'selected' : '' ?>>Random</option>
+                        </select>
+                    </div>
+                    <div class="field">
+                        <label>Negative Marking</label>
+                        <input type="number" name="negative_marking" min="0" step="0.25" value="<?= e((string) old($form, 'negative_marking', '0')) ?>">
+                    </div>
                 </div>
-                <div class="field">
-                    <label>Total Questions</label>
-                    <input type="number" min="1" name="total_questions" required value="<?= e((string) old($form, 'total_questions')) ?>">
-                </div>
-                <div class="field">
-                    <label>Total Marks</label>
-                    <input type="number" min="0" step="0.5" name="total_marks" required value="<?= e((string) old($form, 'total_marks')) ?>">
-                </div>
-                <div class="field">
-                    <label>Passing Marks</label>
-                    <input type="number" min="0" step="0.5" name="passing_marks" required value="<?= e((string) old($form, 'passing_marks')) ?>">
-                </div>
-                <div class="field">
-                    <label>Negative Marking</label>
-                    <input type="number" min="0" step="0.25" name="negative_marking" value="<?= e((string) old($form, 'negative_marking')) ?>" placeholder="0">
-                </div>
-                <div class="field">
-                    <label>Selection Mode</label>
-                    <select name="selection_mode" required>
-                        <?php foreach (['Manual', 'Random'] as $mode): ?>
-                            <option value="<?= e($mode) ?>" <?= old($form, 'selection_mode') === $mode ? 'selected' : '' ?>><?= e($mode) ?></option>
-                        <?php endforeach; ?>
-                    </select>
-                </div>
-            </div>
 
-            <div class="form-group-title">Options</div>
-            <div class="form-grid">
-                <div class="field" style="display:flex; align-items:center; gap:8px;">
-                    <input type="checkbox" name="shuffle_questions" id="shuffle_questions" <?= old($form, 'shuffle_questions') ? 'checked' : '' ?>>
-                    <label for="shuffle_questions" style="margin:0;">Shuffle Questions</label>
+                <div class="form-group-title">Options</div>
+                <div class="form-grid">
+                    <div class="field">
+                        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;">
+                            <input type="checkbox" name="shuffle_questions" value="1" <?= (int) old($form, 'shuffle_questions', 0) ? 'checked' : '' ?>>
+                            Shuffle Questions
+                        </label>
+                    </div>
+                    <div class="field">
+                        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;">
+                            <input type="checkbox" name="shuffle_options" value="1" <?= (int) old($form, 'shuffle_options', 0) ? 'checked' : '' ?>>
+                            Shuffle Options
+                        </label>
+                    </div>
+                    <div class="field">
+                        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;">
+                            <input type="checkbox" name="allow_review" value="1" <?= (int) old($form, 'allow_review', 1) ? 'checked' : '' ?>>
+                            Allow Review
+                        </label>
+                    </div>
+                    <div class="field">
+                        <label>Status</label>
+                        <select name="status" required>
+                            <?php foreach (['Draft','Published','Closed','Archived'] as $s): ?>
+                                <option value="<?= $s ?>" <?= (string) old($form, 'status') === $s ? 'selected' : '' ?>><?= $s ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                    </div>
                 </div>
-                <div class="field" style="display:flex; align-items:center; gap:8px;">
-                    <input type="checkbox" name="shuffle_options" id="shuffle_options" <?= old($form, 'shuffle_options') ? 'checked' : '' ?>>
-                    <label for="shuffle_options" style="margin:0;">Shuffle Options</label>
-                </div>
-                <div class="field" style="display:flex; align-items:center; gap:8px;">
-                    <input type="checkbox" name="allow_review" id="allow_review" <?= old($form, 'allow_review') ? 'checked' : '' ?>>
-                    <label for="allow_review" style="margin:0;">Allow Review Before Submit</label>
-                </div>
-            </div>
 
-            <div class="form-group-title">Instructions <span class="small">(optional)</span></div>
-            <div class="form-grid">
-                <div class="field" style="grid-column:1 / -1;">
-                    <textarea name="instructions" style="min-height:80px;" placeholder="e.g. Answer all questions. Each MCQ carries 1 mark."><?= e((string) old($form, 'instructions')) ?></textarea>
+                <div class="field" style="margin-top:8px;">
+                    <label>Instructions (optional)</label>
+                    <textarea name="instructions" rows="3" placeholder="Exam instructions for students..."><?= e((string) old($form, 'instructions')) ?></textarea>
+                </div>
+
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary"><?= $form['exam_id'] ? 'Update Exam' : 'Create Exam' ?></button>
+                    <?php if ($form['exam_id']): ?>
+                        <a class="btn btn-ghost" href="exams.php">Cancel</a>
+                    <?php endif; ?>
+                </div>
+            </form>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <h3>Exam Overview</h3>
+            </div>
+            <div style="padding:20px;">
+                <?php
+                $draftCount = 0;
+                $publishedCount = 0;
+                $totalCount = count($exams);
+                foreach ($exams as $ex) {
+                    if ($ex['status'] === 'Draft') $draftCount++;
+                    elseif ($ex['status'] === 'Published') $publishedCount++;
+                }
+                ?>
+                <div style="display:flex; gap:12px; flex-wrap:wrap; margin-bottom:20px;">
+                    <div style="flex:1; min-width:60px; text-align:center; padding:14px 8px; border-radius:10px; background:var(--bg-panel); border:1px solid var(--border);">
+                        <div style="font-size:1.5rem; font-weight:700; color:var(--text-strong);"><?= $totalCount ?></div>
+                        <div class="small" style="margin-top:2px;">Total</div>
+                    </div>
+                    <div style="flex:1; min-width:60px; text-align:center; padding:14px 8px; border-radius:10px; background:var(--bg-panel); border:1px solid var(--border);">
+                        <div style="font-size:1.5rem; font-weight:700; color:var(--success);"><?= $publishedCount ?></div>
+                        <div class="small" style="margin-top:2px;">Published</div>
+                    </div>
+                    <div style="flex:1; min-width:60px; text-align:center; padding:14px 8px; border-radius:10px; background:var(--bg-panel); border:1px solid var(--border);">
+                        <div style="font-size:1.5rem; font-weight:700; color:var(--warning);"><?= $draftCount ?></div>
+                        <div class="small" style="margin-top:2px;">Draft</div>
+                    </div>
+                </div>
+                <div style="margin-top:16px;">
+                    <h4 style="margin:0 0 10px; font-size:0.85rem; color:var(--text-muted);">Quick Links</h4>
+                    <div style="display:flex; flex-direction:column; gap:8px;">
+                        <a href="question-bank.php" class="btn btn-ghost" style="justify-content:flex-start;">&#128218; Question Bank</a>
+                        <a href="exam-questions.php" class="btn btn-ghost" style="justify-content:flex-start;">&#128450; Map Questions to Exams</a>
+                        <a href="exam-schedule.php" class="btn btn-ghost" style="justify-content:flex-start;">&#128197; Schedule Exams</a>
+                    </div>
                 </div>
             </div>
+        </div>
 
-            <div class="actions" style="margin-top:18px;">
-                <button class="btn btn-primary" type="submit"><?= $form['exam_id'] ? 'Update Exam' : 'Register Exam' ?></button>
-                <?php if ($form['exam_id']): ?>
-                    <a class="btn btn-ghost" href="exams.php">Cancel</a>
-                <?php endif; ?>
-            </div>
-        </form>
     </div>
 
     <div class="table-card page-section">
-        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
-            <div>
-                <h3 style="margin:0 0 4px;">Registered Exams</h3>
-                <p class="small" style="margin:0 0 16px;">All your exam definitions. Add questions via <a href="question-bank.php">Question Bank</a> and map them via <a href="exam-questions.php">Manual Mapping</a>.</p>
-            </div>
-        </div>
+        <h3 style="margin:0 0 4px;">Exam Registry</h3>
+        <p class="small" style="margin:0 0 16px;">All exams stored in <strong>university_mis</strong>.</p>
         <div class="table-wrapper">
             <table>
                 <thead>
                     <tr>
                         <th>Code</th>
                         <th>Title</th>
+                        <th>Course</th>
                         <th>Type</th>
-                        <th>Duration</th>
-                        <th>Marks</th>
                         <th>Questions</th>
-                        <th>Mapped</th>
-                        <th>Schedules</th>
+                        <th>Marks</th>
                         <th>Status</th>
                         <th>Actions</th>
                     </tr>
                 </thead>
                 <tbody>
                 <?php if (empty($exams)): ?>
-                    <tr>
-                        <td colspan="10">
-                            <div class="empty-state">
-                                <span class="empty-icon">&#128233;</span>
-                                <p>No exams registered yet.</p>
-                            </div>
-                        </td>
-                    </tr>
+                    <tr><td colspan="8">
+                        <div class="empty-state">
+                            <span class="empty-icon">&#128233;</span>
+                            <p>No exams yet. Create one using the form.</p>
+                        </div>
+                    </td></tr>
                 <?php else: ?>
-                    <?php foreach ($exams as $exam): ?>
+                    <?php foreach ($exams as $ex): ?>
                         <tr>
-                            <td><span class="badge badge-manual"><?= e($exam['exam_code']) ?></span></td>
-                            <td style="font-weight:600; color:var(--text-strong);"><?= e($exam['title']) ?></td>
-                            <td class="small"><?= e($exam['exam_type']) ?></td>
-                            <td class="small"><?= (int) $exam['duration_minutes'] ?>m</td>
-                            <td class="small"><?= number_format((float) $exam['total_marks'], 1) ?></td>
-                            <td class="small"><?= (int) $exam['total_questions'] ?></td>
+                            <td><span class="badge badge-manual"><?= e($ex['exam_code']) ?></span></td>
+                            <td class="small fw-700"><?= e(mb_strimwidth($ex['title'], 0, 30, '...')) ?></td>
+                            <td class="small"><?= e($ex['course_code'] ?? 'N/A') ?></td>
+                            <td class="small"><?= e($ex['exam_type']) ?></td>
                             <td class="small">
-                                <?php
-                                $mapped = (int) $exam['mapped_questions'];
-                                $required = (int) $exam['total_questions'];
-                                if ($required > 0 && $mapped >= $required) {
-                                    echo '<span class="badge active">' . $mapped . '/' . $required . '</span>';
-                                } elseif ($mapped > 0) {
-                                    echo '<span class="badge draft">' . $mapped . '/' . $required . '</span>';
-                                } else {
-                                    echo '<span class="badge inactive">0/' . $required . '</span>';
-                                }
-                                ?>
+                                <?= (int) $ex['mapped_questions'] ?> mapped
+                                <?php if ((int) $ex['mapped_questions'] === 0): ?>
+                                    <span style="color:var(--danger);font-size:.7rem;">&#9888;</span>
+                                <?php endif; ?>
                             </td>
-                            <td class="small"><?= (int) $exam['schedule_count'] ?></td>
-                            <td><span class="badge badge-<?= e(strtolower($exam['status'])) ?>"><?= e($exam['status']) ?></span></td>
+                            <td class="small"><?= e(number_format((float) $ex['total_marks'], 1)) ?></td>
+                            <td><span class="badge badge-<?= e(strtolower($ex['status'])) ?>"><?= e($ex['status']) ?></span></td>
                             <td>
-                                <div class="actions" style="gap:4px;">
-                                    <a class="btn btn-ghost btn-sm" href="?edit=<?= (int) $exam['exam_id'] ?>">Edit</a>
-                                    <a class="btn btn-ghost btn-sm" href="exam-questions.php?exam_id=<?= (int) $exam['exam_id'] ?>">Map Qs</a>
-                                    <?php if ($exam['status'] === 'Draft'): ?>
-                                        <?php if ((int) $exam['mapped_questions'] === 0): ?>
-                                            <span class="btn btn-ghost btn-sm" style="opacity:0.5; cursor:not-allowed;" title="Map questions first">Publish</span>
-                                        <?php else: ?>
-                                            <form method="post" style="display:inline; margin:0;">
-                                                <input type="hidden" name="action" value="publish">
-                                                <input type="hidden" name="exam_id" value="<?= (int) $exam['exam_id'] ?>">
-                                                <button class="btn btn-primary btn-sm" type="submit">Publish</button>
-                                            </form>
-                                        <?php endif; ?>
+                                <div class="actions">
+                                    <a class="btn btn-ghost btn-sm" href="?edit=<?= (int) $ex['exam_id'] ?>">Edit</a>
+                                    <?php if ($ex['status'] === 'Draft' && (int) $ex['mapped_questions'] > 0): ?>
+                                        <form method="post" style="display:inline; margin:0;">
+                                            <input type="hidden" name="action" value="publish">
+                                            <input type="hidden" name="exam_id" value="<?= (int) $ex['exam_id'] ?>">
+                                            <button class="btn btn-primary btn-sm" type="submit">Publish</button>
+                                        </form>
                                     <?php endif; ?>
-                                    <form method="post" style="display:inline; margin:0;" onsubmit="return confirm('Delete this exam and all its questions/schedules?');">
+                                    <?php if ($ex['status'] !== 'Archived'): ?>
+                                        <form method="post" style="display:inline; margin:0;" onsubmit="return confirm('Archive this exam?');">
+                                            <input type="hidden" name="action" value="archive">
+                                            <input type="hidden" name="exam_id" value="<?= (int) $ex['exam_id'] ?>">
+                                            <button class="btn btn-ghost btn-sm" type="submit">Archive</button>
+                                        </form>
+                                    <?php endif; ?>
+                                    <form method="post" style="display:inline; margin:0;" onsubmit="return confirm('Delete this exam?');">
                                         <input type="hidden" name="action" value="delete">
-                                        <input type="hidden" name="exam_id" value="<?= (int) $exam['exam_id'] ?>">
+                                        <input type="hidden" name="exam_id" value="<?= (int) $ex['exam_id'] ?>">
                                         <button class="btn btn-danger btn-sm" type="submit">Delete</button>
                                     </form>
                                 </div>

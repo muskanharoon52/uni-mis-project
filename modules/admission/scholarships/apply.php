@@ -4,10 +4,10 @@ $page_title = 'Apply Scholarship';
 include __DIR__ . '/../includes/header.php';
 
 // ============================================
-// FIX: Updated queries to match actual table structure
+// FETCH DATA FOR DROPDOWNS
 // ============================================
 
-// Get students - using correct table name and columns
+// Get students from the correct 'students' table
 $students = $pdo->query("
     SELECT s.student_id, s.full_name, s.program_id, s.batch_year,
            d.department_name 
@@ -17,7 +17,7 @@ $students = $pdo->query("
     ORDER BY s.full_name
 ")->fetchAll();
 
-// Get scholarships - removed 'deadline' column and used correct column names
+// Get scholarships - use 'scholarship_id' because that is your Primary Key!
 $scholarships = $pdo->query("
     SELECT scholarship_id, scholarship_name, scholarship_type, 
            percentage, amount, status 
@@ -27,14 +27,12 @@ $scholarships = $pdo->query("
 ")->fetchAll();
 
 // ============================================
-// FIX: Check if fee_amount column exists in departments
+// CHECK FOR FEE COLUMN IN DEPARTMENTS
 // ============================================
 $check_column = $pdo->query("SHOW COLUMNS FROM departments LIKE 'fee_amount'");
 $has_fee_amount = $check_column->rowCount() > 0;
 
-// If no fee_amount, check for other possible column names
 if (!$has_fee_amount) {
-    // Try to find any fee-related column
     $columns = $pdo->query("SHOW COLUMNS FROM departments")->fetchAll(PDO::FETCH_COLUMN);
     $fee_column = null;
     foreach ($columns as $col) {
@@ -45,13 +43,16 @@ if (!$has_fee_amount) {
     }
 }
 
+// ============================================
+// HANDLE FORM SUBMISSION
+// ============================================
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     try {
         $student_id = $_POST['student_id'];
         $scholarship_id = $_POST['scholarship_id'];
         $marks_obtained = floatval($_POST['marks_obtained']);
         $total_marks = floatval($_POST['total_marks']);
-        $percentage = ($total_marks > 0) ? ($marks_obtained / $total_marks) * 100 : 0;
+        $percentage = ($total_marks > 0) ? (floatval($marks_obtained) / floatval($total_marks)) * 100 : 0;
         
         // Check if already applied
         $check = $pdo->prepare("SELECT * FROM admission_scholarship_applications WHERE student_id = ? AND scholarship_id = ?");
@@ -68,13 +69,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $student_data = $student->fetch();
         
         // ============================================
-        // FIX: Get fee amount dynamically
+        // GET FEE AMOUNT DYNAMICALLY
         // ============================================
         $fee_amount = 50000; // Default fee
         
         if ($student_data && $student_data['program_id']) {
             if ($has_fee_amount) {
-                // If fee_amount column exists
                 $fee = $pdo->prepare("SELECT fee_amount FROM departments WHERE department_id = ?");
                 $fee->execute([$student_data['program_id']]);
                 $fee_data = $fee->fetch();
@@ -82,7 +82,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $fee_amount = $fee_data['fee_amount'];
                 }
             } elseif ($fee_column) {
-                // If another fee-related column exists
                 $fee = $pdo->prepare("SELECT $fee_column FROM departments WHERE department_id = ?");
                 $fee->execute([$student_data['program_id']]);
                 $fee_data = $fee->fetch();
@@ -92,7 +91,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         }
         
-        // Calculate scholarship using the function from database.php
+        // Calculate scholarship using helper function from database.php
+        // NOTE: Your helper function needs to be valid or this will fail.
         $scholarship_result = calculateScholarship($percentage, $fee_amount);
         
         $data = [
@@ -107,18 +107,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'status' => 'Pending'
         ];
         
-        $sql = "INSERT INTO admission_scholarship_applications SET ";
-        $set_parts = [];
-        foreach ($data as $key => $value) {
-            $set_parts[] = "$key = :$key";
-        }
-        $sql .= implode(", ", $set_parts);
+        // Using standard INSERT syntax for maximum database compatibility
+        $sql = "INSERT INTO admission_scholarship_applications 
+                (student_id, scholarship_id, marks_obtained, total_marks, percentage, scholarship_percentage, scholarship_amount, fee_after_scholarship, status) 
+                VALUES 
+                (:student_id, :scholarship_id, :marks_obtained, :total_marks, :percentage, :scholarship_percentage, :scholarship_amount, :fee_after_scholarship, :status)";
         
         $stmt = $pdo->prepare($sql);
         if ($stmt->execute($data)) {
             setFlash('success', 
                 'Scholarship application submitted! Percentage: ' . number_format($percentage, 2) . '% | Scholarship: ' . $scholarship_result['label']
             );
+            // Redirect to index.php to see the new application
             header('Location: index.php');
             exit();
         }
@@ -177,6 +177,7 @@ if ($flash): ?>
                     <select name="scholarship_id" required id="scholarshipSelect">
                         <option value="">-- Select Scholarship --</option>
                         <?php foreach($scholarships as $s): ?>
+                        <!-- FIXED: Use scholarship_id instead of id -->
                         <option value="<?= $s['scholarship_id'] ?>">
                             <?= htmlspecialchars($s['scholarship_name']) ?> 
                             (<?= htmlspecialchars($s['scholarship_type'] ?? 'Merit') ?>)

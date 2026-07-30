@@ -149,22 +149,9 @@ if ($flash): ?>
     </div>
 </div>
 
-<!-- Quick Actions -->
-<div class="card" style="margin-bottom:24px;">
-    <div class="card-header">
-        <div><h3>Quick Actions</h3><p>Common tasks and module shortcuts</p></div>
-    </div>
-    <div class="card-content">
-        <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:12px;">
-            <a href="applications/add.php" class="btn btn-primary" style="justify-content:center;"><i class="fas fa-file-plus"></i><span style="margin-top:4px;">New Application</span></a>
-            <a href="students/add.php" class="btn btn-success" style="justify-content:center;"><i class="fas fa-user-plus"></i><span style="margin-top:4px;">Add Student</span></a>
-            <a href="scholarships/add.php" class="btn btn-primary" style="justify-content:center;"><i class="fas fa-award"></i><span style="margin-top:4px;">Add Scholarship</span></a>
-            <a href="fees/index.php" class="btn btn-primary" style="justify-content:center;"><i class="fas fa-money-bill-wave"></i><span style="margin-top:4px;">Fee Management</span></a>
-            <a href="reports/index.php" class="btn btn-danger" style="justify-content:center;"><i class="fas fa-chart-bar"></i><span style="margin-top:4px;">Reports</span></a>
-            <a href="settings/index.php" class="btn btn-outline" style="justify-content:center;"><i class="fas fa-cog"></i><span style="margin-top:4px;">Settings</span></a>
-        </div>
-    </div>
-</div>
+<!-- ********************* -->
+<!-- QUICK ACTIONS SECTION WAS DELETED FROM HERE -->
+<!-- ********************* -->
 
 <!-- Recent Applications Table -->
 <div class="card" style="margin-bottom:24px;">

@@ -69,8 +69,8 @@ if (isset($_GET['edit'])) {
     if ($row) { $form = array_merge($form, $row); }
 }
 
-$rows          = $db->query('SELECT * FROM sbe_student_answers ORDER BY student_answer_id DESC LIMIT 50')->fetchAll();
-$attempts      = $db->query('SELECT student_exam_id, exam_id, student_id FROM sbe_student_exams ORDER BY student_exam_id DESC')->fetchAll();
+$rows          = $db->query('SELECT sa.*, s.full_name AS student_name FROM sbe_student_answers sa INNER JOIN sbe_student_exams se ON se.student_exam_id = sa.student_exam_id INNER JOIN students s ON s.student_id = se.student_id ORDER BY sa.student_answer_id DESC LIMIT 50')->fetchAll();
+$attempts      = $db->query('SELECT se.student_exam_id, se.exam_id, se.student_id, s.full_name AS student_name FROM sbe_student_exams se INNER JOIN students s ON s.student_id = se.student_id ORDER BY se.student_exam_id DESC')->fetchAll();
 $questions     = $db->query('SELECT question_id, topic, question_text FROM sbe_question_bank ORDER BY question_id DESC')->fetchAll();
 $correctCount  = (int) $db->query('SELECT COUNT(*) FROM sbe_student_answers WHERE is_correct = 1')->fetchColumn();
 $answeredCount = (int) $db->query('SELECT COUNT(*) FROM sbe_student_answers WHERE answered_at IS NOT NULL')->fetchColumn();
@@ -112,7 +112,7 @@ require __DIR__ . '/includes/header.php';
                             <option value="">Select attempt</option>
                             <?php foreach ($attempts as $attempt): ?>
                                 <option value="<?= (int) $attempt['student_exam_id'] ?>" <?= (string) old($form, 'student_exam_id') === (string) $attempt['student_exam_id'] ? 'selected' : '' ?>>
-                                    Attempt #<?= (int) $attempt['student_exam_id'] ?> &middot; Exam #<?= (int) $attempt['exam_id'] ?> &middot; Student #<?= (int) $attempt['student_id'] ?>
+                                    Attempt #<?= (int) $attempt['student_exam_id'] ?> &middot; Exam #<?= (int) $attempt['exam_id'] ?> &middot; <?= e($attempt['student_name']) ?>
                                 </option>
                             <?php endforeach; ?>
                         </select>

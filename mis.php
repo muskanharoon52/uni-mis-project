@@ -42,15 +42,15 @@ session_start();
         <ul class="navbar-nav">
             <li><a href="index.php">Home</a></li>
             <li><a href="examination/index.php">Examination</a></li>
-            <li><a href="modules/sso/login.php">SSO</a></li>
-            <li><a href="modules/finance/login.php">Finance</a></li>
+            <li><a href="/uni-mis-project/">SSO</a></li>
+            <li><a href="/uni-mis-project/">Finance</a></li>
         </ul>
     </nav>
     <div class="container">
         <h1>Management Information System</h1>
         <p class="subtitle">Select a module to access</p>
         <div class="module-grid">
-            <a href="modules/sso/login.php" class="module-card">
+            <a href="/uni-mis-project/" class="module-card">
                 <h2><span class="icon icon-sso">&#128274;</span> SSO Authentication</h2>
                 <p>Single Sign-On login for all modules. Manage user roles and authentication.</p>
                 <span class="badge badge-active">Active</span>
@@ -60,7 +60,7 @@ session_start();
                 <p>Exam scheduling, result management, grading, and semester promotions.</p>
                 <span class="badge badge-active">Active</span>
             </a>
-            <a href="modules/finance/login.php" class="module-card">
+            <a href="/uni-mis-project/" class="module-card">
                 <h2><span class="icon icon-finance">&#128176;</span> Finance</h2>
                 <p>Fee management, payment tracking, receipts, scholarship handling.</p>
                 <span class="badge badge-active">Active</span>

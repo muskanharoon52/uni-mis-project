@@ -10,7 +10,7 @@ if (!function_exists('isLoggedIn')) {
 }
 
 if (!isLoggedIn()) {
-    header('Location: ../modules/sso/login.php');
+    header('Location: /uni-mis-project/');
     exit;
 }
 

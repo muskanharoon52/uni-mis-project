@@ -46,7 +46,6 @@ if ($flash): ?>
         <h4><i class="fas fa-user-graduate"></i> Enrolled Students Directory (<?= count($students) ?>)</h4>
     </div>
     <div class="page-header-actions">
-        <a href="add.php" class="btn btn-primary"><i class="fas fa-user-plus"></i> Add Student</a>
     </div>
 </div>
 

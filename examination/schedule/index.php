@@ -7,6 +7,9 @@ include '../includes/sidebar.php';
 
 $model = new ExamSchedule();
 $schedules = $model->getAll();
+
+// Get the ID to highlight
+$highlight_id = isset($_GET['highlight']) ? intval($_GET['highlight']) : 0;
 ?>
 
 <div class="content-area" id="contentArea">
@@ -55,7 +58,8 @@ $schedules = $model->getAll();
                         </thead>
                         <tbody>
                             <?php foreach ($schedules as $schedule): ?>
-                                <tr>
+                                <tr id="row-<?php echo $schedule['exam_id']; ?>" 
+                                    style="<?php echo ($highlight_id == $schedule['exam_id']) ? 'background-color: #fff3cd; border-left: 4px solid #ffc107;' : ''; ?>">
                                     <td>
                                         <strong><?php echo htmlspecialchars($schedule['course_code']); ?></strong><br>
                                         <span class="muted"><?php echo htmlspecialchars($schedule['course_name']); ?></span>
@@ -103,5 +107,17 @@ $schedules = $model->getAll();
         </div>
     </div>
 </div>
+
+<script>
+// Auto-scroll to the highlighted row when the page loads
+document.addEventListener("DOMContentLoaded", function() {
+    <?php if ($highlight_id > 0): ?>
+        var row = document.getElementById("row-<?php echo $highlight_id; ?>");
+        if (row) {
+            row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+    <?php endif; ?>
+});
+</script>
 
 <?php include '../includes/footer.php'; ?>

@@ -77,7 +77,7 @@ if (isset($_GET['edit'])) {
     if ($row) { $form = array_merge($form, $row); }
 }
 
-$attempts     = $db->query('SELECT * FROM sbe_student_exams ORDER BY student_exam_id DESC LIMIT 50')->fetchAll();
+$attempts     = $db->query('SELECT se.*, s.full_name AS student_name FROM sbe_student_exams se INNER JOIN students s ON s.student_id = se.student_id ORDER BY se.student_exam_id DESC LIMIT 50')->fetchAll();
 $schedules    = $db->query('SELECT es.schedule_id, es.exam_id, e.exam_code, es.section, es.exam_date FROM sbe_exam_schedule es INNER JOIN sbe_exams e ON e.exam_id = es.exam_id ORDER BY es.schedule_id DESC')->fetchAll();
 $statusCounts = $db->query('SELECT status, COUNT(*) AS total FROM sbe_student_exams GROUP BY status')->fetchAll();
 
@@ -227,7 +227,7 @@ require __DIR__ . '/includes/header.php';
                         <th>Attempt</th>
                         <th>Schedule</th>
                         <th>Exam ID</th>
-                        <th>Student ID</th>
+                        <th>Student</th>
                         <th>Status</th>
                         <th>Marks</th>
                         <th>Actions</th>
@@ -247,7 +247,7 @@ require __DIR__ . '/includes/header.php';
                             <td class="small">#<?= (int) $attempt['attempt_no'] ?></td>
                             <td class="small">Sched #<?= (int) $attempt['schedule_id'] ?></td>
                             <td class="small">Exam #<?= (int) $attempt['exam_id'] ?></td>
-                            <td class="small">Student #<?= (int) $attempt['student_id'] ?></td>
+                            <td class="small"><?= e($attempt['student_name']) ?></td>
                             <td><span class="badge badge-<?= e(strtolower($attempt['status'])) ?>"><?= e($attempt['status']) ?></span></td>
                             <td class="fw-700"><?= e(number_format((float) ($attempt['obtained_marks'] ?? 0), 2)) ?></td>
                             <td>

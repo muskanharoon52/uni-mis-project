@@ -6,7 +6,7 @@ require_once __DIR__ . '/../modules/sso/includes/auth.php';
 
 // Check if logged in
 if (!isLoggedIn()) {
-    header('Location: ../modules/sso/login.php');
+    header('Location: /uni-mis-project/');
     exit;
 }
 

@@ -8,7 +8,7 @@ require_once __DIR__ . '/../config/db_connect.php';
 require_once __DIR__ . '/../modules/sso/includes/auth.php';
 
 if (!isLoggedIn()) {
-    header('Location: ' . BASE_URL . 'modules/sso/login.php');
+    header('Location: /uni-mis-project/');
     exit;
 }
 

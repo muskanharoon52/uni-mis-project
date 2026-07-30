@@ -10,7 +10,7 @@ if (!function_exists('isLoggedIn')) {
 }
 
 if (!isLoggedIn()) {
-    header('Location: ../modules/sso/login.php');
+    header('Location: /uni-mis-project/');
     exit;
 }
 
@@ -36,14 +36,20 @@ $dept_query = "SELECT department_id as id, department_name as name FROM departme
 $dept_result = $conn->query($dept_query);
 $departments = $dept_result ? $dept_result->fetch_all(MYSQLI_ASSOC) : [];
 
+// Get semesters for dropdown (FIX: To satisfy Foreign Key constraint)
+$sem_query = "SELECT semester_id as id, semester_name as name FROM semesters ORDER BY semester_name";
+$sem_result = $conn->query($sem_query);
+$semesters = $sem_result ? $sem_result->fetch_all(MYSQLI_ASSOC) : [];
+
 // Handle form submission
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $course_code = strtoupper(trim($_POST['course_code'] ?? ''));
     $course_name = trim($_POST['course_name'] ?? '');
     $credit_hours = (int)($_POST['credit_hours'] ?? 3);
     $program_id = (int)($_POST['program_id'] ?? 0);
-    // Convert 0 to NULL for department_id
     $department_id = !empty($_POST['department_id']) && $_POST['department_id'] != 0 ? (int)$_POST['department_id'] : NULL;
+    // FIX: Get semester_id from dropdown
+    $semester_id = !empty($_POST['semester_id']) && $_POST['semester_id'] != 0 ? (int)$_POST['semester_id'] : NULL; 
     $description = trim($_POST['description'] ?? '');
 
     // Validation
@@ -51,6 +57,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (empty($course_name)) $errors[] = "Course title is required";
     if ($credit_hours < 1 || $credit_hours > 6) $errors[] = "Credit hours must be between 1 and 6";
     if (empty($program_id) || $program_id == 0) $errors[] = "Program is required";
+    
+    // FIX: Add validation for Semester since your DB requires it
+    if (empty($semester_id) || $semester_id == 0) $errors[] = "Semester is required";
 
     // Check if course code already exists
     if (empty($errors)) {
@@ -82,6 +91,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $values = ['?', '?', '?', '?'];
         $params = [$course_code, $course_name, $credit_hours, $program_id];
         $types = "ssii";
+        
+        if (in_array('semester_id', $course_columns)) {
+            $fields[] = 'semester_id';
+            $values[] = '?';
+            $params[] = $semester_id;
+            $types .= "i";
+        }
         
         if (in_array('department_id', $course_columns)) {
             $fields[] = 'department_id';
@@ -229,7 +245,23 @@ include __DIR__ . '/../includes/sidebar.php';
                             <?php endforeach; ?>
                         </select>
                     </div>
+                    
+                    <!-- NEW: Semester Dropdown to fix the foreign key error -->
                     <div class="col-md-6 mb-3">
+                        <label class="required-field">Semester</label>
+                        <select name="semester_id" class="form-select" required>
+                            <option value="0">Select Semester</option>
+                            <?php foreach ($semesters as $sem): ?>
+                                <option value="<?php echo $sem['id']; ?>" 
+                                    <?php echo ($_POST['semester_id'] ?? 0) == $sem['id'] ? 'selected' : ''; ?>>
+                                    <?php echo htmlspecialchars($sem['name']); ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                        <small class="text-muted">Select the semester this course belongs to</small>
+                    </div>
+
+                    <div class="col-md-12 mb-3">
                         <label>Department</label>
                         <select name="department_id" class="form-select">
                             <option value="">Select Department (Optional)</option>

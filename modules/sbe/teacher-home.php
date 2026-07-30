@@ -28,9 +28,9 @@ $avgScore = $db->query("SELECT AVG(percentage) FROM sbe_student_exams WHERE stat
 $avgScoreVal = $avgScore !== null ? round((float) $avgScore, 1) : 0.0;
 $passRate = $submittedAttempts > 0 ? round(($db->query("SELECT COUNT(*) FROM sbe_student_exams WHERE pass_fail_status = 'Pass' AND status IN ('Submitted','Auto Submitted')")->fetchColumn() / $submittedAttempts) * 100) : 0;
 
-$recentResults = $db->query('SELECT er.obtained_marks, er.total_marks, er.percentage, er.pass_fail_status, er.published_at, se.student_id, e.exam_code, e.title FROM sbe_exam_results er INNER JOIN sbe_student_exams se ON se.student_exam_id = er.student_exam_id INNER JOIN sbe_exams e ON e.exam_id = er.exam_id ORDER BY er.published_at DESC LIMIT 6')->fetchAll();
+$recentResults = $db->query('SELECT er.obtained_marks, er.total_marks, er.percentage, er.pass_fail_status, er.published_at, se.student_id, s.full_name AS student_name, e.exam_code, e.title FROM sbe_exam_results er INNER JOIN sbe_student_exams se ON se.student_exam_id = er.student_exam_id INNER JOIN students s ON s.student_id = se.student_id INNER JOIN sbe_exams e ON e.exam_id = er.exam_id ORDER BY er.published_at DESC LIMIT 6')->fetchAll();
 
-$topStudents = $db->query('SELECT se.student_id, ROUND(AVG(se.percentage),1) AS avg_pct, COUNT(*) AS attempts FROM sbe_student_exams se WHERE se.status IN (\'Submitted\',\'Auto Submitted\') GROUP BY se.student_id ORDER BY avg_pct DESC LIMIT 5')->fetchAll();
+$topStudents = $db->query('SELECT se.student_id, s.full_name AS student_name, ROUND(AVG(se.percentage),1) AS avg_pct, COUNT(*) AS attempts FROM sbe_student_exams se INNER JOIN students s ON s.student_id = se.student_id WHERE se.status IN (\'Submitted\',\'Auto Submitted\') GROUP BY se.student_id, s.full_name ORDER BY avg_pct DESC LIMIT 5')->fetchAll();
 
 $upcomingSchedules = $db->query('SELECT es.schedule_id, es.exam_date, es.start_time, es.location, es.section, es.status, e.exam_code, e.title FROM sbe_exam_schedule es INNER JOIN sbe_exams e ON e.exam_id = es.exam_id WHERE es.exam_date >= CURDATE() ORDER BY es.exam_date ASC, es.start_time ASC LIMIT 5')->fetchAll();
 
@@ -138,7 +138,7 @@ require __DIR__ . '/includes/header.php';
                                 <?= $i + 1 ?>
                             </div>
                             <div style="flex:1; min-width:0;">
-                                <div style="font-weight:600; font-size:0.88rem; color:var(--text-strong);">Student #<?= (int) $student['student_id'] ?></div>
+                                <div style="font-weight:600; font-size:0.88rem; color:var(--text-strong);"><?= e($student['student_name']) ?></div>
                                 <div class="small" style="color:var(--text-muted);"><?= (int) $student['attempts'] ?> attempt(s)</div>
                             </div>
                             <div style="text-align:right;">
@@ -168,7 +168,7 @@ require __DIR__ . '/includes/header.php';
                     <?php else: ?>
                         <?php foreach ($recentResults as $r): ?>
                             <tr>
-                                <td class="small fw-700">#<?= (int) $r['student_id'] ?></td>
+                                <td class="small fw-700"><?= e($r['student_name']) ?></td>
                                 <td><span class="badge manual"><?= e($r['exam_code']) ?></span> <span class="small"><?= e(mb_strimwidth($r['title'],0,20,'...')) ?></span></td>
                                 <td class="fw-700"><?= number_format((float) $r['percentage'], 1) ?>%</td>
                                 <td><span class="badge <?= e(strtolower($r['pass_fail_status'])) ?>"><?= e($r['pass_fail_status']) ?></span></td>

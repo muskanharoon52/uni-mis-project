@@ -3,7 +3,7 @@ require_once __DIR__ . '/../config/db_connect.php';
 require_once __DIR__ . '/../modules/sso/includes/auth.php';
 
 if (!function_exists('isLoggedIn')) { die("isLoggedIn() function not found in auth.php"); }
-if (!isLoggedIn()) { header('Location: ../modules/sso/login.php'); exit; }
+if (!isLoggedIn()) { header('Location: /uni-mis-project/'); exit; }
 
 $conn = getConnection();
 $error = '';

@@ -6,12 +6,12 @@ if (session_status() === PHP_SESSION_NONE) {
 include_once __DIR__ . '/../../../config/db_connect.php';
 
 if (!isset($_SESSION['user_id'])) {
-    header('Location: /uni-mis-project/modules/sso/login.php');
+    header('Location: /uni-mis-project/');
     exit();
 }
 
 if ($_SESSION['role_id'] != 3 && $_SESSION['role_id'] != 1) {
-    header('Location: /uni-mis-project/modules/sso/login.php');
+    header('Location: /uni-mis-project/');
     exit();
 }
 

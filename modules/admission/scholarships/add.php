@@ -4,15 +4,11 @@ $page_title = 'Add Scholarship';
 include __DIR__ . '/../includes/header.php';
 
 $error = '';
-$success = '';
-
-// Get students for dropdown
-$students = $pdo->query("SELECT student_id, full_name FROM students ORDER BY full_name")->fetchAll();
 
 // Get users for approved_by dropdown
 $users = $pdo->query("SELECT user_id, full_name FROM users ORDER BY full_name")->fetchAll();
 
-// Get semesters for dropdown (remove duplicates)
+// Get semesters for dropdown
 $semesters = $pdo->query("SELECT semester_id, semester_name FROM semesters GROUP BY semester_name ORDER BY CAST(SUBSTRING_INDEX(semester_name, ' ', -1) AS UNSIGNED)")->fetchAll();
 
 // Get sessions for dropdown
@@ -20,8 +16,6 @@ $sessions = $pdo->query("SELECT session_id, session_name FROM sessions ORDER BY 
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     try {
-        // Get form data matching your table columns
-        $student_id = !empty($_POST['student_id']) ? intval($_POST['student_id']) : null;
         $application_id = !empty($_POST['application_id']) ? intval($_POST['application_id']) : null;
         $scholarship_type = trim($_POST['scholarship_type'] ?? 'Merit');
         $description = trim($_POST['description'] ?? '');
@@ -31,29 +25,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $duration = trim($_POST['duration'] ?? '');
         $semester_id = !empty($_POST['semester_id']) ? intval($_POST['semester_id']) : null;
         $session_id = !empty($_POST['session_id']) ? intval($_POST['session_id']) : null;
-        $status = $_POST['status'] ?? 'Pending';
+        
+        // Force status to 'Active' so it shows on index.php immediately
+        $status = 'Active'; 
         $application_status = $_POST['application_status'] ?? 'Submitted';
         
-        // ============================================
-        // FIX: Handle approved_by properly
-        // ============================================
         $approved_by = !empty($_POST['approved_by']) ? intval($_POST['approved_by']) : null;
         $approved_date = !empty($_POST['approved_date']) ? $_POST['approved_date'] : null;
         $rejection_reason = trim($_POST['rejection_reason'] ?? '');
         $remarks = trim($_POST['remarks'] ?? '');
         
-        // Validation
         if (empty($scholarship_name)) {
             throw new Exception('Scholarship name is required.');
         }
         
-        if (empty($student_id)) {
-            throw new Exception('Student is required.');
-        }
-        
-        // ============================================
-        // FIX: Validate approved_by exists in users table
-        // ============================================
         if (!empty($approved_by)) {
             $check_user = $pdo->prepare("SELECT user_id FROM users WHERE user_id = ?");
             $check_user->execute([$approved_by]);
@@ -62,9 +47,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         }
         
-        // Prepare the insert statement with all columns
+        // NOTE: student_id has been completely removed from this insert
         $sql = "INSERT INTO admission_scholarships SET 
-                student_id = :student_id,
                 application_id = :application_id,
                 scholarship_type = :scholarship_type,
                 description = :description,
@@ -84,7 +68,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $stmt = $pdo->prepare($sql);
         
         $stmt->execute([
-            'student_id' => $student_id,
             'application_id' => $application_id,
             'scholarship_type' => $scholarship_type,
             'description' => $description,
@@ -127,61 +110,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 <div class="form-container">
     <form method="post">
-        <!-- Student Information -->
-        <h6 style="font-size:.92rem;font-weight:700;color:var(--navy);margin-bottom:16px;padding-bottom:8px;border-bottom:1px solid var(--border);">
-            <i class="fas fa-user-graduate"></i> Student Information
-        </h6>
-        
-        <div class="form-row">
-            <div class="form-group">
-                <label>Student *</label>
-                <select name="student_id" required>
-                    <option value="">-- Select Student --</option>
-                    <?php foreach($students as $student): ?>
-                    <option value="<?= $student['student_id'] ?>" 
-                            <?= ($_POST['student_id'] ?? '') == $student['student_id'] ? 'selected' : '' ?>>
-                        <?= htmlspecialchars($student['full_name']) ?>
-                    </option>
-                    <?php endforeach; ?>
-                </select>
-            </div>
-            <div class="form-group">
-                <label>Application ID</label>
-                <input type="number" name="application_id" 
-                       value="<?= htmlspecialchars($_POST['application_id'] ?? '') ?>"
-                       placeholder="Optional">
-            </div>
-        </div>
-        
-        <div class="form-row">
-            <div class="form-group">
-                <label>Semester</label>
-                <select name="semester_id">
-                    <option value="">-- Select Semester --</option>
-                    <?php foreach($semesters as $sem): ?>
-                    <option value="<?= $sem['semester_id'] ?>"
-                            <?= ($_POST['semester_id'] ?? '') == $sem['semester_id'] ? 'selected' : '' ?>>
-                        <?= htmlspecialchars($sem['semester_name']) ?>
-                    </option>
-                    <?php endforeach; ?>
-                </select>
-            </div>
-            <div class="form-group">
-                <label>Session</label>
-                <select name="session_id">
-                    <option value="">-- Select Session --</option>
-                    <?php foreach($sessions as $sess): ?>
-                    <option value="<?= $sess['session_id'] ?>"
-                            <?= ($_POST['session_id'] ?? '') == $sess['session_id'] ? 'selected' : '' ?>>
-                        <?= htmlspecialchars($sess['session_name']) ?>
-                    </option>
-                    <?php endforeach; ?>
-                </select>
-            </div>
-        </div>
-        
         <!-- Scholarship Details -->
-        <h6 style="font-size:.92rem;font-weight:700;color:var(--navy);margin-top:20px;margin-bottom:16px;padding-bottom:8px;border-bottom:1px solid var(--border);">
+        <h6 style="font-size:.92rem;font-weight:700;color:var(--navy);margin-bottom:16px;padding-bottom:8px;border-bottom:1px solid var(--border);">
             <i class="fas fa-award"></i> Scholarship Details
         </h6>
         
@@ -230,66 +160,41 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                        placeholder="e.g., 1 Year, 2 Semesters">
             </div>
         </div>
-        
-        <!-- Status Information -->
+
         <h6 style="font-size:.92rem;font-weight:700;color:var(--navy);margin-top:20px;margin-bottom:16px;padding-bottom:8px;border-bottom:1px solid var(--border);">
-            <i class="fas fa-info-circle"></i> Status Information
+            <i class="fas fa-calendar-alt"></i> Academic Period
         </h6>
-        
         <div class="form-row">
             <div class="form-group">
-                <label>Status</label>
-                <select name="status">
-                    <option value="Pending" <?= ($_POST['status'] ?? '') == 'Pending' ? 'selected' : '' ?>>Pending</option>
-                    <option value="Approved" <?= ($_POST['status'] ?? '') == 'Approved' ? 'selected' : '' ?>>Approved</option>
-                    <option value="Rejected" <?= ($_POST['status'] ?? '') == 'Rejected' ? 'selected' : '' ?>>Rejected</option>
-                    <option value="Active" <?= ($_POST['status'] ?? '') == 'Active' ? 'selected' : '' ?>>Active</option>
-                    <option value="Expired" <?= ($_POST['status'] ?? '') == 'Expired' ? 'selected' : '' ?>>Expired</option>
-                    <option value="Cancelled" <?= ($_POST['status'] ?? '') == 'Cancelled' ? 'selected' : '' ?>>Cancelled</option>
-                </select>
-            </div>
-            <div class="form-group">
-                <label>Application Status</label>
-                <select name="application_status">
-                    <option value="Submitted" <?= ($_POST['application_status'] ?? '') == 'Submitted' ? 'selected' : '' ?>>Submitted</option>
-                    <option value="UnderReview" <?= ($_POST['application_status'] ?? '') == 'UnderReview' ? 'selected' : '' ?>>Under Review</option>
-                    <option value="Approved" <?= ($_POST['application_status'] ?? '') == 'Approved' ? 'selected' : '' ?>>Approved</option>
-                    <option value="Rejected" <?= ($_POST['application_status'] ?? '') == 'Rejected' ? 'selected' : '' ?>>Rejected</option>
-                    <option value="Granted" <?= ($_POST['application_status'] ?? '') == 'Granted' ? 'selected' : '' ?>>Granted</option>
-                    <option value="Denied" <?= ($_POST['application_status'] ?? '') == 'Denied' ? 'selected' : '' ?>>Denied</option>
-                </select>
-            </div>
-        </div>
-        
-        <div class="form-row">
-            <div class="form-group">
-                <label>Approved By</label>
-                <select name="approved_by">
-                    <option value="">-- Select Approver --</option>
-                    <?php foreach($users as $user): ?>
-                    <option value="<?= $user['user_id'] ?>"
-                            <?= ($_POST['approved_by'] ?? '') == $user['user_id'] ? 'selected' : '' ?>>
-                        <?= htmlspecialchars($user['full_name']) ?>
+                <label>Semester</label>
+                <select name="semester_id">
+                    <option value="">-- Select Semester --</option>
+                    <?php foreach($semesters as $sem): ?>
+                    <option value="<?= $sem['semester_id'] ?>"
+                            <?= ($_POST['semester_id'] ?? '') == $sem['semester_id'] ? 'selected' : '' ?>>
+                        <?= htmlspecialchars($sem['semester_name']) ?>
                     </option>
                     <?php endforeach; ?>
                 </select>
-                <small style="color: var(--text-muted); font-size: 0.8rem;">Leave empty if not approved yet</small>
             </div>
             <div class="form-group">
-                <label>Approved Date</label>
-                <input type="date" name="approved_date" 
-                       value="<?= htmlspecialchars($_POST['approved_date'] ?? '') ?>">
+                <label>Session</label>
+                <select name="session_id">
+                    <option value="">-- Select Session --</option>
+                    <?php foreach($sessions as $sess): ?>
+                    <option value="<?= $sess['session_id'] ?>"
+                            <?= ($_POST['session_id'] ?? '') == $sess['session_id'] ? 'selected' : '' ?>>
+                        <?= htmlspecialchars($sess['session_name']) ?>
+                    </option>
+                    <?php endforeach; ?>
+                </select>
             </div>
-        </div>
-        
-        <div class="form-group">
-            <label>Rejection Reason</label>
-            <textarea name="rejection_reason" rows="2" placeholder="If rejected, provide reason"><?= htmlspecialchars($_POST['rejection_reason'] ?? '') ?></textarea>
-        </div>
-        
-        <div class="form-group">
-            <label>Remarks</label>
-            <textarea name="remarks" rows="2" placeholder="Additional remarks"><?= htmlspecialchars($_POST['remarks'] ?? '') ?></textarea>
+            <div class="form-group">
+                <label>Application ID</label>
+                <input type="number" name="application_id" 
+                       value="<?= htmlspecialchars($_POST['application_id'] ?? '') ?>"
+                       placeholder="Optional">
+            </div>
         </div>
         
         <div class="form-actions">

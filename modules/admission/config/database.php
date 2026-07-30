@@ -31,7 +31,7 @@ function isLoggedIn() {
 
 function requireLogin() {
     if (!isLoggedIn()) {
-        header('Location: /uni-mis-project/modules/sso/login.php');
+        header('Location: /uni-mis-project/');
         exit();
     }
 }

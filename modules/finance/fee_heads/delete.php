@@ -1,11 +1,11 @@
 <?php
 session_start();
 if (!isset($_SESSION['user_id'])) {
-    header('Location: /uni-mis-project/modules/sso/login.php');
+    header('Location: /uni-mis-project/');
     exit();
 }
 if ($_SESSION['role_id'] != 3 && $_SESSION['role_id'] != 1) {
-    header('Location: /uni-mis-project/modules/sso/login.php?error=Access denied');
+    header('Location: /uni-mis-project/');
     exit();
 }
 

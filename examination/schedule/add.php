@@ -1,13 +1,11 @@
 <?php
 $page_title = 'Add Exam Schedule';
+
 require_once '../../config/db_connect.php';
 require_once '../models/ExamSchedule.php';
-include '../includes/header.php';
-include '../includes/sidebar.php';
 
 $conn = getConnection();
 $model = new ExamSchedule();
-
 $courses = $conn->query("SELECT course_id, course_code, course_name FROM courses ORDER BY course_name");
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -20,16 +18,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         'room' => $_POST['room']
     ];
     
-    if ($model->add($data)) {
-        $_SESSION['success'] = "Exam schedule added successfully!";
+    // DEBUG: We use a try/catch block to force the error to show
+    try {
+        if ($model->add($data)) {
+            $new_id = $conn->insert_id;
+            $_SESSION['success'] = "Exam schedule added successfully!";
+            header("Location: index.php?highlight=" . $new_id);
+            exit();
+        } else {
+            // If the model returns false, we capture the specific database error
+            throw new Exception("The model's add() method returned false. Check your ExamSchedule.php file.");
+        }
+    } catch (Exception $e) {
+        // Instead of silently failing, we print the error on the screen!
+        $_SESSION['error'] = "DATABASE ERROR: " . $e->getMessage();
         header("Location: index.php");
         exit();
-    } else {
-        $_SESSION['error'] = "Failed to add exam schedule. Please check for conflicts.";
     }
 }
 
-$conn->close();
+include '../includes/header.php';
+include '../includes/sidebar.php';
 ?>
 
 <div class="content-area" id="contentArea">
@@ -43,12 +52,6 @@ $conn->close();
             </a>
         </div>
     </div>
-
-    <?php if (isset($_SESSION['error'])): ?>
-        <div class="alert alert-error">
-            <?php echo $_SESSION['error']; unset($_SESSION['error']); ?>
-        </div>
-    <?php endif; ?>
 
     <div class="form-container">
         <form method="POST" id="scheduleForm">
@@ -110,11 +113,9 @@ $conn->close();
 document.getElementById('scheduleForm').addEventListener('submit', function(e) {
     const startTime = document.getElementById('start_time').value;
     const endTime = document.getElementById('end_time').value;
-    
     if (startTime && endTime && startTime >= endTime) {
         e.preventDefault();
         alert('End time must be after start time!');
-        return false;
     }
 });
 </script>

@@ -75,8 +75,8 @@ if (isset($_GET['edit'])) {
     if ($row) { $form = array_merge($form, $row); }
 }
 
-$rows         = $db->query('SELECT er.*, e.exam_code, e.title AS exam_title FROM sbe_exam_results er INNER JOIN sbe_exams e ON e.exam_id = er.exam_id ORDER BY er.exam_result_id DESC LIMIT 50')->fetchAll();
-$attempts     = $db->query('SELECT student_exam_id, exam_id, student_id FROM sbe_student_exams ORDER BY student_exam_id DESC')->fetchAll();
+$rows         = $db->query('SELECT er.*, e.exam_code, e.title AS exam_title, s.full_name AS student_name FROM sbe_exam_results er INNER JOIN sbe_exams e ON e.exam_id = er.exam_id INNER JOIN sbe_student_exams se ON se.student_exam_id = er.student_exam_id INNER JOIN students s ON s.student_id = se.student_id ORDER BY er.exam_result_id DESC LIMIT 50')->fetchAll();
+$attempts     = $db->query('SELECT se.student_exam_id, se.exam_id, se.student_id, s.full_name AS student_name FROM sbe_student_exams se INNER JOIN students s ON s.student_id = se.student_id ORDER BY se.student_exam_id DESC')->fetchAll();
 $statusCounts = $db->query('SELECT status, COUNT(*) AS total FROM sbe_exam_results GROUP BY status')->fetchAll();
 $passCount    = (int) $db->query("SELECT COUNT(*) FROM sbe_exam_results WHERE pass_fail_status = 'Pass'")->fetchColumn();
 $failCount    = (int) $db->query("SELECT COUNT(*) FROM sbe_exam_results WHERE pass_fail_status = 'Fail'")->fetchColumn();
@@ -118,7 +118,7 @@ require __DIR__ . '/includes/header.php';
                             <option value="">Select attempt</option>
                             <?php foreach ($attempts as $attempt): ?>
                                 <option value="<?= (int) $attempt['student_exam_id'] ?>" <?= (string) old($form, 'student_exam_id') === (string) $attempt['student_exam_id'] ? 'selected' : '' ?>>
-                                    Attempt #<?= (int) $attempt['student_exam_id'] ?> &middot; Exam #<?= (int) $attempt['exam_id'] ?> &middot; Student #<?= (int) $attempt['student_id'] ?>
+                                    Attempt #<?= (int) $attempt['student_exam_id'] ?> &middot; Exam #<?= (int) $attempt['exam_id'] ?> &middot; <?= e($attempt['student_name']) ?>
                                 </option>
                             <?php endforeach; ?>
                         </select>
@@ -245,7 +245,7 @@ require __DIR__ . '/includes/header.php';
                                 <span class="badge badge-manual"><?= e($row['exam_code']) ?></span>
                                 <div class="small" style="margin-top:3px;"><?= e($row['exam_title']) ?></div>
                             </td>
-                            <td class="small">Student #<?= (int) $row['student_id'] ?></td>
+                            <td class="small"><?= e($row['student_name']) ?></td>
                             <td class="fw-700"><?= e(number_format((float) $row['obtained_marks'], 2)) ?> / <?= e(number_format((float) $row['total_marks'], 2)) ?></td>
                             <td class="fw-700"><?= e(number_format((float) $row['percentage'], 1)) ?>%</td>
                             <td><span class="badge badge-<?= e(strtolower($row['pass_fail_status'])) ?>"><?= e($row['pass_fail_status']) ?></span></td>

@@ -318,7 +318,7 @@ img { max-width: 100%; display: block; }
     position: relative;
     display: flex; align-items: center; gap: 20px;
     padding: 28px 32px; border-radius: var(--radius-lg);
-    background: linear-gradient(135deg, #312e81, #4338ca, #6366f1);
+    background: linear-gradient(135deg, #0f172a, #1e3a5f, #2563EB);
     color: #fff;
     overflow: hidden;
     margin-bottom: 24px;

@@ -1,42 +1,106 @@
 <?php
 $page_title = 'Promote Students';
+
 require_once '../../config/db_connect.php';
-require_once '../models/StudentPromotion.php';
-include '../includes/header.php';
-include '../includes/sidebar.php';
 
-$promotion = new StudentPromotion();
-$conn = getConnection();
-
-// Get programs
-$programs = $conn->query("SELECT program_id, program_name FROM programs ORDER BY program_name");
-
-$students = [];
-$selected_program = null;
-$selected_semester = null;
-
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['program_id']) && isset($_POST['semester'])) {
-    $selected_program = $_POST['program_id'];
-    $selected_semester = $_POST['semester'];
-    $students = $promotion->getEligibleStudents($selected_program, $selected_semester);
-}
-
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['promote_students'])) {
-    $student_ids = $_POST['student_ids'] ?? [];
-    $next_semester = $_POST['next_semester'];
-    
-    if (!empty($student_ids)) {
-        if ($promotion->promote($student_ids, $next_semester)) {
-            $_SESSION['success'] = count($student_ids) . " students promoted to Semester " . $next_semester;
-            header("Location: index.php");
-            exit();
-        } else {
-            $_SESSION['error'] = "Failed to promote students!";
+// ============================================
+// START OF CLASS DEFINITION (Embedded directly in file to fix "Class not found" error)
+// ============================================
+class StudentPromotion {
+    private $db;
+    public function __construct() {
+        global $conn;
+        $this->db = $conn;
+        if (!$this->db) {
+            die("Database connection failed in StudentPromotion model.");
         }
-    } else {
-        $_SESSION['error'] = "Please select at least one student to promote!";
+    }
+
+    // Search eligible students by ID/Name and Semester
+    public function searchEligibleStudents($search_term, $semester) {
+        $search_term = trim($search_term);
+        $sql = "SELECT s.*
+                FROM students s
+                WHERE s.semester = ? AND s.status = 'active'";
+        
+        $params = [$semester];
+        $types = "i";
+
+        if (!empty($search_term)) {
+            $sql .= " AND (s.student_id LIKE ? OR s.full_name LIKE ?)";
+            $search_param = "%" . $search_term . "%";
+            $params[] = $search_param;
+            $params[] = $search_param;
+            $types .= "ss";
+        }
+
+        $sql .= " ORDER BY s.full_name ASC";
+        
+        $stmt = $this->db->prepare($sql);
+        if($stmt === false) die("SQL Error: " . $this->db->error);
+        
+        $stmt->bind_param($types, ...$params);
+        $stmt->execute();
+        return $stmt->get_result()->fetch_all(MYSQLI_ASSOC);
+    }
+
+    // Promote selected students to next semester
+    public function promote($student_ids, $next_semester) {
+        if (empty($student_ids)) return false;
+        $placeholders = implode(',', array_fill(0, count($student_ids), '?'));
+        $sql = "UPDATE students SET semester = ? WHERE student_id IN ($placeholders)";
+        $stmt = $this->db->prepare($sql);
+        if($stmt === false) return false;
+        
+        $params = array_merge([$next_semester], $student_ids);
+        $types = "i" . str_repeat("i", count($student_ids));
+        $stmt->bind_param($types, ...$params);
+        return $stmt->execute();
     }
 }
+// ============================================
+// END OF CLASS DEFINITION
+// ============================================
+
+// Connect to Database & Initialize Class
+$conn = getConnection();
+$promotion = new StudentPromotion();
+
+// Initialize search variables
+$search_term = '';
+$selected_semester = null;
+$students = [];
+
+// Handle search request
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    // 1. Check if it's a SEARCH action
+    if (isset($_POST['search_students'])) {
+        $search_term = trim($_POST['search_term'] ?? '');
+        $selected_semester = $_POST['semester'] ?? null;
+        $students = $promotion->searchEligibleStudents($search_term, $selected_semester);
+    }
+    
+    // 2. Check if it's a PROMOTE action
+    if (isset($_POST['promote_students'])) {
+        $student_ids = $_POST['student_ids'] ?? [];
+        $next_semester = $_POST['next_semester'];
+        
+        if (!empty($student_ids)) {
+            if ($promotion->promote($student_ids, $next_semester)) {
+                $_SESSION['success'] = count($student_ids) . " students promoted to Semester " . $next_semester;
+                header("Location: promote.php");
+                exit();
+            } else {
+                $_SESSION['error'] = "Failed to promote students!";
+            }
+        } else {
+            $_SESSION['error'] = "Please select at least one student to promote!";
+        }
+    }
+}
+
+include '../includes/header.php';
+include '../includes/sidebar.php';
 ?>
 
 <div class="content-area" id="contentArea">
@@ -69,19 +133,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['promote_students'])) 
             <div class="form-container">
                 <form method="POST">
                     <div class="form-row">
-                        <div class="form-group">
-                            <label for="program_id">Program</label>
-                            <select id="program_id" name="program_id" required>
-                                <option value="">Select Program</option>
-                                <?php while($program = $programs->fetch_assoc()): ?>
-                                    <option value="<?php echo $program['program_id']; ?>" 
-                                            <?php echo ($selected_program == $program['program_id']) ? 'selected' : ''; ?>>
-                                        <?php echo $program['program_name']; ?>
-                                    </option>
-                                <?php endwhile; ?>
-                            </select>
+                        <!-- Search by Student ID or Name -->
+                        <div class="form-group" style="flex: 2;">
+                            <label for="search_term">Search by Student ID or Name</label>
+                            <input type="text" id="search_term" name="search_term" 
+                                   placeholder="Enter Student ID or Name" 
+                                   value="<?php echo htmlspecialchars($search_term); ?>">
+                            <small style="color: var(--text-muted);">Leave empty to show all students for the selected semester.</small>
                         </div>
-                        <div class="form-group">
+
+                        <!-- Semester Dropdown -->
+                        <div class="form-group" style="flex: 1;">
                             <label for="semester">Current Semester</label>
                             <select id="semester" name="semester" required>
                                 <option value="">Select Semester</option>
@@ -92,10 +154,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['promote_students'])) 
                                 <?php endfor; ?>
                             </select>
                         </div>
+                        
                         <div class="form-group">
                             <label>&nbsp;</label>
-                            <button type="submit" class="btn btn-primary">
-                                <i class="bi bi-search"></i> Check Eligibility
+                            <button type="submit" name="search_students" class="btn btn-primary" style="width:100%;">
+                                <i class="bi bi-search"></i> Search & Check Eligibility
                             </button>
                         </div>
                     </div>
@@ -104,79 +167,83 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['promote_students'])) 
         </div>
     </div>
     
-    <?php if (!empty($students)): ?>
-    <div class="card">
-        <div class="card-header">
-            <div style="display:flex;justify-content:space-between;align-items:center;">
-                <h5>Eligible Students</h5>
-                <span class="status-badge" style="background:var(--success-bg);color:var(--success);border:1px solid var(--success-border);"><?php echo count($students); ?> students found</span>
+    <?php if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['search_students'])): ?>
+        <?php if (!empty($students)): ?>
+        <div class="card">
+            <div class="card-header">
+                <div style="display:flex;justify-content:space-between;align-items:center;">
+                    <h5>Eligible Students</h5>
+                    <span class="status-badge" style="background:var(--success-bg);color:var(--success);border:1px solid var(--success-border);">
+                        <?php echo count($students); ?> students found
+                    </span>
+                </div>
+            </div>
+            <div class="card-content">
+                <form method="POST">
+                    <input type="hidden" name="search_term" value="<?php echo htmlspecialchars($search_term); ?>">
+                    <input type="hidden" name="semester" value="<?php echo $selected_semester; ?>">
+                    <input type="hidden" name="next_semester" value="<?php echo $selected_semester + 1; ?>">
+                    
+                    <div style="margin-bottom:1rem;">
+                        <button type="button" class="btn btn-outline" onclick="selectAll()">
+                            <i class="bi bi-check-all"></i> Select All
+                        </button>
+                        <button type="button" class="btn btn-outline" onclick="deselectAll()">
+                            <i class="bi bi-x-circle"></i> Deselect All
+                        </button>
+                    </div>
+                    
+                    <div class="table-responsive">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th><input type="checkbox" id="selectAllCheckbox" onchange="toggleAllCheckboxes()"></th>
+                                    <th>Student ID</th>
+                                    <th>Name</th>
+                                    <th>Current Semester</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php foreach($students as $student): ?>
+                                <tr>
+                                    <td>
+                                        <input type="checkbox" name="student_ids[]" 
+                                               value="<?php echo $student['student_id']; ?>" 
+                                               class="student-checkbox">
+                                    </td>
+                                    <td><?php echo $student['student_id']; ?></td>
+                                    <td><?php echo htmlspecialchars($student['full_name']); ?></td>
+                                    <td>Semester <?php echo $student['semester']; ?></td>
+                                    <td>
+                                        <span class="status-badge" style="background:var(--success-bg);color:var(--success);border:1px solid var(--success-border);">Eligible</span>
+                                    </td>
+                                </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <div class="alert" style="background:var(--info-bg);color:var(--accent);border:1px solid var(--info-border);margin-top:1rem;">
+                        <i class="bi bi-info-circle"></i> 
+                        Selected students will be promoted to <strong>Semester <?php echo $selected_semester + 1; ?></strong>
+                    </div>
+                    
+                    <div class="form-actions">
+                        <button type="submit" name="promote_students" class="btn btn-primary"
+                                onclick="return confirm('Are you sure you want to promote selected students?')">
+                            <i class="bi bi-arrow-up-circle"></i> Promote Selected Students
+                        </button>
+                    </div>
+                </form>
             </div>
         </div>
-        <div class="card-content">
-            <form method="POST">
-                <input type="hidden" name="program_id" value="<?php echo $selected_program; ?>">
-                <input type="hidden" name="semester" value="<?php echo $selected_semester; ?>">
-                <input type="hidden" name="next_semester" value="<?php echo $selected_semester + 1; ?>">
-                
-                <div style="margin-bottom:1rem;">
-                    <button type="button" class="btn btn-outline" onclick="selectAll()">
-                        <i class="bi bi-check-all"></i> Select All
-                    </button>
-                    <button type="button" class="btn btn-outline" onclick="deselectAll()">
-                        <i class="bi bi-x-circle"></i> Deselect All
-                    </button>
-                </div>
-                
-                <div class="table-responsive">
-                    <table class="data-table">
-                        <thead>
-                            <tr>
-                                <th><input type="checkbox" id="selectAllCheckbox" onchange="toggleAllCheckboxes()"></th>
-                                <th>Student ID</th>
-                                <th>Name</th>
-                                <th>Current Semester</th>
-                                <th>Status</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <?php foreach($students as $student): ?>
-                            <tr>
-                                <td>
-                                    <input type="checkbox" name="student_ids[]" 
-                                           value="<?php echo $student['student_id']; ?>" 
-                                           class="student-checkbox">
-                                </td>
-                                <td><?php echo $student['student_id']; ?></td>
-                                <td><?php echo $student['full_name']; ?></td>
-                                <td>Semester <?php echo $student['semester']; ?></td>
-                                <td>
-                                    <span class="status-badge" style="background:var(--success-bg);color:var(--success);border:1px solid var(--success-border);">Eligible</span>
-                                </td>
-                            </tr>
-                            <?php endforeach; ?>
-                        </tbody>
-                    </table>
-                </div>
-                
-                <div class="alert" style="background:var(--info-bg);color:var(--accent);border:1px solid var(--info-border);margin-top:1rem;">
-                    <i class="bi bi-info-circle"></i> 
-                    Students will be promoted to <strong>Semester <?php echo $selected_semester + 1; ?></strong>
-                </div>
-                
-                <div class="form-actions">
-                    <button type="submit" name="promote_students" class="btn btn-primary"
-                            onclick="return confirm('Are you sure you want to promote selected students?')">
-                        <i class="bi bi-arrow-up-circle"></i> Promote Selected Students
-                    </button>
-                </div>
-            </form>
+        <?php else: ?>
+        <div class="alert" style="background:var(--info-bg);color:var(--accent);border:1px solid var(--info-border);">
+            <i class="bi bi-info-circle"></i> 
+            No students found matching your search criteria in this semester.
         </div>
-    </div>
-    <?php elseif ($_SERVER['REQUEST_METHOD'] === 'POST'): ?>
-    <div class="alert" style="background:var(--info-bg);color:var(--accent);border:1px solid var(--info-border);">
-        <i class="bi bi-info-circle"></i> 
-        No students found eligible for promotion in this program and semester.
-    </div>
+        <?php endif; ?>
     <?php endif; ?>
 </div>
 
