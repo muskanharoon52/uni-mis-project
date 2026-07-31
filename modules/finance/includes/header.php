@@ -53,24 +53,22 @@ $userInitial = strtoupper(substr($userName, 0, 1));
             <a class="<?= $current_page === 'dashboard.php' ? 'active' : '' ?>" href="/uni-mis-project/modules/finance/dashboard.php">
                 <span class="nav-icon">&#128202;</span> Dashboard
             </a>
+            <a class="<?= $current_folder === 'new-admission' ? 'active' : '' ?>" href="/uni-mis-project/modules/finance/new-admission/index.php">
+                <span class="nav-icon">&#127890;</span> New Admission
+            </a>
 
             <span class="nav-section-label">Fee Management</span>
+            <a class="<?= $current_folder === 'fee_generate' ? 'active' : '' ?>" href="/uni-mis-project/modules/finance/fee_generate/index.php">
+                <span class="nav-icon">&#9889;</span> Generate Fee
+            </a>
             <a class="<?= $current_folder === 'fee_heads' ? 'active' : '' ?>" href="/uni-mis-project/modules/finance/fee_heads/index.php">
                 <span class="nav-icon">&#127991;</span> Fee Heads
             </a>
             <a class="<?= $current_folder === 'fee_structure' ? 'active' : '' ?>" href="/uni-mis-project/modules/finance/fee_structure/index.php">
                 <span class="nav-icon">&#128209;</span> Fee Structure
             </a>
-            <a class="<?= $current_folder === 'student_fee' ? 'active' : '' ?>" href="/uni-mis-project/modules/finance/student_fee/index.php">
-                <span class="nav-icon">&#127891;</span> Student Fee
-            </a>
-
-            <span class="nav-section-label">Payments</span>
-            <a class="<?= $current_folder === 'payments' ? 'active' : '' ?>" href="/uni-mis-project/modules/finance/payments/index.php">
-                <span class="nav-icon">&#128176;</span> Payments
-            </a>
-            <a class="<?= $current_folder === 'receipts' ? 'active' : '' ?>" href="/uni-mis-project/modules/finance/receipts/index.php">
-                <span class="nav-icon">&#128196;</span> Receipts
+            <a class="<?= $current_folder === 'fee-receive' ? 'active' : '' ?>" href="/uni-mis-project/modules/finance/fee-receive/index.php">
+                <span class="nav-icon">&#128176;</span> Fee Receive
             </a>
 
             <span class="nav-section-label">System</span>

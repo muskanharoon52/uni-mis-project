@@ -47,6 +47,9 @@ $userInitial = strtoupper(substr($userName, 0, 1));
             <a class="<?= $current_folder === 'applications' ? 'active' : '' ?>" href="/uni-mis-project/modules/admission/applications/index.php">
                 Applications
             </a>
+            <a class="<?= $current_folder === 'enrollment' ? 'active' : '' ?>" href="/uni-mis-project/modules/admission/enrollment/index.php">
+                Enrollment
+            </a>
             <a class="<?= $current_folder === 'students' ? 'active' : '' ?>" href="/uni-mis-project/modules/admission/students/index.php">
                 Students
             </a>

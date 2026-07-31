@@ -26,6 +26,7 @@ $result = mysqli_query($conn, $sql);
                 <tr>
                     <th>#</th>
                     <th>Name</th>
+                    <th>Amount (Rs)</th>
                     <th>Description</th>
                     <th>Status</th>
                     <th>Created</th>
@@ -38,6 +39,7 @@ $result = mysqli_query($conn, $sql);
                         <tr>
                             <td><?= $count++ ?></td>
                             <td style="font-weight:600;"><?= htmlspecialchars($row['fee_head_name']) ?></td>
+                            <td style="font-weight:700;color:#2563eb;">PKR <?= number_format($row['amount'] ?? 0, 2) ?></td>
                             <td class="muted"><?= htmlspecialchars($row['description'] ?? 'N/A') ?></td>
                             <td><span class="badge <?= $row['status'] === 'Active' ? 'badge-active' : 'badge-outline' ?>"><?= $row['status'] ?></span></td>
                             <td class="muted"><?= date('M j, Y', strtotime($row['created_at'])) ?></td>
@@ -50,7 +52,7 @@ $result = mysqli_query($conn, $sql);
                         </tr>
                     <?php endwhile; ?>
                 <?php else: ?>
-                    <tr><td colspan="6" class="muted text-center" style="padding:24px;">No fee heads found. <a href="add.php" style="color:var(--accent);font-weight:600;">Add one now.</a></td></tr>
+                    <tr><td colspan="7" class="muted text-center" style="padding:24px;">No fee heads found. <a href="add.php" style="color:var(--accent);font-weight:600;">Add one now.</a></td></tr>
                 <?php endif; ?>
             </tbody>
         </table>

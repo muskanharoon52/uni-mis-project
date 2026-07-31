@@ -23,11 +23,14 @@ $row = mysqli_fetch_assoc($result);
 
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     $fee_head_name = mysqli_real_escape_string($conn, $_POST['fee_head_name']);
+    $amount = mysqli_real_escape_string($conn, $_POST['amount']); // Added Amount
     $description = mysqli_real_escape_string($conn, $_POST['description']);
     $status = mysqli_real_escape_string($conn, $_POST['status']);
 
     if (empty($fee_head_name)) {
         $error = "Fee Head Name is required!";
+    } elseif (!is_numeric($amount) || $amount < 0) {
+        $error = "Please enter a valid amount (numbers only).";
     } else {
         $check_sql = "SELECT * FROM fee_heads WHERE fee_head_name = '$fee_head_name' 
                       AND fee_head_id != '$fee_head_id' AND deleted_at IS NULL";
@@ -36,8 +39,10 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         if (mysqli_num_rows($check_result) > 0) {
             $error = "Fee head '$fee_head_name' already exists!";
         } else {
+            // Updated SQL to include 'amount'
             $update_sql = "UPDATE fee_heads SET 
                           fee_head_name = '$fee_head_name',
+                          amount = '$amount',
                           description = '$description',
                           status = '$status',
                           updated_at = NOW()
@@ -45,6 +50,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             
             if (mysqli_query($conn, $update_sql)) {
                 $success = "Fee head updated successfully!";
+                // Refresh data after update
                 $result = mysqli_query($conn, $sql);
                 $row = mysqli_fetch_assoc($result);
                 header("refresh:1;url=index.php?msg=Fee head updated successfully!");
@@ -73,11 +79,21 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 <label>Fee Head Name <span style="color:var(--danger);">*</span></label>
                 <input type="text" name="fee_head_name" required value="<?= htmlspecialchars($row['fee_head_name']) ?>">
             </div>
-            <div class="field">
+
+            <!-- NEW: Amount Field -->
+            <div class="field" style="margin-top:16px;">
+                <label>Fee Amount (Rs) <span style="color:var(--danger);">*</span></label>
+                <input type="number" name="amount" step="0.01" min="0" required 
+                       value="<?= htmlspecialchars($row['amount'] ?? 0) ?>" 
+                       style="width:100%;padding:8px;border:1px solid #d1d5db;border-radius:4px;">
+                <p class="muted" style="margin-top:4px;">Update the price for this fee head.</p>
+            </div>
+
+            <div class="field" style="margin-top:16px;">
                 <label>Description</label>
                 <textarea name="description" rows="3"><?= htmlspecialchars($row['description']) ?></textarea>
             </div>
-            <div class="field">
+            <div class="field" style="margin-top:16px;">
                 <label>Status</label>
                 <select name="status">
                     <option value="Active" <?= $row['status'] === 'Active' ? 'selected' : '' ?>>Active</option>

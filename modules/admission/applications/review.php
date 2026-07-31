@@ -111,14 +111,64 @@ if (!$app) {
 }
 
 // =============================================
-// GET SESSIONS
+// GET SESSIONS - FIXED
 // =============================================
 $sessions = [];
 try {
-    $session_stmt = $pdo->query("SELECT * FROM academic_sessions WHERE status = 'active' ORDER BY start_date DESC");
-    $sessions = $session_stmt->fetchAll();
+    // Check if sessions table exists
+    $table_check = $pdo->query("SHOW TABLES LIKE 'sessions'");
+    if ($table_check->rowCount() > 0) {
+        
+        // Get all columns from sessions table
+        $session_cols = $pdo->query("SHOW COLUMNS FROM sessions")->fetchAll(PDO::FETCH_COLUMN);
+        
+        // Build SELECT query dynamically
+        $session_select_fields = [];
+        $session_select_fields[] = "session_id as id";
+        $session_select_fields[] = "session_name";
+        
+        // Only add columns that actually exist
+        if (in_array('session_code', $session_cols)) {
+            $session_select_fields[] = "session_code";
+        }
+        if (in_array('start_date', $session_cols)) {
+            $session_select_fields[] = "start_date";
+        }
+        if (in_array('end_date', $session_cols)) {
+            $session_select_fields[] = "end_date";
+        }
+        if (in_array('status', $session_cols)) {
+            $session_select_fields[] = "status";
+        }
+        if (in_array('year', $session_cols)) {
+            $session_select_fields[] = "year";
+        }
+        
+        $session_select = implode(", ", $session_select_fields);
+        
+        // Check if status column exists for WHERE clause
+        $where_clause = "";
+        if (in_array('status', $session_cols)) {
+            $where_clause = "WHERE status = 'Active'";
+        }
+        
+        // Order by
+        $order_by = "ORDER BY ";
+        if (in_array('start_date', $session_cols)) {
+            $order_by .= "start_date DESC";
+        } elseif (in_array('year', $session_cols)) {
+            $order_by .= "year DESC";
+        } else {
+            $order_by .= "session_id DESC";
+        }
+        
+        $session_sql = "SELECT $session_select FROM sessions $where_clause $order_by";
+        $session_stmt = $pdo->query($session_sql);
+        $sessions = $session_stmt->fetchAll();
+    }
 } catch (PDOException $e) {
-    // Table might not exist
+    error_log("Session query error: " . $e->getMessage());
+    $sessions = [];
 }
 
 // =============================================
@@ -129,11 +179,22 @@ try {
     $section_stmt = $pdo->query("SELECT section_id, section_name, program_id, semester_id, capacity FROM sections WHERE status = 'Active' ORDER BY section_name");
     $sections = $section_stmt->fetchAll();
 } catch (PDOException $e) {
-    // Table might not exist
+    $sections = [];
 }
 
 // =============================================
-// GET FEE STRUCTURES (UPDATED FOR YOUR SCHEMA)
+// GET SEMESTERS
+// =============================================
+$semesters = [];
+try {
+    $semester_stmt = $pdo->query("SELECT semester_id, semester_name, semester_number FROM semesters ORDER BY semester_number ASC");
+    $semesters = $semester_stmt->fetchAll();
+} catch (PDOException $e) {
+    $semesters = [];
+}
+
+// =============================================
+// GET FEE STRUCTURES
 // =============================================
 $fee_structures = [];
 try {
@@ -146,7 +207,7 @@ try {
     ");
     $fee_structures = $fee_struct_stmt->fetchAll();
 } catch (PDOException $e) {
-    // Table might not exist
+    $fee_structures = [];
 }
 
 // =============================================
@@ -158,32 +219,24 @@ try {
     $admission_stmt->execute([$app['application_id']]);
     $admission_details = $admission_stmt->fetch();
 } catch (PDOException $e) {
-    // Table might not exist
+    $admission_details = null;
 }
 
 // =============================================
 // CHECK IF FEE TABLE EXISTS
 // =============================================
-try {
-    $table_check = $pdo->query("SHOW TABLES LIKE 'admission_fees'");
-    $fee_table_exists = $table_check->rowCount() > 0;
-} catch (PDOException $e) {
-    $fee_table_exists = false;
-}
-
-// Check if fee record exists for this application
 $fee_record = null;
 $fee_exists = false;
-
-if ($fee_table_exists) {
-    try {
+try {
+    $table_check = $pdo->query("SHOW TABLES LIKE 'admission_fees'");
+    if ($table_check->rowCount() > 0) {
         $fee_check = $pdo->prepare("SELECT * FROM admission_fees WHERE application_id = ?");
         $fee_check->execute([$app['application_id']]);
         $fee_record = $fee_check->fetch();
         $fee_exists = ($fee_record !== false);
-    } catch (PDOException $e) {
-        $fee_exists = false;
     }
+} catch (PDOException $e) {
+    $fee_exists = false;
 }
 
 // =============================================
@@ -192,7 +245,7 @@ if ($fee_table_exists) {
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     try {
         $action = $_POST['action'] ?? '';
-        $rejection_reason = sanitize($_POST['rejection_reason'] ?? '');
+        $rejection_reason = isset($_POST['rejection_reason']) ? htmlspecialchars($_POST['rejection_reason']) : '';
         
         // Start transaction
         $pdo->beginTransaction();
@@ -204,7 +257,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $session_id = $_POST['session_id'] ?? null;
             $section_id = $_POST['section_id'] ?? null;
             $semester_id = $_POST['semester_id'] ?? null;
-            $fee_structure_id = $_POST['fee_structure_id'] ?? null;
             $fee_structure_ids = isset($_POST['fee_structure_ids']) ? implode(',', array_map('intval', $_POST['fee_structure_ids'])) : '';
             $scholarship_id = !empty($_POST['scholarship_id']) ? (int)$_POST['scholarship_id'] : null;
             $start_date = $_POST['start_date'] ?? date('Y-m-d');
@@ -221,6 +273,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     UPDATE student_admission_details SET 
                         session_id = ?,
                         section_id = ?,
+                        semester_id = ?,
                         selected_fee_ids = ?,
                         scholarship_id = ?,
                         admission_date = ?,
@@ -232,6 +285,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $update_admission->execute([
                     $session_id,
                     $section_id,
+                    $semester_id,
                     $fee_structure_ids,
                     $scholarship_id,
                     $admission_date,
@@ -243,14 +297,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             } else {
                 $insert_admission = $pdo->prepare("
                     INSERT INTO student_admission_details 
-                    (application_id, session_id, section_id, selected_fee_ids, scholarship_id,
+                    (application_id, session_id, section_id, semester_id, selected_fee_ids, scholarship_id,
                      admission_date, start_date, end_date, admission_year, created_by) 
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, YEAR(?), ?)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, YEAR(?), ?)
                 ");
                 $insert_admission->execute([
                     $app['application_id'],
                     $session_id,
                     $section_id,
+                    $semester_id,
                     $fee_structure_ids,
                     $scholarship_id,
                     $admission_date,
@@ -261,7 +316,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 ]);
             }
             
-            // Update application with semester info
+            // Update application with session info
             $update_app = $pdo->prepare("
                 UPDATE admission_applications SET 
                     session_id = ?
@@ -283,227 +338,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         
         // =============================================
-        // CASE 1: APPROVE WITH FEE
+        // CASE 1: APPROVE - create admission_students entry
         // =============================================
-        if ($action === 'approve_with_fee') {
-            // Check if fee table exists, if not create it
-            if (!$fee_table_exists) {
-                $create_table = "
-                    CREATE TABLE IF NOT EXISTS `admission_fees` (
-                        `id` int(11) NOT NULL AUTO_INCREMENT,
-                        `application_id` varchar(50) NOT NULL,
-                        `student_name` varchar(100) NOT NULL,
-                        `cnic` varchar(15) DEFAULT NULL,
-                        `email` varchar(100) DEFAULT NULL,
-                        `phone` varchar(15) DEFAULT NULL,
-                        `program` varchar(100) DEFAULT NULL,
-                        `fee_amount` decimal(10,2) NOT NULL DEFAULT 1000.00,
-                        `fee_challan_no` varchar(50) NOT NULL,
-                        `status` enum('pending','paid','cancelled') DEFAULT 'pending',
-                        `payment_method` varchar(50) DEFAULT NULL,
-                        `payment_reference` varchar(100) DEFAULT NULL,
-                        `paid_at` datetime DEFAULT NULL,
-                        `created_at` datetime DEFAULT CURRENT_TIMESTAMP,
-                        `due_date` datetime DEFAULT NULL,
-                        PRIMARY KEY (`id`),
-                        UNIQUE KEY `fee_challan_no` (`fee_challan_no`),
-                        KEY `application_id` (`application_id`)
-                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
-                ";
-                $pdo->exec($create_table);
-                $fee_table_exists = true;
-            }
-            
-            // Check if fee already exists
-            $fee_check = $pdo->prepare("SELECT * FROM admission_fees WHERE application_id = ?");
-            $fee_check->execute([$app['application_id']]);
-            $existing_fee = $fee_check->fetch();
-            
-            if (!$existing_fee) {
-                // Get fee amount from fee structure if selected
-                $fee_amount = 1000;
-                $fee_structure_id = $_POST['fee_structure_id'] ?? null;
-                if ($fee_structure_id) {
-                    $fee_struct_stmt = $pdo->prepare("SELECT amount FROM fee_structures WHERE fee_structure_id = ?");
-                    $fee_struct_stmt->execute([$fee_structure_id]);
-                    $fee_struct = $fee_struct_stmt->fetch();
-                    if ($fee_struct) {
-                        $fee_amount = $fee_struct['amount'];
-                    }
-                }
-                
-                $fee_challan_no = 'CH-' . date('Y') . '-' . str_pad(rand(1, 99999), 5, '0', STR_PAD_LEFT);
-                
-                // Get the correct values based on column names
-                $cnic_value = $app[$cnic_column] ?? '';
-                $phone_value = $app[$phone_column] ?? '';
-                
-                $fee_stmt = $pdo->prepare("
-                    INSERT INTO admission_fees 
-                    (application_id, student_name, cnic, email, phone, program, 
-                     fee_amount, fee_challan_no, status, created_at, due_date) 
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', NOW(), DATE_ADD(NOW(), INTERVAL 7 DAY))
-                ");
-                $fee_stmt->execute([
-                    $app['application_id'],
-                    $app['full_name'],
-                    $cnic_value,
-                    $app['email'] ?? '',
-                    $phone_value,
-                    $app['program'] ?? '',
-                    $fee_amount,
-                    $fee_challan_no
-                ]);
-                
-                // Update application status to "Fee Pending"
-                $update_stmt = $pdo->prepare("
-                    UPDATE admission_applications SET 
-                        $status_column = 'Fee Pending',
-                        status = 'fee_pending'
-                    WHERE application_id = ?
-                ");
-                $update_stmt->execute([$app['application_id']]);
-                
-                $pdo->commit();
-                
-                setFlash('success', 
-                    '✅ Application Approved! Fee Challan Generated.<br>
-                    <strong>Fee Amount:</strong> Rs ' . number_format($fee_amount) . '<br>
-                    <strong>Challan No:</strong> ' . $fee_challan_no . '<br>
-                    <strong>Due Date:</strong> ' . date('d M Y', strtotime('+7 days')) . '<br><br>
-                    <em>Student will be created after fee payment confirmation.</em>'
-                );
-                header('Location: index.php');
-                exit();
-            } else {
-                $pdo->commit();
-                setFlash('warning', 'Fee already generated for this application. Challan No: ' . $existing_fee['fee_challan_no']);
-                header('Location: index.php');
-                exit();
-            }
-        }
-        
-        // =============================================
-        // CASE 2: CONFIRM PAYMENT & CREATE STUDENT
-        // =============================================
-        elseif ($action === 'confirm_payment') {
-            // Check if fee table exists
-            if (!$fee_table_exists) {
-                throw new Exception('Fee table does not exist. Please approve with fee first.');
-            }
-            
-            // Check fee record
-            $fee_stmt = $pdo->prepare("SELECT * FROM admission_fees WHERE application_id = ?");
-            $fee_stmt->execute([$app['application_id']]);
-            $fee = $fee_stmt->fetch();
-            
-            if (!$fee) {
-                // Create fee record automatically if it doesn't exist
-                $fee_amount = 1000;
-                $fee_challan_no = 'CH-' . date('Y') . '-' . str_pad(rand(1, 99999), 5, '0', STR_PAD_LEFT);
-                
-                $cnic_value = $app[$cnic_column] ?? '';
-                $phone_value = $app[$phone_column] ?? '';
-                
-                $fee_stmt = $pdo->prepare("
-                    INSERT INTO admission_fees 
-                    (application_id, student_name, cnic, email, phone, program, 
-                     fee_amount, fee_challan_no, status, created_at, due_date) 
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', NOW(), DATE_ADD(NOW(), INTERVAL 7 DAY))
-                ");
-                $fee_stmt->execute([
-                    $app['application_id'],
-                    $app['full_name'],
-                    $cnic_value,
-                    $app['email'] ?? '',
-                    $phone_value,
-                    $app['program'] ?? '',
-                    $fee_amount,
-                    $fee_challan_no
-                ]);
-                
-                // Get the newly created fee
-                $fee_stmt = $pdo->prepare("SELECT * FROM admission_fees WHERE application_id = ?");
-                $fee_stmt->execute([$app['application_id']]);
-                $fee = $fee_stmt->fetch();
-            }
-            
-            if ($fee['status'] === 'paid') {
-                throw new Exception('Fee already paid for this application.');
-            }
-            
-            // Update fee status to paid
-            $update_fee = $pdo->prepare("
-                UPDATE admission_fees SET 
-                    status = 'paid',
-                    paid_at = NOW(),
-                    payment_method = ?,
-                    payment_reference = ?
-                WHERE application_id = ?
-            ");
-            $update_fee->execute([
-                $_POST['payment_method'] ?? 'Manual',
-                $_POST['payment_reference'] ?? 'MANUAL-' . date('YmdHis'),
-                $app['application_id']
-            ]);
-            
-            // Create Student Record
-            $student_id = 'STU-' . date('Y') . '-' . str_pad(rand(1, 9999), 4, '0', STR_PAD_LEFT);
-            $default_password = 'student123';
-            $password_hash = password_hash($default_password, PASSWORD_DEFAULT);
-            $username = strtolower(preg_replace('/[^a-zA-Z0-9]/', '', explode(' ', $app['full_name'])[0])) . rand(100, 999);
-            $login_id = strval(9000 + (int)date('Y') % 1000 + rand(100, 999));
-            
-            // Ensure unique login_id
-            while (true) {
-                $check_uid = $pdo->prepare("SELECT user_id FROM users WHERE login_id = ?");
-                $check_uid->execute([$login_id]);
-                if (!$check_uid->fetch()) break;
-                $login_id = strval(9000 + (int)date('Y') % 1000 + rand(100, 999));
-            }
-            
-            // Get phone and cnic values
-            $phone_value = $app[$phone_column] ?? '';
+        if ($action === 'approve') {
+            $program_id = $app['program_id'] ?? 1;
             $cnic_value = $app[$cnic_column] ?? '';
+            $phone_value = $app[$phone_column] ?? '';
             $address_value = $app[$address_column] ?? '';
-            
-            // Create user
-            $user_stmt = $pdo->prepare("
-                INSERT INTO users (full_name, username, login_id, email, phone, password_hash, role_id, department_id, status)
-                VALUES (?, ?, ?, ?, ?, ?, 4, ?, 'Active')
-            ");
-            $user_stmt->execute([
-                $app['full_name'],
-                $username,
-                $login_id,
-                $app['email'] ?? $username . '@university.edu',
-                $phone_value,
-                $password_hash,
-                $app['program_id'] ?? 1
-            ]);
-            $new_user_id = (int) $pdo->lastInsertId();
-            
-            // Get scholarship from admission_details if set
-            $award_scholarship_id = null;
-            try {
-                $det_stmt = $pdo->prepare("SELECT scholarship_id FROM student_admission_details WHERE application_id = ?");
-                $det_stmt->execute([$app['application_id']]);
-                $det_row = $det_stmt->fetch();
-                if ($det_row && !empty($det_row['scholarship_id'])) {
-                    $award_scholarship_id = (int)$det_row['scholarship_id'];
-                }
-            } catch (Exception $e) {}
 
-            // Create student record in admission_students
-            $student_stmt = $pdo->prepare("
+            $student_id = 'STU-' . date('Y') . '-' . str_pad(rand(1, 9999), 4, '0', STR_PAD_LEFT);
+
+            $app_stmt = $pdo->prepare("
                 INSERT INTO admission_students 
-                (student_id, application_id, student_name, father_name, cnic_or_bform, 
-                 dob, gender, contact_no, email, address, program_id, scholarship_id, status) 
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active')
+                (student_id, application_id, full_name, student_name, father_name, cnic_or_bform, 
+                 dob, gender, contact_no, email, address, program_id, status, fee_paid) 
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', 0)
             ");
-            $student_stmt->execute([
+            $app_stmt->execute([
                 $student_id,
                 $app['application_id'],
+                $app['full_name'],
                 $app['full_name'],
                 $app['father_name'] ?? '',
                 $cnic_value,
@@ -512,11 +366,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $phone_value,
                 $app['email'] ?? '',
                 $address_value,
-                $app['program_id'] ?? 1,
-                $award_scholarship_id
+                $program_id
             ]);
-            
-            // Update application status
+
             $update_stmt = $pdo->prepare("
                 UPDATE admission_applications SET 
                     $status_column = 'Approved',
@@ -526,22 +378,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 WHERE application_id = ?
             ");
             $update_stmt->execute([$_SESSION['user_id'] ?? 1, $app['application_id']]);
-            
+
             $pdo->commit();
-            
+
             setFlash('success', 
-                '✅ Payment Confirmed & Student Created!<br>
+                '✅ Application Approved!<br>
+                Student record created in finance for fee payment.<br>
                 <strong>Student ID:</strong> ' . $student_id . '<br>
-                <strong>Login ID:</strong> ' . $login_id . '<br>
-                <strong>Password:</strong> ' . $default_password . '<br><br>
-                <em>Student can now login to the system.</em>'
+                <em>Student will be fully registered after finance confirms fee payment.</em>'
             );
             header('Location: index.php');
             exit();
         }
-        
+
         // =============================================
-        // CASE 3: REJECT APPLICATION
+        // CASE 2: REJECT APPLICATION
         // =============================================
         elseif ($action === 'reject') {
             $update_stmt = $pdo->prepare("
@@ -567,7 +418,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         
         // =============================================
-        // CASE 4: KEEP UNDER REVIEW
+        // CASE 3: KEEP UNDER REVIEW
         // =============================================
         elseif ($action === 'under_review') {
             $update_stmt = $pdo->prepare("
@@ -592,6 +443,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
+// =============================================
+// CHECK ADMISSION STUDENTS STATUS
+// =============================================
+$adm_student = null;
+$fee_paid = false;
+try {
+    $adm_check = $pdo->prepare("SELECT * FROM admission_students WHERE application_id = ?");
+    $adm_check->execute([$app['application_id']]);
+    $adm_student = $adm_check->fetch();
+    if ($adm_student && !empty($adm_student['fee_paid'])) {
+        $fee_paid = true;
+    }
+} catch (Exception $e) {}
+
 // Generate preview student ID
 $preview_student_id = 'STU-' . date('Y') . '-' . str_pad(rand(1, 9999), 4, '0', STR_PAD_LEFT);
 
@@ -615,7 +480,7 @@ if ($flash): ?>
             </span>
             <?php if($fee_exists && $fee_record): ?>
                 <span style="margin-left:10px;font-size:12px;background:#f0fdf4;color:#065f46;padding:2px 10px;border-radius:12px;">
-                    <i class="fas fa-money-bill-wave"></i> Fee: <?= ucfirst($fee_record['status']) ?>
+                    <i class="fas fa-money-bill-wave"></i> Fee: <?= ucfirst($fee_record['status'] ?? 'Pending') ?>
                 </span>
             <?php endif; ?>
         </p>
@@ -718,16 +583,16 @@ if ($flash): ?>
                 </h4>
                 <div style="display:grid;grid-template-columns:1fr 1fr;gap:5px;font-size:13px;">
                     <div><span style="color:#6b7280;">Challan No:</span></div>
-                    <div><strong><?= htmlspecialchars($fee_record['fee_challan_no']) ?></strong></div>
+                    <div><strong><?= htmlspecialchars($fee_record['fee_challan_no'] ?? 'N/A') ?></strong></div>
                     <div><span style="color:#6b7280;">Amount:</span></div>
-                    <div><strong>Rs <?= number_format($fee_record['fee_amount'], 0) ?></strong></div>
+                    <div><strong>Rs <?= number_format($fee_record['fee_amount'] ?? 0, 0) ?></strong></div>
                     <div><span style="color:#6b7280;">Status:</span></div>
                     <div>
-                        <span class="status-badge <?= $fee_record['status'] ?>">
-                            <?= ucfirst($fee_record['status']) ?>
+                        <span class="status-badge <?= $fee_record['status'] ?? 'pending' ?>">
+                            <?= ucfirst($fee_record['status'] ?? 'Pending') ?>
                         </span>
                     </div>
-                    <?php if($fee_record['due_date']): ?>
+                    <?php if(isset($fee_record['due_date']) && $fee_record['due_date']): ?>
                     <div><span style="color:#6b7280;">Due Date:</span></div>
                     <div><?= date('d M Y', strtotime($fee_record['due_date'])) ?></div>
                     <?php endif; ?>
@@ -764,11 +629,31 @@ if ($flash): ?>
                             </label>
                             <select name="session_id" id="session_id" style="width:100%;padding:6px 10px;border:1px solid #d1d5db;border-radius:4px;font-size:13px;">
                                 <option value="">Select Session</option>
-                                <?php foreach ($sessions as $session): ?>
-                                    <option value="<?= $session['id'] ?>" <?= ($admission_details && $admission_details['session_id'] == $session['id']) ? 'selected' : '' ?>>
-                                        <?= htmlspecialchars($session['session_name'] . ' (' . $session['session_code'] . ')') ?>
-                                    </option>
-                                <?php endforeach; ?>
+                                <?php if (!empty($sessions)): ?>
+                                    <?php foreach ($sessions as $session): ?>
+                                        <?php 
+                                        // Build display text safely
+                                        $display_text = '';
+                                        if (isset($session['session_name']) && !empty($session['session_name'])) {
+                                            $display_text = htmlspecialchars($session['session_name']);
+                                        } elseif (isset($session['name']) && !empty($session['name'])) {
+                                            $display_text = htmlspecialchars($session['name']);
+                                        } else {
+                                            $display_text = 'Session #' . ($session['id'] ?? '');
+                                        }
+                                        
+                                        // Add session code if it exists
+                                        if (isset($session['session_code']) && !empty($session['session_code'])) {
+                                            $display_text .= ' (' . htmlspecialchars($session['session_code']) . ')';
+                                        }
+                                        ?>
+                                        <option value="<?= $session['id'] ?? '' ?>" <?= ($admission_details && isset($admission_details['session_id']) && $admission_details['session_id'] == ($session['id'] ?? '')) ? 'selected' : '' ?>>
+                                            <?= $display_text ?>
+                                        </option>
+                                    <?php endforeach; ?>
+                                <?php else: ?>
+                                    <option value="" disabled>No active sessions found</option>
+                                <?php endif; ?>
                             </select>
                         </div>
                         
@@ -779,11 +664,15 @@ if ($flash): ?>
                             </label>
                             <select name="section_id" id="section_id" style="width:100%;padding:6px 10px;border:1px solid #d1d5db;border-radius:4px;font-size:13px;">
                                 <option value="">Select Section</option>
-                                <?php foreach ($sections as $section): ?>
-                                    <option value="<?= $section['section_id'] ?>" <?= ($admission_details && $admission_details['section_id'] == $section['section_id']) ? 'selected' : '' ?>>
-                                        <?= htmlspecialchars($section['section_name']) ?>
-                                    </option>
-                                <?php endforeach; ?>
+                                <?php if (!empty($sections)): ?>
+                                    <?php foreach ($sections as $section): ?>
+                                        <option value="<?= $section['section_id'] ?>" <?= ($admission_details && isset($admission_details['section_id']) && $admission_details['section_id'] == $section['section_id']) ? 'selected' : '' ?>>
+                                            <?= htmlspecialchars($section['section_name']) ?>
+                                        </option>
+                                    <?php endforeach; ?>
+                                <?php else: ?>
+                                    <option value="" disabled>No sections found</option>
+                                <?php endif; ?>
                             </select>
                         </div>
                         
@@ -794,30 +683,15 @@ if ($flash): ?>
                             </label>
                             <select name="semester_id" id="semester_id" style="width:100%;padding:6px 10px;border:1px solid #d1d5db;border-radius:4px;font-size:13px;">
                                 <option value="">Select Semester</option>
-                                <?php 
-                                $selected_dept_id = $app['department_id'] ?? $app['program_id'] ?? 0;
-                                
-                                if(!empty($selected_dept_id)) {
-                                    try {
-                                        $sem_stmt = $pdo->prepare("SELECT semester_id, semester_name, semester_number FROM semesters WHERE department_id = ? ORDER BY semester_number ASC");
-                                        $sem_stmt->execute([$selected_dept_id]);
-                                        $filtered_semesters = $sem_stmt->fetchAll();
-                                        
-                                        foreach ($filtered_semesters as $semester): 
-                                            $selected_sem = ($admission_details && $admission_details['semester_id'] == $semester['semester_id']) ? 'selected' : '';
-                                ?>
-                                            <option value="<?= $semester['semester_id'] ?>" <?= $selected_sem ?>>
-                                                <?= htmlspecialchars($semester['semester_name']) ?>
-                                            </option>
-                                <?php 
-                                        endforeach;
-                                    } catch (PDOException $e) {
-                                        echo "<option value=''>ERROR: " . htmlspecialchars($e->getMessage()) . "</option>";
-                                    }
-                                } else {
-                                    echo "<option value=''>No Department found</option>";
-                                }
-                                ?>
+                                <?php if (!empty($semesters)): ?>
+                                    <?php foreach ($semesters as $semester): ?>
+                                        <option value="<?= $semester['semester_id'] ?>" <?= ($admission_details && isset($admission_details['semester_id']) && $admission_details['semester_id'] == $semester['semester_id']) ? 'selected' : '' ?>>
+                                            <?= htmlspecialchars($semester['semester_name']) ?>
+                                        </option>
+                                    <?php endforeach; ?>
+                                <?php else: ?>
+                                    <option value="" disabled>No semesters found</option>
+                                <?php endif; ?>
                             </select>
                         </div>
                         
@@ -834,19 +708,18 @@ if ($flash): ?>
                                 }
                                 if (!empty($fee_structures)) {
                                     foreach ($fee_structures as $fs): 
-                                        $fs_id = (string)$fs['fee_structure_id']; 
+                                        $fs_id = (string)($fs['fee_structure_id'] ?? ''); 
                                         $sel_fs = in_array($fs_id, $selected_fee_ids) ? 'selected' : '';
-                                        $display_text = htmlspecialchars($fs['fee_type'] . ' (' . ($fs['department_name'] ?? 'N/A') . ') - Rs ' . number_format($fs['amount'] ?? 0, 0));
+                                        $display_text = htmlspecialchars(($fs['fee_type'] ?? 'Fee') . ' (' . ($fs['department_name'] ?? 'N/A') . ') - Rs ' . number_format($fs['amount'] ?? 0, 0));
                                 ?>
                                         <option value="<?= $fs_id ?>" <?= $sel_fs ?>>
                                             <?= $display_text ?>
                                         </option>
                                 <?php 
                                     endforeach; 
-                                } else {
-                                    echo "<option value=''>No fee structures found</option>";
-                                }
-                                ?>
+                                } else { ?>
+                                    <option value="">No fee structures found</option>
+                                <?php } ?>
                             </select>
                             <div style="font-size:11px;color:#6b7280;margin-top:2px;">
                                 <i class="fas fa-info-circle"></i> Hold Ctrl/Cmd to select multiple fee structures
@@ -863,14 +736,21 @@ if ($flash): ?>
                                 <?php
                                 try {
                                     $scholarships = $pdo->query("SELECT * FROM admission_scholarships WHERE LOWER(status) = 'active' ORDER BY scholarship_name")->fetchAll();
-                                    foreach ($scholarships as $sch):
-                                        $sel = ($admission_details && ($admission_details['scholarship_id'] ?? 0) == $sch['scholarship_id']) ? 'selected' : '';
-                                ?>
-                                    <option value="<?= $sch['scholarship_id'] ?>" <?= $sel ?>>
-                                        <?= htmlspecialchars($sch['scholarship_name']) ?> (<?= number_format($sch['percentage'] ?? 0, 0) ?>%)
-                                    </option>
-                                <?php endforeach;
-                                } catch (Exception $e) { echo "<option value=''>Error loading scholarships</option>"; } ?>
+                                    if (!empty($scholarships)) {
+                                        foreach ($scholarships as $sch):
+                                            $sel = ($admission_details && isset($admission_details['scholarship_id']) && ($admission_details['scholarship_id'] ?? 0) == $sch['scholarship_id']) ? 'selected' : '';
+                                    ?>
+                                        <option value="<?= $sch['scholarship_id'] ?>" <?= $sel ?>>
+                                            <?= htmlspecialchars($sch['scholarship_name'] ?? '') ?> (<?= number_format($sch['percentage'] ?? 0, 0) ?>%)
+                                        </option>
+                                    <?php 
+                                        endforeach;
+                                    } else {
+                                        echo "<option value=''>No active scholarships</option>";
+                                    }
+                                } catch (Exception $e) { 
+                                    echo "<option value=''>Error loading scholarships</option>"; 
+                                } ?>
                             </select>
                             <div style="font-size:11px;color:#6b7280;margin-top:2px;">
                                 <i class="fas fa-award"></i> Optional - award a scholarship to this student
@@ -916,53 +796,37 @@ if ($flash): ?>
                     </div>
                 </div>
 
-                <!-- OPTION 1: Approve with Fee -->
+                <!-- OPTION 1: Approve Application -->
                 <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:16px;margin-bottom:16px;">
                     <label style="display:flex;align-items:center;gap:10px;cursor:pointer;">
-                        <input type="radio" name="action" value="approve_with_fee" required <?= (!$fee_exists) ? 'checked' : '' ?>>
+                        <input type="radio" name="action" value="approve" required <?= (!$adm_student) ? 'checked' : '' ?>>
                         <div>
-                            <div style="font-weight:600;color:#065f46;">✅ Approve with Registration Fee</div>
+                            <div style="font-weight:600;color:#065f46;">✅ Approve Application</div>
                             <div style="font-size:13px;color:#047857;">
-                                <i class="fas fa-money-bill-wave"></i> Fee Amount: <strong id="fee_display">Rs 1,000</strong>
-                                <br><em>Student will be created after fee payment confirmation</em>
+                                <i class="fas fa-check-circle"></i> Approve and create student record for fee collection
+                                <br><em>Student will appear in Finance module for admission fee payment</em>
                             </div>
                         </div>
                     </label>
                 </div>
 
-                <!-- OPTION 2: Confirm Payment & Create Student -->
+                <?php if ($fee_paid): ?>
+                <!-- OPTION 2: Fee Paid - Go to Enrollment -->
                 <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:16px;margin-bottom:16px;">
-                    <label style="display:flex;align-items:center;gap:10px;cursor:pointer;">
-                        <input type="radio" name="action" value="confirm_payment" <?= ($fee_exists && $fee_record['status'] === 'pending') ? 'checked' : '' ?>>
+                    <div style="display:flex;align-items:center;gap:10px;">
+                        <div style="font-size:1.2rem;">🎓</div>
                         <div>
-                            <div style="font-weight:600;color:#1e40af;">💳 Confirm Payment & Create Student</div>
+                            <div style="font-weight:600;color:#1e40af;">Admission Fee Confirmed</div>
                             <div style="font-size:13px;color:#1e40af;">
-                                <i class="fas fa-check-circle"></i> Mark fee as paid and create student account
-                                <br><em>Only use after receiving payment</em>
-                            </div>
-                        </div>
-                    </label>
-                    
-                    <!-- Payment Details -->
-                    <div id="payment_details" style="display:<?= ($fee_exists && $fee_record['status'] === 'pending') ? 'block' : 'none' ?>;margin-top:12px;padding-top:12px;border-top:1px solid #bfdbfe;">
-                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-                            <div>
-                                <label style="font-size:12px;font-weight:600;color:#374151;">Payment Method *</label>
-                                <select name="payment_method" style="width:100%;padding:8px;border:1px solid #d1d5db;border-radius:6px;font-size:13px;">
-                                    <option value="Cash">Cash</option>
-                                    <option value="Bank Transfer">Bank Transfer</option>
-                                    <option value="Online">Online</option>
-                                    <option value="Cheque">Cheque</option>
-                                    <option value="Other">Other</option>
-                                </select>
-                            </div>
-                            <div>
-                                <label style="font-size:12px;font-weight:600;color:#374151;">Reference/Transaction ID</label>
-                                <input type="text" name="payment_reference" placeholder="e.g., TRX-12345" style="width:100%;padding:8px;border:1px solid #d1d5db;border-radius:6px;font-size:13px;">
+                                <i class="fas fa-check-circle"></i> Finance has confirmed the admission fee payment
+                                <br><a href="/uni-mis-project/modules/admission/enrollment/index.php?app_id=<?= $app['application_id'] ?>" style="font-weight:600;color:#2563eb;">
+                                    Click here to assign courses & complete registration in Enrollment module
+                                </a>
                             </div>
                         </div>
                     </div>
                 </div>
+                <?php endif; ?>
 
                 <!-- OPTION 3: Reject Application -->
                 <div style="background:#fff1f2;border:1px solid #fecaca;border-radius:8px;padding:16px;margin-bottom:16px;">
@@ -1016,37 +880,13 @@ if ($flash): ?>
 <!-- JavaScript for Dynamic UI -->
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    // Update fee display when fee structure changes
-    const feeStructureSelect = document.getElementById('fee_structure_ids');
-    const feeDisplay = document.getElementById('fee_display');
-    
-    if (feeStructureSelect && feeDisplay) {
-        feeStructureSelect.addEventListener('change', function() {
-            let total = 0;
-            for (let opt of this.selectedOptions) {
-                const text = opt.text;
-                const match = text.match(/Rs\s+([\d,]+)/);
-                if (match) {
-                    total += parseInt(match[1].replace(/,/g, ''));
-                }
-            }
-            feeDisplay.textContent = total > 0 ? 'Rs ' + total.toLocaleString() : 'Rs 0';
-        });
-    }
-    
-    // Toggle rejection reason and payment details
+    // Toggle rejection reason
     document.querySelectorAll('input[name="action"]').forEach(function(radio) {
         radio.addEventListener('change', function() {
             const rejectionDiv = document.getElementById('rejection_reason_div');
-            const paymentDetails = document.getElementById('payment_details');
-            
             if (rejectionDiv) rejectionDiv.style.display = 'none';
-            if (paymentDetails) paymentDetails.style.display = 'none';
-            
             if (this.value === 'reject') {
                 if (rejectionDiv) rejectionDiv.style.display = 'block';
-            } else if (this.value === 'confirm_payment') {
-                if (paymentDetails) paymentDetails.style.display = 'block';
             }
         });
     });
@@ -1061,7 +901,7 @@ document.addEventListener('DOMContentLoaded', function() {
             return false;
         }
         
-        if (action.value === 'approve_with_fee' || action.value === 'save_admission_details') {
+        if (action.value === 'approve' || action.value === 'save_admission_details') {
             const session = document.getElementById('session_id');
             const section = document.getElementById('section_id');
             const semester = document.getElementById('semester_id');
@@ -1103,24 +943,12 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }
         
-        if (action.value === 'confirm_payment') {
-            const paymentMethod = document.querySelector('select[name="payment_method"]');
-            if (!paymentMethod || !paymentMethod.value) {
-                e.preventDefault();
-                alert('Please select a payment method.');
-                if (paymentMethod) paymentMethod.focus();
-                return false;
-            }
-        }
-        
         // Confirm before submitting
         let confirmMsg = 'Are you sure you want to proceed?';
         if (action.value === 'save_admission_details') {
             confirmMsg = 'This will save the admission details (session, section, semester, fee structure).';
-        } else if (action.value === 'approve_with_fee') {
-            confirmMsg = 'This will generate a fee challan for the student.\n\nStudent will be created after payment confirmation.';
-        } else if (action.value === 'confirm_payment') {
-            confirmMsg = 'This will mark the fee as PAID and create the student account.\n\nA student record will be created with default credentials.';
+        } else if (action.value === 'approve') {
+            confirmMsg = 'This will approve the application and create a record for finance fee collection.\n\nStudent will be registered after finance confirms fee payment.';
         } else if (action.value === 'reject') {
             confirmMsg = 'This will REJECT the application.\n\nStudent will NOT be created.';
         }
