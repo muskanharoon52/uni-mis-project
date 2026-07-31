@@ -1,5 +1,5 @@
 <?php
-$pageTitle = 'Bulk Fee Generation';
+$pageTitle = 'Fee Generation';
 include_once __DIR__ . '/../includes/header.php';
 require_once __DIR__ . '/../includes/lms_sync.php';
 
@@ -157,7 +157,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['generate_bulk']) && $f
 
 <div class="card">
     <div class="card-header">
-        <h3>Bulk Fee Generation</h3>
+        <h3>Fee Generation</h3>
     </div>
     <form method="GET" style="padding:18px 22px;">
         <div class="inline-form-row" style="grid-template-columns:1fr 1fr 1fr;">

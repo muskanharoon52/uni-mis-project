@@ -226,12 +226,6 @@ include __DIR__ . '/../includes/sidebar.php';
                                                onclick="return confirm('Are you sure you want to delete this course?')">
                                                 <i class="fas fa-trash"></i>
                                             </a>
-                                            <?php if ($hasProgramId && !empty($course['program_id'])): ?>
-                                                <a href="../semester_courses/index.php?program=<?php echo $course['program_id']; ?>" 
-                                                   class="btn btn-success btn-sm" title="Add to Semester">
-                                                    <i class="fas fa-plus-circle"></i>
-                                                </a>
-                                            <?php endif; ?>
                                         </td>
                                     </tr>
                                 <?php endforeach; ?>

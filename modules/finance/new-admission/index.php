@@ -20,55 +20,19 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['mark_paid'])) {
         mysqli_begin_transaction($conn);
         try {
             $now = date('Y-m-d H:i:s');
+            
+            // =============================================
+            // CHANGE: ONLY MARK FEE AS PAID. NO STUDENT CREATION.
+            // =============================================
             mysqli_query($conn, "UPDATE admission_students SET fee_paid = 1, fee_paid_at = '$now' WHERE id = '$adm_id'");
 
-            $app_id = $adm['application_id'] ? intval($adm['application_id']) : 'NULL';
-            $program_id = intval($adm['program_id'] ?? 1);
-            $session_id = 1;
-            $semester_id = 1;
-
-            if ($adm['application_id']) {
-                $app_result = mysqli_query($conn, "SELECT session_id, applied_semester_id FROM admission_applications WHERE application_id = '{$adm['application_id']}'");
-                if ($app_result && mysqli_num_rows($app_result) > 0) {
-                    $app_row = mysqli_fetch_assoc($app_result);
-                    if ($app_row['session_id']) $session_id = intval($app_row['session_id']);
-                    if ($app_row['applied_semester_id']) $semester_id = intval($app_row['applied_semester_id']);
-                }
-            }
-
-            $login_result = mysqli_query($conn, "SELECT MAX(CAST(login_id AS UNSIGNED)) as max_login FROM users");
-            $login_row = mysqli_fetch_assoc($login_result);
-            $login_id = ($login_row['max_login'] ?? 10000) + 1;
-
-            $sid_result = mysqli_query($conn, "SELECT MAX(student_id) as max_sid FROM students");
-            $sid_row = mysqli_fetch_assoc($sid_result);
-            $next_sid = ($sid_row['max_sid'] ?? 0) + 1;
-
-            $name_slug = strtolower(preg_replace('/[^a-zA-Z0-9]/', '', $adm['full_name']));
-            $username = substr($name_slug, 0, 10) . $login_id;
-            $password_hash = password_hash('student123', PASSWORD_DEFAULT);
-            $email = $adm['email'] ?? $username . '@university.edu';
-            $phone = $adm['contact_no'] ?? '';
-
-            $user_insert = "INSERT INTO users (full_name, username, login_id, email, phone, password_hash, role_id, department_id, status)
-                VALUES ('{$adm['full_name']}', '$username', '$login_id', '$email', '$phone', '$password_hash', 4, '$program_id', 'Active')";
-            mysqli_query($conn, $user_insert);
-            $new_user_id = mysqli_insert_id($conn);
-
-            $roll_no = date('Y') . '-' . $program_id . '-' . str_pad($next_sid, 3, '0', STR_PAD_LEFT);
-            $batch_year = date('Y');
-            $admission_date = date('Y-m-d');
-
-            $student_insert = "INSERT INTO students (application_id, roll_no, full_name, father_name, cnic_or_bform, dob, gender, contact_no, email, address, program_id, admission_session_id, current_session_id, current_semester_id, batch_year, admission_date, status, user_id)
-                VALUES ($app_id, '$roll_no', '{$adm['full_name']}', '{$adm['father_name']}', '{$adm['cnic_or_bform']}', '{$adm['dob']}', '{$adm['gender']}', '$phone', '$email', '{$adm['address']}', '$program_id', '$session_id', '$session_id', '$semester_id', '$batch_year', '$admission_date', 'Active', '$new_user_id')";
-            mysqli_query($conn, $student_insert);
-
-            if ($adm['application_id']) {
-                mysqli_query($conn, "UPDATE admission_applications SET application_status = 'Admitted' WHERE application_id = '{$adm['application_id']}'");
+            // Update the application status to waiting for enrollment
+            if (!empty($adm['application_id'])) {
+                mysqli_query($conn, "UPDATE admission_applications SET application_status = 'Fee Paid' WHERE application_id = '{$adm['application_id']}'");
             }
 
             mysqli_commit($conn);
-            $success = "Admission fee marked as paid. Student registered successfully as <strong>{$adm['full_name']}</strong> (Roll No: $roll_no).";
+            $success = "Admission fee of 20,000 PKR marked as paid for <strong>{$adm['full_name']}</strong>. The student is now ready for enrollment in the Section module.";
         } catch (Exception $e) {
             mysqli_rollback($conn);
             $error = "Error: " . $e->getMessage();
@@ -128,10 +92,10 @@ $students = mysqli_query($conn, "SELECT asd.*, p.program_name
                             <td class="muted"><?= htmlspecialchars($row['contact_no'] ?? 'N/A') ?></td>
                             <td class="muted"><?= $row['created_at'] ? date('M j, Y', strtotime($row['created_at'])) : 'N/A' ?></td>
                             <td>
-                                <form method="POST" onsubmit="return confirm('Mark admission fee as paid for <?= htmlspecialchars($row['full_name']) ?>? This will register the student.');">
+                                <form method="POST" onsubmit="return confirm('Mark 20,000 PKR admission fee as paid for <?= htmlspecialchars($row['full_name']) ?>?');">
                                     <input type="hidden" name="adm_id" value="<?= $row['id'] ?>">
                                     <button type="submit" name="mark_paid" class="btn btn-sm btn-primary">
-                                        Mark Fee Paid &amp; Register
+                                        Mark Fee Paid (20,000 PKR)
                                     </button>
                                 </form>
                             </td>

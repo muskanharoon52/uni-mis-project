@@ -92,13 +92,6 @@ include __DIR__ . '/../includes/header.php';
             <div class="muted" style="font-size:.82rem;">View application status</div>
         </div>
     </a>
-    <a href="<?= BASE_URL ?>Timetable/index.php" style="text-decoration:none;">
-        <div class="card" style="text-align:center;cursor:pointer;transition:box-shadow .2s;" onmouseover="this.style.boxShadow='var(--shadow-md)'" onmouseout="this.style.boxShadow='var(--shadow)'">
-            <div style="font-size:1.8rem;color:var(--danger);margin-bottom:8px;"><i class="fas fa-calendar-alt"></i></div>
-            <div style="font-weight:600;margin-bottom:4px;">Timetable Report</div>
-            <div class="muted" style="font-size:.82rem;">View class schedules</div>
-        </div>
-    </a>
     <a href="<?= BASE_URL ?>student_enrollment/index.php" style="text-decoration:none;">
         <div class="card" style="text-align:center;cursor:pointer;transition:box-shadow .2s;" onmouseover="this.style.boxShadow='var(--shadow-md)'" onmouseout="this.style.boxShadow='var(--shadow)'">
             <div style="font-size:1.8rem;color:var(--muted);margin-bottom:8px;"><i class="fas fa-user-graduate"></i></div>

@@ -172,17 +172,6 @@ try {
 }
 
 // =============================================
-// GET SECTIONS
-// =============================================
-$sections = [];
-try {
-    $section_stmt = $pdo->query("SELECT section_id, section_name, program_id, semester_id, capacity FROM sections WHERE status = 'Active' ORDER BY section_name");
-    $sections = $section_stmt->fetchAll();
-} catch (PDOException $e) {
-    $sections = [];
-}
-
-// =============================================
 // GET SEMESTERS
 // =============================================
 $semesters = [];
@@ -255,7 +244,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         // =============================================
         if ($action === 'save_admission_details') {
             $session_id = $_POST['session_id'] ?? null;
-            $section_id = $_POST['section_id'] ?? null;
             $semester_id = $_POST['semester_id'] ?? null;
             $fee_structure_ids = isset($_POST['fee_structure_ids']) ? implode(',', array_map('intval', $_POST['fee_structure_ids'])) : '';
             $scholarship_id = !empty($_POST['scholarship_id']) ? (int)$_POST['scholarship_id'] : null;
@@ -272,7 +260,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $update_admission = $pdo->prepare("
                     UPDATE student_admission_details SET 
                         session_id = ?,
-                        section_id = ?,
                         semester_id = ?,
                         selected_fee_ids = ?,
                         scholarship_id = ?,
@@ -284,7 +271,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 ");
                 $update_admission->execute([
                     $session_id,
-                    $section_id,
                     $semester_id,
                     $fee_structure_ids,
                     $scholarship_id,
@@ -297,14 +283,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             } else {
                 $insert_admission = $pdo->prepare("
                     INSERT INTO student_admission_details 
-                    (application_id, session_id, section_id, semester_id, selected_fee_ids, scholarship_id,
+                    (application_id, session_id, semester_id, selected_fee_ids, scholarship_id,
                      admission_date, start_date, end_date, admission_year, created_by) 
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, YEAR(?), ?)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, YEAR(?), ?)
                 ");
                 $insert_admission->execute([
                     $app['application_id'],
                     $session_id,
-                    $section_id,
                     $semester_id,
                     $fee_structure_ids,
                     $scholarship_id,
@@ -329,7 +314,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             setFlash('success', 
                 '✅ Admission Details Saved Successfully!<br>
                 <strong>Session:</strong> ' . ($session_id ? 'Selected' : 'Not Set') . '<br>
-                <strong>Section:</strong> ' . ($section_id ? 'Selected' : 'Not Set') . '<br>
                 <strong>Semester:</strong> ' . ($semester_id ? 'Selected' : 'Not Set') . '<br>
                 <strong>Start Date:</strong> ' . date('d M Y', strtotime($start_date))
             );
@@ -657,25 +641,6 @@ if ($flash): ?>
                             </select>
                         </div>
                         
-                        <!-- Section -->
-                        <div>
-                            <label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:3px;">
-                                Section <span style="color:#ef4444;">*</span>
-                            </label>
-                            <select name="section_id" id="section_id" style="width:100%;padding:6px 10px;border:1px solid #d1d5db;border-radius:4px;font-size:13px;">
-                                <option value="">Select Section</option>
-                                <?php if (!empty($sections)): ?>
-                                    <?php foreach ($sections as $section): ?>
-                                        <option value="<?= $section['section_id'] ?>" <?= ($admission_details && isset($admission_details['section_id']) && $admission_details['section_id'] == $section['section_id']) ? 'selected' : '' ?>>
-                                            <?= htmlspecialchars($section['section_name']) ?>
-                                        </option>
-                                    <?php endforeach; ?>
-                                <?php else: ?>
-                                    <option value="" disabled>No sections found</option>
-                                <?php endif; ?>
-                            </select>
-                        </div>
-                        
                         <!-- Semester -->
                         <div>
                             <label style="font-size:12px;font-weight:600;color:#374151;display:block;margin-bottom:3px;">
@@ -791,7 +756,7 @@ if ($flash): ?>
                             <i class="fas fa-save"></i> Save Admission Details
                         </button>
                         <div style="font-size:11px;color:#0369a1;margin-top:4px;text-align:center;">
-                            <i class="fas fa-info-circle"></i> Save session, section, semester and fee structure
+                            <i class="fas fa-info-circle"></i> Save session, semester and fee structure
                         </div>
                     </div>
                 </div>
@@ -903,7 +868,6 @@ document.addEventListener('DOMContentLoaded', function() {
         
         if (action.value === 'approve' || action.value === 'save_admission_details') {
             const session = document.getElementById('session_id');
-            const section = document.getElementById('section_id');
             const semester = document.getElementById('semester_id');
             const feeStructure = document.getElementById('fee_structure_ids');
             
@@ -911,12 +875,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 e.preventDefault();
                 alert('Please select a session.');
                 if (session) session.focus();
-                return false;
-            }
-            if (!section || !section.value) {
-                e.preventDefault();
-                alert('Please select a section.');
-                if (section) section.focus();
                 return false;
             }
             if (!semester || !semester.value) {
@@ -946,7 +904,7 @@ document.addEventListener('DOMContentLoaded', function() {
         // Confirm before submitting
         let confirmMsg = 'Are you sure you want to proceed?';
         if (action.value === 'save_admission_details') {
-            confirmMsg = 'This will save the admission details (session, section, semester, fee structure).';
+            confirmMsg = 'This will save the admission details (session, semester, fee structure).';
         } else if (action.value === 'approve') {
             confirmMsg = 'This will approve the application and create a record for finance fee collection.\n\nStudent will be registered after finance confirms fee payment.';
         } else if (action.value === 'reject') {

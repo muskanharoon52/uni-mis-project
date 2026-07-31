@@ -56,22 +56,56 @@ $roleName = ucfirst($_SESSION['role_name'] ?? 'User');
             <a class="<?= $currentFolder === 'students' ? 'active' : '' ?>" href="/uni-mis-project/students/index.php">
                 Students
             </a>
-            <a class="<?= $currentFolder === 'student_enrollment' ? 'active' : '' ?>" href="/uni-mis-project/student_enrollment/index.php">
-                Enrollment
+            <a class="<?= $currentFolder === 'student_inquiry' ? 'active' : '' ?>" href="/uni-mis-project/student_inquiry/index.php">
+                Student Inquiry
+            </a>
+
+            <?php
+            $acrKeys = [
+                'section_change.php'    => 'Section Change Request',
+                'department_transfer.php' => 'Department Transfer Request',
+                'program_change.php'    => 'Program Change Request',
+                'course_add_drop.php'   => 'Course Add/Drop Request',
+                'course_withdrawal.php' => 'Course Withdrawal Request',
+                'request_status.php'    => 'Request Status',
+            ];
+            $acrIsOpen = $currentFolder === 'academic_change_requests';
+            ?>
+            <div class="nav-group <?= $acrIsOpen ? 'open' : '' ?>" id="nav-acr">
+                <a href="javascript:void(0);" class="nav-parent" onclick="toggleNavGroup('nav-acr'); return false;">
+                    <span>Academic Change Requests</span>
+                    <i class="fas fa-chevron-right nav-caret"></i>
+                </a>
+                <div class="nav-sub">
+                    <?php foreach ($acrKeys as $file => $label): ?>
+                        <?php $activeSub = $currentFolder === 'academic_change_requests' && $currentPage === $file; ?>
+                        <a class="<?= $activeSub ? 'active' : '' ?>" href="/uni-mis-project/academic_change_requests/<?= $file; ?>">
+                            <?= htmlspecialchars($label); ?>
+                        </a>
+                    <?php endforeach; ?>
+            </div>
+        </div>
+        <script>
+        function toggleNavGroup(id) {
+            var el = document.getElementById(id);
+            if (el) el.classList.toggle('open');
+        }
+        </script>
+
+            <span class="nav-section-label">Faculty Management</span>
+            <a class="<?= $currentFolder === 'faculty_registry' ? 'active' : '' ?>" href="/uni-mis-project/faculty_registry/index.php">
+                Faculty Registry
+            </a>
+            <a class="<?= $currentFolder === 'faculty_management' ? 'active' : '' ?>" href="/uni-mis-project/faculty_management/index.php">
+                Faculty Management
+            </a>
+            <a class="<?= $currentFolder === 'faculty_enquiry' ? 'active' : '' ?>" href="/uni-mis-project/faculty_enquiry/index.php">
+                Faculty Enquiry
             </a>
 
             <span class="nav-section-label">Academics</span>
             <a class="<?= $currentFolder === 'Courses' ? 'active' : '' ?>" href="/uni-mis-project/Courses/index.php">
                 Courses
-            </a>
-            <a class="<?= $currentFolder === 'semester_courses' ? 'active' : '' ?>" href="/uni-mis-project/semester_courses/index.php">
-                Semester Courses
-            </a>
-            <a class="<?= $currentFolder === 'teacher_assignment' ? 'active' : '' ?>" href="/uni-mis-project/teacher_assignment/index.php">
-                Teachers
-            </a>
-            <a class="<?= $currentFolder === 'TImetable' ? 'active' : '' ?>" href="/uni-mis-project/TImetable/index.php">
-                Timetable
             </a>
             <a class="<?= $currentFolder === 'attendance' ? 'active' : '' ?>" href="/uni-mis-project/attendance/index.php">
                 Attendance
@@ -81,18 +115,57 @@ $roleName = ucfirst($_SESSION['role_name'] ?? 'User');
                 Application
             </a>
 
-            <div class="spacer"></div>
+            <?php
+            $ttKeys = [
+                'index.php'      => 'Timetable Home',
+                'generate.php'   => 'Generate Timetable',
+                'view.php'       => 'View Timetable',
+                'conflicts.php'  => 'Conflict Detection',
+                'adjust.php'     => 'Timetable Adjustment',
+                'publish.php'    => 'Publish Timetable',
+            ];
+            $ttIsOpen = $currentFolder === 'timetable_management';
+            ?>
+            <div class="nav-group <?= $ttIsOpen ? 'open' : '' ?>" id="nav-tt">
+                <a href="javascript:void(0);" class="nav-parent" onclick="toggleNavGroup('nav-tt'); return false;">
+                    <span>Timetable Management</span>
+                    <i class="fas fa-chevron-right nav-caret"></i>
+                </a>
+                <div class="nav-sub">
+                    <?php foreach ($ttKeys as $file => $label): ?>
+                        <?php $activeSub = $currentFolder === 'timetable_management' && $currentPage === $file; ?>
+                        <a class="<?= $activeSub ? 'active' : '' ?>" href="/uni-mis-project/timetable_management/<?= $file; ?>">
+                            <?= htmlspecialchars($label); ?>
+                        </a>
+                    <?php endforeach; ?>
+                </div>
+            </div>
 
             <?php
-            $isSuper = strtolower($_SESSION['role_name'] ?? '') === 'super admin';
-            $isAdmin = strtolower($_SESSION['role_name'] ?? '') === 'admin';
-            if ($isSuper || $isAdmin):
+            $ssrKeys = [
+                'index.php'    => 'Requests Home',
+                'submit.php'   => 'Submit Request',
+                'review.php'   => 'Review Requests',
+                'history.php'  => 'Request History',
+            ];
+            $ssrIsOpen = $currentFolder === 'student_schedule_requests';
             ?>
-            <span class="nav-section-label">Administration</span>
-            <a class="<?= $currentFolder === 'admin' ? 'active' : '' ?>" href="/uni-mis-project/modules/admin/users.php">
-                User Management
-            </a>
-            <?php endif; ?>
+            <div class="nav-group <?= $ssrIsOpen ? 'open' : '' ?>" id="nav-ssr">
+                <a href="javascript:void(0);" class="nav-parent" onclick="toggleNavGroup('nav-ssr'); return false;">
+                    <span>Student Schedule Requests</span>
+                    <i class="fas fa-chevron-right nav-caret"></i>
+                </a>
+                <div class="nav-sub">
+                    <?php foreach ($ssrKeys as $file => $label): ?>
+                        <?php $activeSub = $currentFolder === 'student_schedule_requests' && $currentPage === $file; ?>
+                        <a class="<?= $activeSub ? 'active' : '' ?>" href="/uni-mis-project/student_schedule_requests/<?= $file; ?>">
+                            <?= htmlspecialchars($label); ?>
+                        </a>
+                    <?php endforeach; ?>
+                </div>
+            </div>
+
+            <div class="spacer"></div>
 
             <a href="/uni-mis-project/logout.php" class="sidebar-logout-btn">
                 Logout

@@ -2,21 +2,20 @@
 require_once __DIR__ . '/../config/db_connect.php';
 require_once __DIR__ . '/../modules/sso/includes/auth.php';
 
-// Check if logged in
 if (!isLoggedIn()) {
     header('Location: /uni-mis-project/');
     exit;
 }
 
 $user = getCurrentUser();
-$role = $user['role_name'] ?? 'User';
+$role = strtolower($user['role_name'] ?? 'user');
 
-// Helper function to check if column exists
+global $conn;
+
 if (!function_exists('columnExists')) {
     function columnExists($conn, $table, $column) {
         try {
-            $query = "SHOW COLUMNS FROM $table LIKE '$column'";
-            $result = mysqli_query($conn, $query);
+            $result = mysqli_query($conn, "SHOW COLUMNS FROM $table LIKE '$column'");
             return ($result && mysqli_num_rows($result) > 0);
         } catch (Exception $e) {
             return false;
@@ -24,180 +23,202 @@ if (!function_exists('columnExists')) {
     }
 }
 
-// Helper function to get table columns
-if (!function_exists('getTableColumns')) {
-    function getTableColumns($conn, $table) {
-        try {
-            $columns = [];
-            $query = "SHOW COLUMNS FROM $table";
-            $result = mysqli_query($conn, $query);
-            if ($result) {
-                while ($row = mysqli_fetch_assoc($result)) {
-                    $columns[] = $row['Field'];
+$error = '';
+$success = '';
+
+$dept_filter = isset($_GET['dept']) ? (int)$_GET['dept'] : 0;
+$session_filter = isset($_GET['session']) ? (int)$_GET['session'] : 0;
+
+$hasSectionId = columnExists($conn, 'admission_students', 'section_id');
+
+// =============================================
+// GET FILTER DATA
+// =============================================
+$departments = [];
+$res = mysqli_query($conn, "SELECT department_id, department_name FROM departments WHERE status = 'Active' ORDER BY department_name");
+if ($res) { while ($row = mysqli_fetch_assoc($res)) { $departments[] = $row; } }
+
+$sessions = [];
+$res = mysqli_query($conn, "SELECT session_id, session_name FROM sessions WHERE status = 'Active' ORDER BY session_name");
+if ($res) { while ($row = mysqli_fetch_assoc($res)) { $sessions[] = $row; } }
+
+$sections = [];
+if ($dept_filter > 0) {
+    $stmt = mysqli_prepare($conn, "SELECT DISTINCT TRIM(REPLACE(s.section_name, 'Section ', '')) AS section_name FROM sections s JOIN programs p ON p.program_id = s.program_id WHERE p.department_id = ? AND s.status = 'Active' ORDER BY section_name");
+    if ($stmt) {
+        mysqli_stmt_bind_param($stmt, 'i', $dept_filter);
+        mysqli_stmt_execute($stmt);
+        $res = mysqli_stmt_get_result($stmt);
+        while ($row = mysqli_fetch_assoc($res)) {
+            if (!empty($row['section_name'])) { $sections[] = $row['section_name']; }
+        }
+        mysqli_stmt_close($stmt);
+    }
+    $sections = array_values(array_unique($sections));
+}
+
+// =============================================
+// HANDLE POST (single combined enroll form)
+// =============================================
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $action = $_POST['action'] ?? '';
+    $student_ids = isset($_POST['student_ids']) && is_array($_POST['student_ids']) ? array_map('intval', $_POST['student_ids']) : [];
+
+    // ============ ENROLL SELECTED STUDENTS ============
+    if ($action === 'enroll') {
+        $course_ids = isset($_POST['course_ids']) && is_array($_POST['course_ids']) ? array_map('intval', $_POST['course_ids']) : [];
+        $new_section = trim($_POST['new_section'] ?? '');
+        $capacity = isset($_POST['capacity']) ? (int)$_POST['capacity'] : 0;
+        $dept_id = isset($_POST['dept_id']) ? (int)$_POST['dept_id'] : $dept_filter;
+        $allocated_by = (int)($_SESSION['user_id'] ?? 0);
+
+        if (empty($student_ids)) {
+            $error = "No students selected.";
+        } elseif (empty($course_ids) && empty($new_section)) {
+            $error = "Please select at least one course or a section.";
+        } else {
+            $student_count = 0;
+            $course_count = 0;
+            $section_count = 0;
+
+            foreach ($student_ids as $aid) {
+                $q = mysqli_query($conn, "SELECT application_id, program_id, full_name FROM admission_students WHERE id = $aid");
+                $st = $q ? mysqli_fetch_assoc($q) : null;
+                if (!$st || empty($st['application_id'])) continue;
+                $app_id = (int)$st['application_id'];
+                $student_count++;
+
+                // --- Assign predefined courses ---
+                if (!empty($course_ids)) {
+                    // Get roll_no if student is already registered
+                    $roll_no = '';
+                    $rq = mysqli_query($conn, "SELECT roll_no FROM students WHERE application_id = $app_id LIMIT 1");
+                    if ($rq && ($rr = mysqli_fetch_assoc($rq))) { $roll_no = $rr['roll_no']; }
+
+                    foreach ($course_ids as $cid) {
+                        $chk = mysqli_query($conn, "SELECT id FROM student_course_allocation WHERE application_id = $app_id AND course_id = $cid");
+                        if ($chk && mysqli_num_rows($chk) > 0) continue;
+
+                        $cq = mysqli_query($conn, "SELECT course_code, course_name, course_title, credit_hours FROM courses WHERE course_id = $cid");
+                        $c = $cq ? mysqli_fetch_assoc($cq) : null;
+                        if (!$c) continue;
+                        $c_name = $c['course_name'] ?: $c['course_title'];
+
+                        $ins = mysqli_query($conn, "INSERT INTO student_course_allocation (application_id, course_id, course_code, course_name, credit_hours, semester, allocated_by) VALUES ($app_id, $cid, '" . mysqli_real_escape_string($conn, $c['course_code']) . "', '" . mysqli_real_escape_string($conn, $c_name) . "', " . (int)$c['credit_hours'] . ", 1, $allocated_by)");
+                        if ($ins) $course_count++;
+
+                        // Also enroll registered students in student_courses
+                        if (!empty($roll_no)) {
+                            $chk2 = mysqli_query($conn, "SELECT id FROM student_courses WHERE student_id = '" . mysqli_real_escape_string($conn, $roll_no) . "' AND course_id = $cid");
+                            if (!($chk2 && mysqli_num_rows($chk2) > 0)) {
+                                mysqli_query($conn, "INSERT INTO student_courses (student_id, course_id, enrollment_date, status) VALUES ('" . mysqli_real_escape_string($conn, $roll_no) . "', $cid, CURDATE(), 'Active')");
+                            }
+                        }
+                    }
+                }
+
+                // --- Assign section ---
+                if (!empty($new_section)) {
+                    $section_id = null;
+                    if ($st['program_id']) {
+                        $sq = mysqli_query($conn, "SELECT section_id FROM sections WHERE TRIM(REPLACE(section_name, 'Section ', '')) = '" . mysqli_real_escape_string($conn, $new_section) . "' AND program_id = " . (int)$st['program_id'] . " AND status = 'Active' LIMIT 1");
+                        if ($sq && ($r = mysqli_fetch_assoc($sq))) $section_id = $r['section_id'];
+                    }
+                    if (!$section_id) {
+                        $sq = mysqli_query($conn, "SELECT section_id FROM sections WHERE TRIM(REPLACE(section_name, 'Section ', '')) = '" . mysqli_real_escape_string($conn, $new_section) . "' AND status = 'Active' LIMIT 1");
+                        if ($sq && ($r = mysqli_fetch_assoc($sq))) $section_id = $r['section_id'];
+                    }
+
+                    if ($section_id) {
+                        $upd = mysqli_query($conn, "UPDATE admission_students SET section_id = " . (int)$section_id . " WHERE id = $aid");
+                        if ($upd) $section_count++;
+                        if (!empty($st['application_id'])) {
+                            mysqli_query($conn, "UPDATE students SET section_id = " . (int)$section_id . " WHERE application_id = " . (int)$st['application_id']);
+                        }
+                    }
                 }
             }
-            return $columns;
-        } catch (Exception $e) {
-            return [];
+
+            // --- Set capacity for the selected section (dept-wide) ---
+            if (!empty($new_section) && $capacity > 0 && $dept_id > 0) {
+                $upd = "UPDATE sections s JOIN programs p ON p.program_id = s.program_id SET s.capacity = $capacity WHERE p.department_id = $dept_id AND TRIM(REPLACE(s.section_name, 'Section ', '')) = '" . mysqli_real_escape_string($conn, $new_section) . "' AND s.status = 'Active'";
+                if (mysqli_query($conn, $upd)) {
+                    $affected = mysqli_affected_rows($conn);
+                    $success .= " Capacity for Section '$new_section' set to $capacity (updated $affected record(s)).";
+                }
+            }
+
+            $msg_parts = [];
+            if ($student_count > 0) $msg_parts[] = "$student_count student(s)";
+            if ($course_count > 0) $msg_parts[] = "$course_count course allocation(s)";
+            if ($section_count > 0) $msg_parts[] = "$section_count section assignment(s)";
+            $success = "Enrolled: " . implode(', ', $msg_parts) . "." . $success;
+        }
+    }
+
+    // ============ SET CAPACITY ONLY ============
+    elseif ($action === 'set_capacity') {
+        $section_name = trim($_POST['section_name'] ?? '');
+        $capacity = isset($_POST['capacity']) ? (int)$_POST['capacity'] : 0;
+        $dept_id = isset($_POST['dept_id']) ? (int)$_POST['dept_id'] : 0;
+
+        if (empty($section_name)) {
+            $error = "Please select a section.";
+        } elseif ($capacity <= 0) {
+            $error = "Capacity must be a positive number.";
+        } elseif ($dept_id <= 0) {
+            $error = "Please select a department.";
+        } else {
+            $upd = "UPDATE sections s JOIN programs p ON p.program_id = s.program_id SET s.capacity = $capacity WHERE p.department_id = $dept_id AND TRIM(REPLACE(s.section_name, 'Section ', '')) = '" . mysqli_real_escape_string($conn, $section_name) . "' AND s.status = 'Active'";
+            if (mysqli_query($conn, $upd)) {
+                $affected = mysqli_affected_rows($conn);
+                $success = "Capacity for section '$section_name' set to $capacity (updated $affected section record(s)).";
+            } else {
+                $error = "Error updating capacity: " . mysqli_error($conn);
+            }
         }
     }
 }
 
-// Get filter parameters
-$search = isset($_GET['search']) ? trim($_GET['search']) : '';
-$program = isset($_GET['program']) ? (int)$_GET['program'] : 0;
-$status = isset($_GET['status']) ? $_GET['status'] : '';
-
-// Use global $conn
-global $conn;
-
-// Check which columns exist in users table
-$userColumns = getTableColumns($conn, 'users');
-$hasUserPhone = in_array('phone', $userColumns);
-$hasUserEmail = in_array('email', $userColumns);
-$hasUserFullName = in_array('full_name', $userColumns);
-
-// Check which columns exist in students table
-$studentColumns = getTableColumns($conn, 'students');
-$hasStudentRollNo = in_array('roll_no', $studentColumns);
-$hasStudentFatherName = in_array('father_name', $studentColumns);
-$hasStudentProgramId = in_array('program_id', $studentColumns);
-$hasStudentSemester = in_array('semester', $studentColumns);
-$hasStudentStatus = in_array('status', $studentColumns);
-$hasStudentUserId = in_array('user_id', $studentColumns);
-
-// Determine which column to use for student name
-$studentNameColumn = 'student_name'; // Most likely column in 'students'
-if (!in_array($studentNameColumn, $studentColumns)) {
-    $studentNameColumn = 'name'; // Fallback
-}
-if (!in_array($studentNameColumn, $studentColumns)) {
-    $studentNameColumn = 'full_name'; // Final fallback
-}
-
-// Build query with all joins - only include columns that exist
-$query = "SELECT s.*";
-
-// Add program fields
-$query .= ", p.program_name, p.program_code";
-
-// Add user fields - only if they exist AND if students table has user_id column
-if ($hasStudentUserId) {
-    // IMPORTANT: We prioritize the name from the students table first
-    if (in_array($studentNameColumn, $studentColumns)) {
-        $query .= ", s.$studentNameColumn as display_name";
-    } else {
-        $query .= ", NULL as display_name";
-    }
-
-    if ($hasUserFullName) {
-        $query .= ", u.full_name as user_full_name";
-    } else {
-        $query .= ", NULL as user_full_name";
-    }
-
-    if ($hasUserEmail) {
-        $query .= ", u.email";
-    } else {
-        $query .= ", NULL as email";
-    }
-
-    if ($hasUserPhone) {
-        $query .= ", u.phone";
-    } else {
-        $query .= ", NULL as phone";
-    }
-} else {
-    // If no user_id column, set user fields to NULL
-    $query .= ", NULL as display_name, NULL as user_full_name, NULL as email, NULL as phone";
-}
-
-$query .= " FROM students s
-          LEFT JOIN programs p ON s.program_id = p.program_id";
-
-// Only join users table if students table has user_id column
-if ($hasStudentUserId) {
-    $query .= " LEFT JOIN users u ON s.user_id = u.user_id";
-}
-
-$query .= " WHERE 1=1";
+// =============================================
+// BUILD STUDENT LIST (Removed Search & Section filters)
+// =============================================
+$sql = "SELECT asd.*, aa.session_id AS app_session_id, p.program_name, d.department_name, sec.section_name AS assigned_section,
+            CASE WHEN st.student_id IS NOT NULL THEN 1 ELSE 0 END AS is_registered, st.roll_no AS reg_roll_no
+        FROM admission_students asd
+        LEFT JOIN admission_applications aa ON aa.application_id = asd.application_id
+        LEFT JOIN programs p ON p.program_id = asd.program_id
+        LEFT JOIN departments d ON d.department_id = p.department_id
+        LEFT JOIN sections sec ON sec.section_id = asd.section_id
+        LEFT JOIN students st ON st.application_id = asd.application_id
+        WHERE asd.fee_paid = 1 AND asd.status = 'active'";
 
 $params = [];
-$types = "";
+$types = '';
 
-if (!empty($search)) {
-    $searchConditions = [];
-    
-    // Search using the correct name column from students
-    if (in_array($studentNameColumn, $studentColumns)) {
-        $searchConditions[] = "s.$studentNameColumn LIKE ?";
-    }
-    
-    if ($hasUserFullName && $hasStudentUserId) {
-        $searchConditions[] = "u.full_name LIKE ?";
-    }
-    if ($hasStudentRollNo) {
-        $searchConditions[] = "s.roll_no LIKE ?";
-    }
-    if ($hasUserEmail && $hasStudentUserId) {
-        $searchConditions[] = "u.email LIKE ?";
-    }
-    if ($hasStudentFatherName) {
-        $searchConditions[] = "s.father_name LIKE ?";
-    }
-    
-    // If no search conditions available, search by student_id
-    if (empty($searchConditions)) {
-        $searchConditions[] = "s.student_id LIKE ?";
-    }
-    
-    $query .= " AND (" . implode(" OR ", $searchConditions) . ")";
-    $searchParam = "%$search%";
-    
-    foreach ($searchConditions as $condition) {
-        $params[] = $searchParam;
-        $types .= "s";
-    }
+if ($dept_filter > 0) { $sql .= " AND p.department_id = ?"; $params[] = $dept_filter; $types .= 'i'; }
+if ($session_filter > 0) { $sql .= " AND aa.session_id = ?"; $params[] = $session_filter; $types .= 'i'; }
+
+$sql .= " ORDER BY asd.id DESC";
+
+$students = [];
+$stmt = mysqli_prepare($conn, $sql);
+if ($stmt) {
+    if (!empty($params)) { mysqli_stmt_bind_param($stmt, $types, ...$params); }
+    mysqli_stmt_execute($stmt);
+    $res = mysqli_stmt_get_result($stmt);
+    while ($row = mysqli_fetch_assoc($res)) { $students[] = $row; }
+    mysqli_stmt_close($stmt);
 }
 
-if ($program > 0 && $hasStudentProgramId) {
-    $query .= " AND s.program_id = ?";
-    $params[] = $program;
-    $types .= "i";
-}
-
-if (!empty($status) && $hasStudentStatus) {
-    $query .= " AND s.status = ?";
-    $params[] = $status;
-    $types .= "s";
-}
-
-$query .= " ORDER BY s.student_id DESC";
-
-// Prepare and execute
-$stmt = $conn->prepare($query);
-
-if ($stmt === false) {
-    die("Error in query: " . $conn->error);
-}
-
-if (!empty($params)) {
-    $stmt->bind_param($types, ...$params);
-}
-
-$stmt->execute();
-$result = $stmt->get_result();
-$students = $result->fetch_all(MYSQLI_ASSOC);
-$stmt->close();
-
-// Get programs for filter
-$program_query = "SELECT program_id as id, program_name as name FROM programs ORDER BY program_name";
-$program_result = $conn->query($program_query);
-
-if ($program_result === false) {
-    $programs = [];
+// Courses for assignment (predefined courses from SSO Courses area)
+$courses = [];
+if ($dept_filter > 0) {
+    $cres = mysqli_query($conn, "SELECT c.course_id, c.course_code, COALESCE(NULLIF(c.course_name, ''), c.course_title) AS course_name, c.credit_hours FROM courses c WHERE c.status = 'Active' AND (c.program_id IN (SELECT program_id FROM programs WHERE department_id = $dept_filter) OR c.program_id IS NULL) ORDER BY c.course_code");
+    if ($cres) { while ($row = mysqli_fetch_assoc($cres)) { $courses[] = $row; } }
 } else {
-    $programs = $program_result->fetch_all(MYSQLI_ASSOC);
+    $cres = mysqli_query($conn, "SELECT c.course_id, c.course_code, COALESCE(NULLIF(c.course_name, ''), c.course_title) AS course_name, c.credit_hours FROM courses c WHERE c.status = 'Active' ORDER BY c.course_code");
+    if ($cres) { while ($row = mysqli_fetch_assoc($cres)) { $courses[] = $row; } }
 }
 
 include __DIR__ . '/../includes/header.php';
@@ -205,66 +226,57 @@ include __DIR__ . '/../includes/sidebar.php';
 ?>
 
     <div class="container-fluid">
-        <!-- Page Header with Add Student Button -->
+        <!-- Page Header -->
         <div class="page-header">
             <h2><i class="fas fa-user-graduate"></i> Student Management</h2>
             <div class="btn-group">
-                <a href="add.php" class="btn btn-add-student">
-                    <i class="fas fa-user-plus"></i> Add Student
-                </a>
-                <a href="export.php" class="btn btn-export">
-                    <i class="fas fa-file-export"></i> Export
-                </a>
+                <span class="badge bg-primary" style="align-self:center;"><?= count($students) ?> activated student(s)</span>
             </div>
         </div>
 
-        <!-- Filter Section -->
+        <?php if ($error): ?><div class="alert alert-error"><i class="fas fa-exclamation-circle"></i> <?= htmlspecialchars($error) ?></div><?php endif; ?>
+        <?php if ($success): ?><div class="alert alert-success"><i class="fas fa-check-circle"></i> <?= $success ?></div><?php endif; ?>
+
+        <!-- Filter Section (Removed Search and Section) -->
         <div class="panel">
-            <form method="GET" class="row g-3">
-                <div class="col-md-4">
-                    <input type="text" name="search" class="form-control" 
-                           placeholder="Search by name, roll no, father name or email..." 
-                           value="<?php echo htmlspecialchars($search); ?>">
-                </div>
-                <div class="col-md-3">
-                    <select name="program" class="form-select">
-                        <option value="0">All Programs</option>
-                        <?php foreach ($programs as $prog): ?>
-                            <option value="<?php echo $prog['id']; ?>" 
-                                <?php echo $program == $prog['id'] ? 'selected' : ''; ?>>
-                                <?php echo htmlspecialchars($prog['name']); ?>
+            <form method="GET" class="row g-3" id="filterForm">
+                <div class="col-md-6">
+                    <select name="dept" class="form-select" onchange="this.form.submit()">
+                        <option value="0">All Departments</option>
+                        <?php foreach ($departments as $d): ?>
+                            <option value="<?= $d['department_id']; ?>" <?= $dept_filter == $d['department_id'] ? 'selected' : ''; ?>>
+                                <?= htmlspecialchars($d['department_name']); ?>
                             </option>
                         <?php endforeach; ?>
                     </select>
                 </div>
-                <div class="col-md-2">
-                    <select name="status" class="form-select">
-                        <option value="">All Status</option>
-                        <option value="active" <?php echo $status == 'active' ? 'selected' : ''; ?>>Active</option>
-                        <option value="confirmed" <?php echo $status == 'confirmed' ? 'selected' : ''; ?>>Confirmed</option>
-                        <option value="pending" <?php echo $status == 'pending' ? 'selected' : ''; ?>>Pending</option>
-                        <option value="inactive" <?php echo $status == 'inactive' ? 'selected' : ''; ?>>Inactive</option>
-                        <option value="graduated" <?php echo $status == 'graduated' ? 'selected' : ''; ?>>Graduated</option>
+                <div class="col-md-6">
+                    <select name="session" class="form-select" onchange="this.form.submit()">
+                        <option value="0">All Sessions</option>
+                        <?php foreach ($sessions as $s): ?>
+                            <option value="<?= $s['session_id']; ?>" <?= $session_filter == $s['session_id'] ? 'selected' : ''; ?>>
+                                <?= htmlspecialchars($s['session_name']); ?>
+                            </option>
+                        <?php endforeach; ?>
                     </select>
                 </div>
-                <div class="col-md-3">
-                    <button type="submit" class="btn btn-primary">
-                        <i class="fas fa-search"></i> Filter
-                    </button>
-                    <a href="index.php" class="btn btn-secondary">
-                        <i class="fas fa-times"></i> Reset
-                    </a>
+                <div class="col-12 mt-2">
+                    <button type="submit" class="btn btn-primary"><i class="fas fa-search"></i> Filter</button>
+                    <a href="index.php" class="btn btn-secondary"><i class="fas fa-times"></i> Reset</a>
                 </div>
             </form>
         </div>
 
+        <!-- Single form: student checkboxes + enroll panel below -->
+        <form method="POST" id="bulkForm">
+
         <!-- Students Table -->
-        <div class="card">
+        <div class="card mt-3">
             <div class="card-header d-flex justify-content-between align-items-center">
-                <h5>All Students (<?php echo count($students); ?>)</h5>
-                <?php if (count($students) > 0): ?>
-                    <span class="badge bg-primary"><?php echo count($students); ?> records</span>
-                <?php endif; ?>
+                <h5>Activated Admission Students (<?= count($students); ?>)</h5>
+                <label style="font-weight:500;">
+                    <input type="checkbox" id="select_all" style="margin-right:5px;"> Select All
+                </label>
             </div>
             <div class="card-body">
                 <?php if (!empty($students)): ?>
@@ -272,93 +284,35 @@ include __DIR__ . '/../includes/sidebar.php';
                         <table class="table table-hover datatable">
                             <thead>
                                 <tr>
-                                    <th>Roll No</th>
-                                    <th>Student</th>
-                                    <th>Father's Name</th>
+                                    <th><input type="checkbox" id="select_all_top"></th>
+                                    <th>Student ID</th>
+                                    <th>Name</th>
                                     <th>Program</th>
-                                    <th>Semester</th>
+                                    <th>Department</th>
+                                    <th>Session</th>
                                     <th>Status</th>
-                                    <th>Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                <?php foreach ($students as $student): ?>
+                                <?php foreach ($students as $s): ?>
                                     <tr>
+                                        <td><input type="checkbox" name="student_ids[]" value="<?= $s['id']; ?>" class="student-cb"></td>
+                                        <td style="font-weight:600;"><?= htmlspecialchars($s['student_id'] ?? 'N/A'); ?></td>
                                         <td>
-                                            <span class="roll-badge">
-                                                <?php echo htmlspecialchars($student['roll_no'] ?? 'N/A'); ?>
-                                            </span>
+                                            <?= htmlspecialchars($s['full_name'] ?? 'N/A'); ?>
+                                            <?php if (!empty($s['reg_roll_no'])): ?>
+                                                <br><small class="text-muted"><?= htmlspecialchars($s['reg_roll_no']); ?></small>
+                                            <?php endif; ?>
                                         </td>
+                                        <td><?= htmlspecialchars($s['program_name'] ?? 'N/A'); ?></td>
+                                        <td><?= htmlspecialchars($s['department_name'] ?? 'N/A'); ?></td>
+                                        <td class="muted"><?= $s['app_session_id'] ? 'Session #' . htmlspecialchars($s['app_session_id']) : 'N/A'; ?></td>
                                         <td>
-                                            <div class="d-flex align-items-center">
-                                                <div class="student-avatar me-2">
-                                                    <?php 
-                                                    // Display the first letter of the student's actual name
-                                                    $name = $student['display_name'] ?? 'U';
-                                                    echo strtoupper(substr($name, 0, 1)); 
-                                                    ?>
-                                                </div>
-                                                <div>
-                                                    <div>
-                                                        <?php 
-                                                        // Show name from the students table first
-                                                        echo htmlspecialchars($student['display_name'] ?? 'N/A'); 
-                                                        ?>
-                                                    </div>
-                                                    <?php if (!empty($student['email']) && $student['email'] != 'N/A'): ?>
-                                                        <small class="text-muted"><?php echo htmlspecialchars($student['email']); ?></small>
-                                                    <?php endif; ?>
-                                                    <?php if (!empty($student['phone']) && $student['phone'] != 'N/A'): ?>
-                                                        <br>
-                                                        <small class="text-muted"><i class="fas fa-phone"></i> <?php echo htmlspecialchars($student['phone']); ?></small>
-                                                    <?php endif; ?>
-                                                </div>
-                                            </div>
-                                        </td>
-                                        <td class="father-name">
-                                            <?php echo htmlspecialchars($student['father_name'] ?? 'N/A'); ?>
-                                        </td>
-                                        <td>
-                                            <?php echo htmlspecialchars($student['program_name'] ?? 'N/A'); ?>
-                                        </td>
-                                        <td>
-                                            <?php 
-                                            $semester_num = $student['semester'] ?? 1;
-                                            $ordinal = ['1st', '2nd', '3rd', '4th', '5th', '6th', '7th', '8th'];
-                                            echo ($semester_num >= 1 && $semester_num <= 8) 
-                                                ? $ordinal[$semester_num - 1] . ' Semester' 
-                                                : 'Semester ' . $semester_num;
-                                            ?>
-                                        </td>
-                                        <td>
-                                            <?php
-                                            $status_class = match($student['status']) {
-                                                'active' => 'active',
-                                                'confirmed' => 'confirmed',
-                                                'pending' => 'pending',
-                                                'inactive' => 'inactive',
-                                                'graduated' => 'graduated',
-                                                default => 'inactive'
-                                            };
-                                            ?>
-                                            <span class="status-badge status-<?php echo $status_class; ?>">
-                                                <?php echo ucfirst($student['status'] ?? 'N/A'); ?>
-                                            </span>
-                                        </td>
-                                        <td class="table-actions">
-                                            <a href="view.php?id=<?php echo $student['student_id']; ?>" 
-                                               class="btn btn-info btn-sm" title="View">
-                                                <i class="fas fa-eye"></i>
-                                            </a>
-                                            <a href="edit.php?id=<?php echo $student['student_id']; ?>" 
-                                               class="btn btn-primary btn-sm" title="Edit">
-                                                <i class="fas fa-edit"></i>
-                                            </a>
-                                            <a href="delete.php?id=<?php echo $student['student_id']; ?>" 
-                                               class="btn btn-danger btn-sm" title="Delete"
-                                               onclick="return confirm('Are you sure you want to delete this student?')">
-                                                <i class="fas fa-trash"></i>
-                                            </a>
+                                            <?php if ($s['is_registered']): ?>
+                                                <span class="status-badge status-active">Registered</span>
+                                            <?php else: ?>
+                                                <span class="status-badge status-pending">Pending</span>
+                                            <?php endif; ?>
                                         </td>
                                     </tr>
                                 <?php endforeach; ?>
@@ -368,15 +322,96 @@ include __DIR__ . '/../includes/sidebar.php';
                 <?php else: ?>
                     <div class="empty-state">
                         <i class="fas fa-user-graduate"></i>
-                        <h5>No Students Found</h5>
-                        <p class="text-muted">Start by adding your first student.</p>
-                        <a href="add.php" class="btn btn-primary mt-3">
-                            <i class="fas fa-user-plus"></i> Add First Student
-                        </a>
+                        <h5>No Activated Students Found</h5>
+                        <p class="text-muted">Students appear here after their admission fee is marked as paid in the Finance module.</p>
                     </div>
                 <?php endif; ?>
             </div>
         </div>
+
+        <!-- Enroll Selected Students (Section and Capacity KEPT HERE) -->
+        <div class="panel mt-3" style="border:1px dashed var(--border);">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <h5 class="m-0"><i class="fas fa-user-plus"></i> Enroll Selected Students</h5>
+                <span class="text-muted small">Students ticked above will be enrolled below.</span>
+            </div>
+            <div class="row g-3 align-items-end">
+                <div class="col-md-5">
+                    <label class="form-label fw-semibold small text-muted">Predefined Courses (from SSO Courses)</label>
+                    <select name="course_ids[]" class="form-select" multiple style="min-height:90px;">
+                        <?php foreach ($courses as $c): ?>
+                            <option value="<?= $c['course_id']; ?>">
+                                <?= htmlspecialchars($c['course_code'] . ' - ' . ($c['course_name'] ?: 'Untitled')); ?> (<?= (int)$c['credit_hours']; ?> cr)
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
+                    <div class="small text-muted mt-1"><i class="fas fa-info-circle"></i> Hold Ctrl/Cmd to select multiple courses</div>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label fw-semibold small text-muted">Section</label>
+                    <select name="new_section" class="form-select">
+                        <option value="">Select Section</option>
+                        <?php foreach ($sections as $sec): ?>
+                            <option value="<?= htmlspecialchars($sec); ?>">Section <?= htmlspecialchars($sec); ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label fw-semibold small text-muted">Capacity</label>
+                    <input type="number" name="capacity" class="form-control" min="1" placeholder="e.g. 30">
+                </div>
+                <div class="col-md-2">
+                    <input type="hidden" name="dept_id" value="<?= $dept_filter; ?>">
+                    <button type="submit" name="action" value="enroll" class="btn btn-primary w-100" onclick="return requireSelection('enroll')">
+                        <i class="fas fa-check-circle"></i> Enroll
+                    </button>
+                </div>
+            </div>
+            <div class="small text-muted mt-2">
+                <i class="fas fa-users"></i> Capacity sets the max students allowed in the chosen section. Courses are assigned to all selected students.
+            </div>
+        </div>
+
+        </form>
     </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const selects = ['#select_all', '#select_all_top'];
+    selects.forEach(function(sel) {
+        const el = document.querySelector(sel);
+        if (el) el.addEventListener('change', function() {
+            document.querySelectorAll('.student-cb').forEach(function(cb) {
+                cb.checked = el.checked;
+            });
+        });
+    });
+
+    document.querySelectorAll('.student-cb').forEach(function(cb) {
+        cb.addEventListener('change', function() {
+            const total = document.querySelectorAll('.student-cb').length;
+            const checked = document.querySelectorAll('.student-cb:checked').length;
+            document.querySelectorAll('#select_all, #select_all_top').forEach(function(el) {
+                el.checked = total > 0 && checked === total;
+            });
+        });
+    });
+
+    window.requireSelection = function() {
+        if (document.querySelectorAll('.student-cb:checked').length === 0) {
+            alert('Please select at least one student first.');
+            return false;
+        }
+        return true;
+    };
+
+    document.getElementById('bulkForm').addEventListener('submit', function(e) {
+        if (document.querySelectorAll('.student-cb:checked').length === 0) {
+            e.preventDefault();
+            alert('Please select at least one student first.');
+        }
+    });
+});
+</script>
 
 <?php include __DIR__ . '/../includes/footer.php'; ?>

@@ -88,7 +88,13 @@ if ($flash): ?>
         <p style="margin:4px 0 0 0;font-size:14px;color:#6b7280;">Manage all student admission applications</p>
     </div>
     <div style="display:flex;gap:10px;flex-wrap:wrap;">
-        <a href="../admission/register.php" target="_blank" style="display:inline-flex;align-items:center;gap:6px;background:#10b981;color:#fff;padding:8px 18px;border-radius:8px;text-decoration:none;font-size:14px;font-weight:500;transition:all 0.3s;border:none;">
+        <!-- ============================================= -->
+        <!-- CORRECT PATH: ../register.php                   -->
+        <!-- From: modules/admission/applications/          -->
+        <!-- To:   modules/admission/register.php           -->
+        <!-- Final URL: http://localhost/uni-mis-project/modules/admission/register.php -->
+        <!-- ============================================= -->
+        <a href="../register.php" target="_blank" style="display:inline-flex;align-items:center;gap:6px;background:#10b981;color:#fff;padding:8px 18px;border-radius:8px;text-decoration:none;font-size:14px;font-weight:500;transition:all 0.3s;border:none;">
             <i class="fas fa-globe"></i> Public Registration
         </a>
         <a href="add.php" style="display:inline-flex;align-items:center;gap:6px;background:#2563eb;color:#fff;padding:8px 18px;border-radius:8px;text-decoration:none;font-size:14px;font-weight:500;transition:all 0.3s;border:none;">
@@ -127,7 +133,10 @@ if ($flash): ?>
                     <a href="add.php" class="btn btn-primary" style="background:#2563eb;color:#fff;padding:10px 24px;border-radius:8px;text-decoration:none;">
                         <i class="fas fa-plus"></i> New Application
                     </a>
-                    <a href="../admission/register.php" target="_blank" class="btn btn-success" style="background:#10b981;color:#fff;padding:10px 24px;border-radius:8px;text-decoration:none;">
+                    <!-- ============================================= -->
+                    <!-- CORRECT PATH: ../register.php                   -->
+                    <!-- ============================================= -->
+                    <a href="../register.php" target="_blank" class="btn btn-success" style="background:#10b981;color:#fff;padding:10px 24px;border-radius:8px;text-decoration:none;">
                         <i class="fas fa-globe"></i> Public Registration
                     </a>
                 </div>
@@ -157,7 +166,7 @@ if ($flash): ?>
                             
                             // Set badge class
                             $badge_class = 'status-badge';
-                            if (in_array($status_lower, ['submitted', 'pending', 'under review'])) {
+                            if (in_array($status_lower, ['submitted', 'pending', 'under review', 'fee_pending'])) {
                                 $badge_class .= ' pending';
                             } elseif (in_array($status_lower, ['approved', 'admitted'])) {
                                 $badge_class .= ' approved';
@@ -203,7 +212,7 @@ if ($flash): ?>
                                        onmouseout="this.style.background='#f3f4f6'">
                                         <i class="fas fa-eye"></i> View
                                     </a>
-                                    <?php if(in_array($status_lower, ['submitted', 'pending', 'under review'])): ?>
+                                    <?php if(in_array($status_lower, ['submitted', 'pending', 'under review', 'fee_pending'])): ?>
                                     <a href="review.php?id=<?= $app_id ?>" 
                                        style="display:inline-flex;align-items:center;gap:4px;padding:4px 12px;background:#2563eb;color:#fff;border-radius:6px;text-decoration:none;font-size:12px;transition:all 0.2s;"
                                        onmouseover="this.style.background='#1d4ed8'"
@@ -230,7 +239,10 @@ if ($flash): ?>
                     <i class="fas fa-info-circle"></i> Showing <?= count($apps) ?> applications
                 </div>
                 <div style="display:flex;gap:6px;">
-                    <button class="btn btn-sm btn-outline" onclick="window.location.href='../admission/register.php'" style="padding:4px 14px;border:1px solid #e2e8f0;background:transparent;border-radius:6px;cursor:pointer;font-size:12px;">
+                    <!-- ============================================= -->
+                    <!-- CORRECT PATH: ../register.php                   -->
+                    <!-- ============================================= -->
+                    <button class="btn btn-sm btn-outline" onclick="window.location.href='../register.php'" style="padding:4px 14px;border:1px solid #e2e8f0;background:transparent;border-radius:6px;cursor:pointer;font-size:12px;">
                         <i class="fas fa-globe"></i> Public Form
                     </button>
                     <button class="btn btn-sm btn-primary" onclick="window.location.href='add.php'" style="padding:4px 14px;background:#2563eb;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:12px;">
