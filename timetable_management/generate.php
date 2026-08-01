@@ -158,6 +158,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                             }
                         }
                         $success = "Timetable generated successfully: $course_inserted course(s), $entry_inserted slot(s), $alloc_inserted room allocation(s) recorded. Status: Draft.";
+                        log_activity('Timetable Management', 'Generate Timetable', 'timetables', $timetable_id, "Program #$program_id / Session #$session_id / Semester #$semester_id / Section $section — $entry_inserted slots, $course_inserted courses");
                         // reset filters to reload new timetable
                         $f_program = $program_id; $f_session = $session_id; $f_semester = $semester_id; $f_section = $section;
                     }

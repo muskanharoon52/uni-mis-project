@@ -14,6 +14,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             mysqli_stmt_execute($stmt);
             mysqli_stmt_close($stmt);
             $success = "Request #$req_id marked as $new_status.";
+            log_activity('Academic Change Requests', 'Status -> ' . $new_status, 'acr_requests', $req_id, "Request #$req_id marked as $new_status");
         }
     } else {
         $error = "Invalid request or status.";

@@ -63,6 +63,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     mysqli_query($conn, "UPDATE timetables SET published_at = '$ts' WHERE id = $tt_id");
                 }
                 $success = "Timetable #$tt_id moved to <strong>$next</strong>.";
+                log_activity('Timetable Management', 'Workflow: ' . $next, 'timetables', $tt_id, "Timetable #$tt_id moved to $next");
             }
         }
     }

@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/../config/db_connect.php';
 require_once __DIR__ . '/../modules/sso/includes/auth.php';
+require_once __DIR__ . '/../includes/activity.php';
 
 if (!isLoggedIn()) {
     header('Location: /uni-mis-project/');
@@ -143,6 +144,7 @@ function acr_log($type, $student, $old, $new, $status = 'Applied') {
     mysqli_stmt_bind_param($stmt, 'ssissssi', $type, $ref, $app, $name, $old, $new, $status, $by);
     mysqli_stmt_execute($stmt);
     mysqli_stmt_close($stmt);
+    log_activity('Academic Change Requests', $type, 'acr_requests', null, "$name ($ref): $old -> $new");
 }
 
 function acr_course_codes($app_id) {

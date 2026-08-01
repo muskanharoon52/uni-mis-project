@@ -81,6 +81,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
             // Resolve related open conflicts for this entry
             mysqli_query($conn, "UPDATE timetable_conflicts SET status = 'Resolved', resolved_at = NOW() WHERE entry_id = $entry_id AND status = 'Open'");
+            log_activity('Timetable Management', 'Adjust Entry', 'timetable_entries', $entry_id, "Entry #$entry_id -> $new_day $new_start-$new_end room #$new_room teacher #$new_teacher section $new_section");
             $success = "Timetable entry #$entry_id adjusted successfully and conflicts re-validated.";
         }
     }

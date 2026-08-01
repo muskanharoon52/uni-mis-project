@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/../config/db_connect.php';
 require_once __DIR__ . '/../modules/sso/includes/auth.php';
+require_once __DIR__ . '/../includes/activity.php';
 
 if (!isLoggedIn()) {
     header('Location: /uni-mis-project/');
@@ -154,5 +155,8 @@ function ssr_log_request($student, $course_id, $conflict_type, $description, $so
     mysqli_stmt_execute($stmt);
     $ok = mysqli_affected_rows($conn) > 0;
     mysqli_stmt_close($stmt);
+    if ($ok) {
+        log_activity('Student Schedule Requests', 'Request Submitted', 'student_schedule_requests', null, "$name ($roll): $conflict_type on course #$course_id");
+    }
     return $ok;
 }

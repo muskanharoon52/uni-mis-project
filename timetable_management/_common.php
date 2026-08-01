@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/../config/db_connect.php';
 require_once __DIR__ . '/../modules/sso/includes/auth.php';
+require_once __DIR__ . '/../includes/activity.php';
 
 if (!isLoggedIn()) {
     header('Location: /uni-mis-project/');

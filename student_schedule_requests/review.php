@@ -25,9 +25,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     } elseif ($decision === 'Approved') {
         mysqli_query($conn, "UPDATE student_schedule_requests SET status = 'Approved', reviewed_by = $reviewer, reviewed_at = NOW() WHERE id = $request_id");
         $success = "Request #$request_id approved.";
+        log_activity('Student Schedule Requests', 'Request Approved', 'student_schedule_requests', $request_id, "Request #$request_id for {$req['student_name']} approved");
     } elseif ($decision === 'Forwarded') {
         mysqli_query($conn, "UPDATE student_schedule_requests SET status = 'Forwarded', reviewed_by = $reviewer, reviewed_at = NOW() WHERE id = $request_id");
         $success = "Request #$request_id forwarded to senior administration.";
+        log_activity('Student Schedule Requests', 'Request Forwarded', 'student_schedule_requests', $request_id, "Request #$request_id for {$req['student_name']} forwarded");
     } elseif ($decision === 'Rejected') {
         if ($rejection === '') { $error = "Please provide a reason for rejection."; }
         else {
@@ -38,6 +40,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 mysqli_stmt_close($stmt);
             }
             $success = "Request #$request_id rejected.";
+            log_activity('Student Schedule Requests', 'Request Rejected', 'student_schedule_requests', $request_id, "Request #$request_id for {$req['student_name']} rejected: $rejection");
         }
     } else {
         $error = "Invalid action.";

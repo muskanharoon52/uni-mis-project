@@ -44,6 +44,7 @@ if (isset($_GET['scan']) && $_GET['scan'] === '1') {
         }
     }
     $success = "Conflict scan complete. Detected " . count($detected) . " conflict(s).";
+    log_activity('Timetable Management', 'Conflict Scan', 'timetable_conflicts', null, "Scanned " . count($entries) . " entries, detected " . count($detected) . " conflict(s)");
 }
 
 // ---- Action: resolve / ignore ----
@@ -57,6 +58,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             mysqli_stmt_execute($stmt);
             mysqli_stmt_close($stmt);
             $success = "Conflict #$conflict_id marked as $action.";
+            log_activity('Timetable Management', 'Conflict ' . $action, 'timetable_conflicts', $conflict_id, "Conflict #$conflict_id marked as $action");
         }
     }
 }
