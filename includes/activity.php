@@ -28,6 +28,8 @@ if (!function_exists('activity_module_for_page')) {
             'timetable_management'        => 'Timetable Management',
             'student_schedule_requests'   => 'Student Schedule Requests',
             'reports'                     => 'Reports',
+            'notifications'               => 'Notifications',
+            'sbe_applications'            => 'SBE Applications',
             'students'                    => 'Students',
             'student_inquiry'             => 'Student Inquiry',
             'faculty_registry'            => 'Faculty Registry',

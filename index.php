@@ -75,6 +75,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         .tag-examiner { background: rgba(245,158,11,0.2); color: #fbbf24; }
         .tag-teacher { background: rgba(168,85,247,0.2); color: #c084fc; }
         .tag-student { background: rgba(34,197,94,0.2); color: #4ade80; }
+        .tag-sbe { background: rgba(14,165,233,0.2); color: #38bdf8; }
         .hint-item .cred { font-family: monospace; color: rgba(255,255,255,0.6); }
         @media (max-width: 680px) {
             .login-wrapper { flex-direction: column; margin: 12px; }
@@ -128,6 +129,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     <div class="hint-item"><span class="role-tag tag-examiner">Examiner</span> <span class="cred">examiner / examiner123</span></div>
                     <div class="hint-item"><span class="role-tag tag-teacher">Teacher</span> <span class="cred">sara.khan / teacher123</span></div>
                     <div class="hint-item"><span class="role-tag tag-student">Student</span> <span class="cred">ali.raza / student123</span></div>
+                </div>
+            </div>
+
+            <div class="credential-hints" style="margin-top:12px;">
+                <p>System Based Examination (SBE) &mdash; separate module login</p>
+                <div class="hint-grid">
+                    <div class="hint-item"><span class="role-tag tag-sbe">SBE Tchr</span> <span class="cred">5001 / teacher123</span></div>
+                    <div class="hint-item"><span class="role-tag tag-sbe">SBE Std</span> <span class="cred">9001 / student123</span></div>
+                </div>
+                <div style="margin-top:10px; text-align:center;">
+                    <a href="modules/sbe/login.php" style="color:#818cf8; font-size:.82rem; text-decoration:none;">Open SBE Portal Login &rarr;</a>
                 </div>
             </div>
         </div>

@@ -8,4 +8,4 @@ require __DIR__ . '/includes/auth.php';
 
 require_login(['Teacher']);
 
-redirect('exam-schedule.php');
+redirect('schedule.php');

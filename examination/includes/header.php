@@ -92,26 +92,19 @@ function getGradeColor($grade) {
             <a class="<?= $currentDir === 'schedule' && $currentPage === 'index.php' ? 'active' : '' ?>" href="<?= BASE_URL ?>examination/schedule/index.php">
                 <span class="nav-icon">&#128197;</span> Exam Schedule
             </a>
-            <a class="<?= $currentDir === 'schedule' && $currentPage === 'add.php' ? 'active' : '' ?>" href="<?= BASE_URL ?>examination/schedule/add.php">
-                <span class="nav-icon">&#10133;</span> Add Schedule
+
+            <span class="nav-section-label">Datesheets</span>
+            <a class="<?= $currentDir === 'datesheets' ? 'active' : '' ?>" href="<?= BASE_URL ?>examination/datesheets/index.php">
+                <span class="nav-icon">&#128196;</span> Datesheets
             </a>
 
             <span class="nav-section-label">Results</span>
             <a class="<?= $currentDir === 'results' && $currentPage === 'index.php' ? 'active' : '' ?>" href="<?= BASE_URL ?>examination/results/index.php">
                 <span class="nav-icon">&#128202;</span> Results
             </a>
-            <a class="<?= $currentDir === 'results' && $currentPage === 'add.php' ? 'active' : '' ?>" href="<?= BASE_URL ?>examination/results/add.php">
-                <span class="nav-icon">&#10133;</span> Add Result
-            </a>
-            <a class="<?= $currentDir === 'results' && $currentPage === 'publish.php' ? 'active' : '' ?>" href="<?= BASE_URL ?>examination/results/publish.php">
-                <span class="nav-icon">&#9729;</span> Publish Results
-            </a>
-            <a class="<?= $currentDir === 'sbe-results' ? 'active' : '' ?>" href="<?= BASE_URL ?>examination/sbe-results/index.php">
-                <span class="nav-icon">&#128221;</span> SBE Results
-            </a>
 
             <span class="nav-section-label">Promotion</span>
-            <a class="<?= $currentDir === 'promote' ? 'active' : '' ?>" href="<?= BASE_URL ?>examination/promote/promote.php">
+            <a class="<?= $currentDir === 'promote' ? 'active' : '' ?>" href="<?= BASE_URL ?>examination/promote/index.php">
                 <span class="nav-icon">&#11014;</span> Promote Students
             </a>
 

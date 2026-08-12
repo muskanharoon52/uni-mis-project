@@ -13,12 +13,29 @@ $student = current_user();
 $studentId = (int) $student['student_id'];
 $scheduleId = (int) ($_GET['schedule_id'] ?? $_POST['schedule_id'] ?? 0);
 
-$scheduleStmt = $db->prepare('SELECT es.*, e.exam_code, e.title, e.duration_minutes, e.total_questions, e.total_marks, e.passing_marks, e.allow_review, e.selection_mode, e.status AS exam_status FROM sbe_exam_schedule es INNER JOIN sbe_exams e ON e.exam_id = es.exam_id WHERE es.schedule_id = :id');
+$scheduleStmt = $db->prepare('SELECT es.*, e.exam_code, e.title, e.duration_minutes, e.total_questions, e.total_marks, e.passing_marks, e.allow_review, e.selection_mode, e.department_id, e.batch_year, e.status AS exam_status FROM sbe_exam_schedule es INNER JOIN sbe_exams e ON e.exam_id = es.exam_id WHERE es.schedule_id = :id');
 $scheduleStmt->execute([':id' => $scheduleId]);
 $schedule = $scheduleStmt->fetch();
 
-if (!$schedule || $schedule['exam_status'] !== 'Published' || $schedule['status'] !== 'Ongoing') {
-    $_SESSION['message'] = 'This exam session is not currently active. The exam must be published and set to ongoing before you can proceed.';
+if (!$schedule || $schedule['exam_status'] !== 'Published' || !in_array($schedule['status'], ['Scheduled', 'Ongoing'], true)) {
+    $_SESSION['message'] = 'This exam session is not currently active. The exam must be published and scheduled before you can proceed.';
+    redirect('student-start-exam.php');
+}
+
+$scopeStmt = $db->prepare('SELECT s.batch_year, p.department_id FROM students s LEFT JOIN programs p ON p.program_id = s.program_id WHERE s.student_id = :sid');
+$scopeStmt->execute([':sid' => $studentId]);
+$studentRow = $scopeStmt->fetch();
+$deptId = (int) ($studentRow['department_id'] ?? 0);
+$batchYear = (int) ($studentRow['batch_year'] ?? 0);
+$examDeptId = (int) ($schedule['department_id'] ?? 0);
+$examBatch = (int) ($schedule['batch_year'] ?? 0);
+
+if ($examDeptId > 0 && $deptId > 0 && $examDeptId !== $deptId) {
+    $_SESSION['message'] = 'This exam is not scheduled for your department.';
+    redirect('student-start-exam.php');
+}
+if ($examBatch > 0 && $batchYear > 0 && $examBatch !== $batchYear) {
+    $_SESSION['message'] = 'This exam is not scheduled for your batch.';
     redirect('student-start-exam.php');
 }
 
@@ -142,8 +159,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         ]);
 
         $resultSql = 'INSERT INTO sbe_exam_results (student_exam_id, exam_id, student_id, obtained_marks, total_marks, percentage, pass_fail_status, rank_position, remarks, status, published_at)
-            VALUES (:student_exam_id, :exam_id, :student_id, :obtained_marks, :total_marks, :percentage, :pass_fail_status, NULL, :remarks, \'Published\', NOW())
-            ON DUPLICATE KEY UPDATE obtained_marks = VALUES(obtained_marks), total_marks = VALUES(total_marks), percentage = VALUES(percentage), pass_fail_status = VALUES(pass_fail_status), remarks = VALUES(remarks), status = \'Published\', published_at = NOW()';
+            VALUES (:student_exam_id, :exam_id, :student_id, :obtained_marks, :total_marks, :percentage, :pass_fail_status, NULL, :remarks, \'Draft\', NULL)
+            ON DUPLICATE KEY UPDATE obtained_marks = VALUES(obtained_marks), total_marks = VALUES(total_marks), percentage = VALUES(percentage), pass_fail_status = VALUES(pass_fail_status), remarks = VALUES(remarks)';
         $resultStmt = $db->prepare($resultSql);
         $resultStmt->execute([
             ':student_exam_id'   => (int) $attempt['student_exam_id'],
@@ -182,8 +199,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     elseif ($percentage >= 60) $grade = 'D';
                     
                     $examResultSql = 'INSERT INTO exam_results (student_id, exam_id, marks_obtained, total_marks, grade, percentage, status, remarks, entered_by, published_at)
-                                      VALUES (?, ?, ?, ?, ?, ?, \'published\', ?, ?, NOW())
-                                      ON DUPLICATE KEY UPDATE marks_obtained = VALUES(marks_obtained), total_marks = VALUES(total_marks), grade = VALUES(grade), percentage = VALUES(percentage), status = \'published\', remarks = VALUES(remarks), published_at = NOW()';
+                                      VALUES (?, ?, ?, ?, ?, ?, \'draft\', ?, ?, NULL)
+                                      ON DUPLICATE KEY UPDATE marks_obtained = VALUES(marks_obtained), total_marks = VALUES(total_marks), grade = VALUES(grade), percentage = VALUES(percentage), status = \'draft\', remarks = VALUES(remarks), published_at = NULL';
                     $examResultStmt = $db->prepare($examResultSql);
                     $examResultStmt->execute([
                         $studentId,

@@ -391,19 +391,19 @@ $conn->close();
             </div>
             <div class="card-content">
                 <div class="grid-4">
-                    <a href="schedule/add.php" class="btn btn-primary" style="display:flex;flex-direction:column;align-items:center;gap:8px;padding:20px;">
+                    <a href="schedule/index.php" class="btn btn-primary" style="display:flex;flex-direction:column;align-items:center;gap:8px;padding:20px;">
                         <i class="bi bi-calendar-plus" style="font-size:1.5rem;"></i>
                         Schedule Exam
                     </a>
-                    <a href="results/add.php" class="btn btn-primary" style="display:flex;flex-direction:column;align-items:center;gap:8px;padding:20px;background:var(--success);border-color:var(--success);">
+                    <a href="results/index.php" class="btn btn-primary" style="display:flex;flex-direction:column;align-items:center;gap:8px;padding:20px;background:var(--success);border-color:var(--success);">
                         <i class="bi bi-pencil-square" style="font-size:1.5rem;"></i>
-                        Enter Results
+                        Exam Results
                     </a>
-                    <a href="results/publish.php" class="btn btn-primary" style="display:flex;flex-direction:column;align-items:center;gap:8px;padding:20px;background:var(--accent);border-color:var(--accent);">
+                    <a href="../result_publish_applications/index.php" class="btn btn-primary" style="display:flex;flex-direction:column;align-items:center;gap:8px;padding:20px;background:var(--accent);border-color:var(--accent);">
                         <i class="bi bi-cloud-upload" style="font-size:1.5rem;"></i>
-                        Publish Results
+                        SSO Publish Requests
                     </a>
-                    <a href="promote/promote.php" class="btn btn-primary" style="display:flex;flex-direction:column;align-items:center;gap:8px;padding:20px;background:var(--warning);border-color:var(--warning);">
+                    <a href="promote/index.php" class="btn btn-primary" style="display:flex;flex-direction:column;align-items:center;gap:8px;padding:20px;background:var(--warning);border-color:var(--warning);">
                         <i class="bi bi-arrow-up-circle" style="font-size:1.5rem;"></i>
                         Promote Students
                     </a>

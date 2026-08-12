@@ -100,6 +100,7 @@ function dashboardUrlForRole() {
 
     switch ($role) {
         case 'super admin':
+            return $base . 'superadmin/index.php';
         case 'admin':
             return $base . 'dashboard.php';
         case 'admission officer':
@@ -109,7 +110,7 @@ function dashboardUrlForRole() {
         case 'examiner':
             return $base . 'examination/dashboard.php';
         case 'teacher':
-            return $base . 'modules/lms/public/dashboard.php';
+            return $base . 'modules/lms/teacher/dashboard.php';
         case 'student':
             return $base . 'modules/lms/student/dashboard.php';
         default:

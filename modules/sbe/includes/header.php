@@ -50,15 +50,14 @@ $userInitial = strtoupper(substr($user['display_name'] ?? 'G', 0, 1));
                 <a class="<?= $activePage === 'dashboard' ? 'active' : '' ?>" href="teacher-home.php">Dashboard</a>
                 
                 <span class="nav-section-label">Exam Builder</span>
-                <a class="<?= $activePage === 'question_bank' ? 'active' : '' ?>" href="question-bank.php">Question Pool</a>
-                <a class="<?= $activePage === 'exams' ? 'active' : '' ?>" href="exams.php">Exam Pool</a>
-                <a class="<?= $activePage === 'exam_schedule' ? 'active' : '' ?>" href="exam-schedule.php">Exam Schedule</a>
-                <a class="<?= $activePage === 'exam_questions' ? 'active' : '' ?>" href="exam-questions.php">Question Mapping</a>
-                
-                <span class="nav-section-label">Grading & Audits</span>
-                <a class="<?= $activePage === 'student_exams' ? 'active' : '' ?>" href="student-exams.php">Student Attempts</a>
-                <a class="<?= $activePage === 'student_answers' ? 'active' : '' ?>" href="student-answers.php">Answer Audits</a>
-                <a class="<?= $activePage === 'exam_results' ? 'active' : '' ?>" href="exam-results.php">Final Grades</a>
+                <a class="<?= $activePage === 'exams' ? 'active' : '' ?>" href="exams.php">Create Exam</a>
+
+                <span class="nav-section-label">Scheduling</span>
+                <a class="<?= $activePage === 'exam_schedule' ? 'active' : '' ?>" href="schedule.php">Schedule</a>
+                <a class="<?= $activePage === 'datesheets' ? 'active' : '' ?>" href="datesheets.php">Datesheets</a>
+
+                <span class="nav-section-label">Results</span>
+                <a class="<?= $activePage === 'view_results' ? 'active' : '' ?>" href="view-results.php">View Results</a>
             <?php elseif ($userRole === 'Student'): ?>
                 <span class="nav-section-label">Student</span>
                 <a class="<?= $activePage === 'dashboard' ? 'active' : '' ?>" href="student-home.php">My Dashboard</a>

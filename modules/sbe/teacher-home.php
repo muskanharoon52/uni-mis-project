@@ -28,12 +28,6 @@ $avgScore = $db->query("SELECT AVG(percentage) FROM sbe_student_exams WHERE stat
 $avgScoreVal = $avgScore !== null ? round((float) $avgScore, 1) : 0.0;
 $passRate = $submittedAttempts > 0 ? round(($db->query("SELECT COUNT(*) FROM sbe_student_exams WHERE pass_fail_status = 'Pass' AND status IN ('Submitted','Auto Submitted')")->fetchColumn() / $submittedAttempts) * 100) : 0;
 
-$recentResults = $db->query('SELECT er.obtained_marks, er.total_marks, er.percentage, er.pass_fail_status, er.published_at, se.student_id, s.full_name AS student_name, e.exam_code, e.title FROM sbe_exam_results er INNER JOIN sbe_student_exams se ON se.student_exam_id = er.student_exam_id INNER JOIN students s ON s.student_id = se.student_id INNER JOIN sbe_exams e ON e.exam_id = er.exam_id ORDER BY er.published_at DESC LIMIT 6')->fetchAll();
-
-$topStudents = $db->query('SELECT se.student_id, s.full_name AS student_name, ROUND(AVG(se.percentage),1) AS avg_pct, COUNT(*) AS attempts FROM sbe_student_exams se INNER JOIN students s ON s.student_id = se.student_id WHERE se.status IN (\'Submitted\',\'Auto Submitted\') GROUP BY se.student_id, s.full_name ORDER BY avg_pct DESC LIMIT 5')->fetchAll();
-
-$upcomingSchedules = $db->query('SELECT es.schedule_id, es.exam_date, es.start_time, es.location, es.section, es.status, e.exam_code, e.title FROM sbe_exam_schedule es INNER JOIN sbe_exams e ON e.exam_id = es.exam_id WHERE es.exam_date >= CURDATE() ORDER BY es.exam_date ASC, es.start_time ASC LIMIT 5')->fetchAll();
-
 $questionTopics = $db->query('SELECT topic, COUNT(*) AS total FROM sbe_question_bank GROUP BY topic ORDER BY total DESC LIMIT 5')->fetchAll();
 
 $hour = (int) date('H');
@@ -49,16 +43,16 @@ require __DIR__ . '/includes/header.php';
         <h2><?= e($greeting) ?>, <?= e($user['display_name']) ?>!</h2>
         <p>Your SBE workspace. Create exams, manage questions, and track student performance.</p>
         <div class="greeting-actions">
-            <a class="btn btn-solid" href="question-bank.php">+ Add Questions</a>
-            <a class="btn" href="exams.php">Create Exam</a>
-            <a class="btn" href="exam-schedule.php">Schedule Exam</a>
+            <a class="btn btn-solid" href="exams.php">+ Create Exam</a>
+            <a class="btn" href="exam-questions.php">Add Questions</a>
+            <a class="btn" href="schedule.php">Schedule Exam</a>
         </div>
     </div>
 
     <div class="stats-grid animate-in animate-delay-1">
         <div class="stat-card-v2">
             <div class="stat-icon purple">&#128218;</div>
-            <div class="stat-label">Question Bank</div>
+            <div class="stat-label">Questions</div>
             <div class="stat-value"><?= number_format($questionsCount) ?></div>
             <div class="stat-trend neutral">MCQs available</div>
         </div>
@@ -82,8 +76,7 @@ require __DIR__ . '/includes/header.php';
         </div>
     </div>
 
-    <div class="grid-2 page-section animate-in animate-delay-2">
-
+    <div class="page-section animate-in animate-delay-2">
         <div class="card">
             <div class="card-header">
                 <h3>Exam Overview</h3>
@@ -118,119 +111,28 @@ require __DIR__ . '/includes/header.php';
                 <?php endif; ?>
             </div>
         </div>
-
-        <div class="card">
-            <div class="card-header">
-                <h3>Top Performing Students</h3>
-                <p>Highest average scores across all exams</p>
-            </div>
-            <div style="margin-top:16px;">
-                <?php if (empty($topStudents)): ?>
-                    <div class="empty-state">
-                        <span class="empty-icon">&#128233;</span>
-                        <p>No student attempts yet.</p>
-                    </div>
-                <?php else: ?>
-                    <?php foreach ($topStudents as $i => $student): ?>
-                        <?php $pct = (float) $student['avg_pct']; ?>
-                        <div style="display:flex; align-items:center; gap:12px; padding:10px 0; <?= $i < count($topStudents) - 1 ? 'border-bottom:1px solid var(--border);' : '' ?>">
-                            <div style="width:32px; height:32px; border-radius:50%; background:<?= $i === 0 ? 'linear-gradient(135deg,#f59e0b,#d97706)' : ($i === 1 ? 'linear-gradient(135deg,#94a3b8,#64748b)' : ($i === 2 ? 'linear-gradient(135deg,#d97706,#b45309)' : 'var(--bg-panel)')) ?>; color:<?= $i < 3 ? '#fff' : 'var(--text-muted)' ?>; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:0.8rem;">
-                                <?= $i + 1 ?>
-                            </div>
-                            <div style="flex:1; min-width:0;">
-                                <div style="font-weight:600; font-size:0.88rem; color:var(--text-strong);"><?= e($student['student_name']) ?></div>
-                                <div class="small" style="color:var(--text-muted);"><?= (int) $student['attempts'] ?> attempt(s)</div>
-                            </div>
-                            <div style="text-align:right;">
-                                <div style="font-weight:700; color:<?= $pct >= 50 ? 'var(--success)' : 'var(--danger)' ?>;"><?= number_format($pct, 1) ?>%</div>
-                            </div>
-                        </div>
-                    <?php endforeach; ?>
-                <?php endif; ?>
-            </div>
-        </div>
-
-    </div>
-
-    <div class="grid-2 page-section animate-in animate-delay-3">
-
-        <div class="table-card">
-            <div class="card-header">
-                <h3>Recent Results</h3>
-                <p>Latest graded submissions from students</p>
-            </div>
-            <div class="table-wrapper" style="margin-top:10px;">
-                <table>
-                    <thead><tr><th>Student</th><th>Exam</th><th>Score</th><th>Status</th></tr></thead>
-                    <tbody>
-                    <?php if (empty($recentResults)): ?>
-                        <tr><td colspan="4"><div class="empty-state"><p>No results yet.</p></div></td></tr>
-                    <?php else: ?>
-                        <?php foreach ($recentResults as $r): ?>
-                            <tr>
-                                <td class="small fw-700"><?= e($r['student_name']) ?></td>
-                                <td><span class="badge manual"><?= e($r['exam_code']) ?></span> <span class="small"><?= e(mb_strimwidth($r['title'],0,20,'...')) ?></span></td>
-                                <td class="fw-700"><?= number_format((float) $r['percentage'], 1) ?>%</td>
-                                <td><span class="badge <?= e(strtolower($r['pass_fail_status'])) ?>"><?= e($r['pass_fail_status']) ?></span></td>
-                            </tr>
-                        <?php endforeach; ?>
-                    <?php endif; ?>
-                    </tbody>
-                </table>
-            </div>
-        </div>
-
-        <div class="table-card">
-            <div class="card-header">
-                <h3>Upcoming Schedules</h3>
-                <p>Exam sessions from today onwards</p>
-            </div>
-            <div class="table-wrapper" style="margin-top:10px;">
-                <table>
-                    <thead><tr><th>Exam</th><th>Date</th><th>Section</th><th>Status</th></tr></thead>
-                    <tbody>
-                    <?php if (empty($upcomingSchedules)): ?>
-                        <tr><td colspan="4"><div class="empty-state"><p>No upcoming schedules.</p></div></td></tr>
-                    <?php else: ?>
-                        <?php foreach ($upcomingSchedules as $s): ?>
-                            <tr>
-                                <td>
-                                    <span class="badge manual"><?= e($s['exam_code']) ?></span>
-                                    <div class="small fw-700" style="margin-top:2px;"><?= e(mb_strimwidth($s['title'],0,24,'...')) ?></div>
-                                </td>
-                                <td class="small"><?= e($s['exam_date']) ?></td>
-                                <td class="small"><?= e($s['section']) ?></td>
-                                <td><span class="badge <?= e(strtolower($s['status'])) ?>"><?= e($s['status']) ?></span></td>
-                            </tr>
-                        <?php endforeach; ?>
-                    <?php endif; ?>
-                    </tbody>
-                </table>
-            </div>
-        </div>
-
     </div>
 
     <div class="grid-3 page-section animate-in animate-delay-3">
-        <a class="action-card" href="question-bank.php" style="flex-direction:row; align-items:center; gap:14px; text-decoration:none;">
+        <a class="action-card" href="exams.php" style="flex-direction:row; align-items:center; gap:14px; text-decoration:none;">
             <div class="action-icon" style="background:#f5f3ff; color:#7c3aed;">&#128218;</div>
             <div>
-                <strong style="color:var(--text-strong);">Question Bank</strong>
-                <small style="display:block; margin-top:2px; color:var(--text-muted);">Add and manage MCQs</small>
+                <strong style="color:var(--text-strong);">Create Exam</strong>
+                <small style="display:block; margin-top:2px; color:var(--text-muted);">New exam with dept, section, batch &amp; subject</small>
             </div>
         </a>
         <a class="action-card" href="exam-questions.php" style="flex-direction:row; align-items:center; gap:14px; text-decoration:none;">
             <div class="action-icon" style="background:#ecfdf5; color:#059669;">&#128450;</div>
             <div>
-                <strong style="color:var(--text-strong);">Map Questions</strong>
-                <small style="display:block; margin-top:2px; color:var(--text-muted);">Bulk-assign questions to exams</small>
+                <strong style="color:var(--text-strong);">Add Questions</strong>
+                <small style="display:block; margin-top:2px; color:var(--text-muted);">Upload PDF or add manually</small>
             </div>
         </a>
-        <a class="action-card" href="exam-results.php" style="flex-direction:row; align-items:center; gap:14px; text-decoration:none;">
+        <a class="action-card" href="view-results.php" style="flex-direction:row; align-items:center; gap:14px; text-decoration:none;">
             <div class="action-icon" style="background:#fff1f2; color:#f43f5e;">&#127942;</div>
             <div>
-                <strong style="color:var(--text-strong);">Grade Results</strong>
-                <small style="display:block; margin-top:2px; color:var(--text-muted);">View all graded attempts</small>
+                <strong style="color:var(--text-strong);">View Results</strong>
+                <small style="display:block; margin-top:2px; color:var(--text-muted);">Student results for each subject</small>
             </div>
         </a>
     </div>

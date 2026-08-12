@@ -67,9 +67,15 @@ if ($isPost) {
             gap: 6px;
         }
         
-        /* HIDE the rotating chevron arrows */
+        /* Rotating dropdown arrow (chevron-down flips when group opens) */
         .nav-group .nav-caret {
-            display: none !important;
+            font-size: .65rem;
+            color: rgba(255,255,255,0.5);
+            transition: transform 0.2s ease;
+        }
+
+        .nav-group.open .nav-caret {
+            transform: rotate(180deg);
         }
         
         .nav-group .nav-sub {
@@ -234,6 +240,23 @@ if ($isPost) {
             <a class="<?= $currentFolder === 'reports' ? 'active' : '' ?>" href="/uni-mis-project/reports/index.php">
                 <i class="fas fa-chart-line"></i> Reports
             </a>
+
+            <a class="<?= $currentFolder === 'notifications' ? 'active' : '' ?>" href="/uni-mis-project/notifications/index.php">
+                <i class="fas fa-bell"></i> Notifications
+            </a>
+
+            <?php if (in_array(strtolower($roleName), ['admin', 'super admin', 'examiner'], true)): ?>
+                <a class="<?= $currentFolder === 'sbe_applications' ? 'active' : '' ?>" href="/uni-mis-project/sbe_applications/index.php">
+                    <i class="fas fa-clipboard-check"></i> SBE Applications
+                </a>
+            <?php endif; ?>
+
+            <?php if (in_array(strtolower($roleName), ['admin', 'super admin', 'sso'], true)): ?>
+                <span class="nav-section-label">Examination</span>
+                <a class="<?= $currentFolder === 'result_publish_applications' ? 'active' : '' ?>" href="/uni-mis-project/result_publish_applications/index.php">
+                    <i class="fas fa-upload"></i> Result Publish Requests
+                </a>
+            <?php endif; ?>
 
             <div class="spacer"></div>
 
