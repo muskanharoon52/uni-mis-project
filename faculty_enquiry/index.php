@@ -10,9 +10,39 @@ if (!isLoggedIn()) {
 global $conn;
 
 $error = '';
+$success = '';
 $mode = isset($_GET['mode']) ? $_GET['mode'] : 'individual';
 $search = isset($_GET['search']) ? trim($_GET['search']) : '';
 $dept_filter = isset($_GET['dept']) ? (int)$_GET['dept'] : 0;
+
+// =============================================
+// HANDLE POST
+// =============================================
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $action = $_POST['action'] ?? '';
+    if ($action === 'reset_password') {
+        $teacher_id = (int)($_POST['teacher_id'] ?? 0);
+        $new_password = trim($_POST['new_password'] ?? '');
+        if ($teacher_id <= 0) {
+            $error = "Please select a valid teacher to reset the password.";
+        } elseif (strlen($new_password) < 6) {
+            $error = "New password must be at least 6 characters.";
+        } else {
+            $uq = mysqli_query($conn, "SELECT user_id FROM teachers WHERE teacher_id = $teacher_id LIMIT 1");
+            if ($uq && ($ur = mysqli_fetch_assoc($uq)) && (int)$ur['user_id'] > 0) {
+                $hash = password_hash($new_password, PASSWORD_DEFAULT);
+                $hq = mysqli_real_escape_string($conn, $hash);
+                if (mysqli_query($conn, "UPDATE users SET password_hash = '$hq' WHERE user_id = " . (int)$ur['user_id'])) {
+                    $success = "Password updated for teacher #$teacher_id. The new password is now active for LMS login.";
+                } else {
+                    $error = "Error updating password: " . mysqli_error($conn);
+                }
+            } else {
+                $error = "This teacher has no linked LMS login account.";
+            }
+        }
+    }
+}
 
 // Departments
 $departments = [];
@@ -42,7 +72,8 @@ if ($mode === 'individual' && !empty($search)) {
                    t.department_id, t.status AS teacher_status, t.user_id,
                    d.department_name,
                    f.faculty_id, f.faculty_name AS legacy_faculty_name,
-                   u.username, u.login_id, u.email AS user_email, u.status AS user_status
+                   u.username, u.login_id, u.email AS user_email, u.status AS user_status,
+                   u.password_hash AS user_password_hash
             FROM teachers t
             LEFT JOIN departments d ON d.department_id = t.department_id
             LEFT JOIN faculty f ON f.teacher_id = t.teacher_id
@@ -133,6 +164,7 @@ include __DIR__ . '/../includes/header.php';
         </div>
 
         <?php if ($error): ?><div class="alert alert-error"><i class="fas fa-exclamation-circle"></i> <?= htmlspecialchars($error) ?></div><?php endif; ?>
+        <?php if ($success): ?><div class="alert alert-success"><i class="fas fa-check-circle"></i> <?= htmlspecialchars($success) ?></div><?php endif; ?>
 
         <!-- Search / Filters Panel -->
         <div class="panel">
@@ -289,13 +321,76 @@ include __DIR__ . '/../includes/header.php';
                         </div>
                         <div class="col-md-4">
                             <div class="detail-block">
+                                <label>Login ID (LMS)</label>
+                                <span><?= htmlspecialchars($individual['login_id'] ?? 'N/A'); ?></span>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="detail-block">
                                 <label>Login Username</label>
                                 <span><?= htmlspecialchars($individual['username'] ?? 'N/A'); ?></span>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="detail-block">
+                                <label>LMS Password</label>
+                                <?php
+                                $storedPw = $individual['user_password_hash'] ?? '';
+                                $isHash = (strpos($storedPw, '$2y$') === 0 || strpos($storedPw, '$2a$') === 0 || strpos($storedPw, '$2b$') === 0 || strpos($storedPw, '$2x$') === 0);
+                                if ($storedPw !== '' && !$isHash): ?>
+                                    <span><?= htmlspecialchars($storedPw); ?></span>
+                                <?php else: ?>
+                                    <span class="text-muted"><?= $storedPw === '' ? 'No login account' : 'Password protected — use reset form' ?></span>
+                                <?php endif; ?>
                             </div>
                         </div>
                     </div>
                 </div>
             </div>
+
+            <?php if ($individual['user_id']): ?>
+            <div class="card mt-3">
+                <div class="card-header">
+                    <h5>LMS Login &amp; Password Reset</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-5">
+                            <div class="detail-block">
+                                <label>Login ID</label>
+                                <span><?= htmlspecialchars($individual['login_id'] ?? 'N/A'); ?></span>
+                            </div>
+                            <div class="detail-block">
+                                <label>Username</label>
+                                <span><?= htmlspecialchars($individual['username'] ?? 'N/A'); ?></span>
+                            </div>
+                            <div class="detail-block">
+                                <label>Current LMS Password</label>
+                                <?php if ($storedPw !== '' && !$isHash): ?>
+                                    <span><?= htmlspecialchars($storedPw); ?></span>
+                                <?php else: ?>
+                                    <span class="text-muted"><?= $storedPw === '' ? 'No login account' : 'Password protected — reset below to change it.' ?></span>
+                                <?php endif; ?>
+                            </div>
+                            <div class="small text-muted"><i class="fas fa-info-circle"></i> Login at the main page using the Login ID or Username with this password.</div>
+                        </div>
+                        <div class="col-md-7">
+                            <form method="POST" class="row g-3">
+                                <input type="hidden" name="action" value="reset_password">
+                                <input type="hidden" name="teacher_id" value="<?= (int)$individual['teacher_id']; ?>">
+                                <div class="col-md-8">
+                                    <label class="form-label fw-semibold small text-muted">New Password</label>
+                                    <input type="password" name="new_password" class="form-control" required minlength="6" placeholder="Enter new password (min 6 chars)">
+                                </div>
+                                <div class="col-md-4 d-flex align-items-end">
+                                    <button type="submit" class="btn btn-warning w-100"><i class="fas fa-key"></i> Reset Password</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <?php endif; ?>
 
             <?php if (!empty($individual_courses)): ?>
             <div class="card mt-3">

@@ -108,6 +108,11 @@ function getGradeColor($grade) {
                 <span class="nav-icon">&#11014;</span> Promote Students
             </a>
 
+            <?php
+            require_once __DIR__ . '/../../includes/sa_submenu.php';
+            sa_render_submodules('examination', ['dashboard', 'mid_final_schedule', 'datesheets', 'view_results', 'promote']);
+            ?>
+
             <div class="spacer"></div>
 
             <a href="<?= BASE_URL ?>modules/sso/logout.php" class="sidebar-logout-btn">

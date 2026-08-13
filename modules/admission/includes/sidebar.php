@@ -34,12 +34,6 @@
                     <i class="fas fa-list"></i> All Applications
                 </a>
                 
-                <!-- Add New Application (Admin) -->
-                <a class="nav-link <?= basename($_SERVER['PHP_SELF']) == 'add.php' ? 'active' : '' ?>" 
-                   href="<?= BASE_URL ?>applications/add.php">
-                    <i class="fas fa-plus-circle"></i> Add Application
-                </a>
-                
                 <!-- Pending Applications (Filtered) -->
                 <a class="nav-link" 
                    href="<?= BASE_URL ?>applications/index.php?status=pending">

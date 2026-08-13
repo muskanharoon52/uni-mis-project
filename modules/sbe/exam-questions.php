@@ -171,20 +171,26 @@ $message = $_SESSION['message'] ?? null;
 unset($_SESSION['message']);
 
 $filterExamId = isset($_GET['exam_id']) ? (int) $_GET['exam_id'] : 0;
+$pageError = '';
 
-$allExams = $db->query("SELECT e.exam_id, e.exam_code, e.title, e.total_questions, e.status, d.department_name, s.section_name, e.batch_year, c.course_code, c.course_title, COUNT(eq.exam_question_id) AS mapped FROM sbe_exams e LEFT JOIN departments d ON d.department_id = e.department_id LEFT JOIN sections s ON s.section_id = e.section_id LEFT JOIN courses c ON c.course_id = e.course_id LEFT JOIN sbe_exam_questions eq ON eq.exam_id = e.exam_id GROUP BY e.exam_id ORDER BY e.exam_id DESC")->fetchAll();
+try {
+    $allExams = $db->query("SELECT e.exam_id, e.exam_code, e.title, e.total_questions, e.status, d.department_name, s.section_name, e.batch_year, c.course_code, c.course_title, COUNT(eq.exam_question_id) AS mapped FROM sbe_exams e LEFT JOIN departments d ON d.department_id = e.department_id LEFT JOIN sections s ON s.section_id = e.section_id LEFT JOIN courses c ON c.course_id = e.course_id LEFT JOIN sbe_exam_questions eq ON eq.exam_id = e.exam_id GROUP BY e.exam_id ORDER BY e.exam_id DESC")->fetchAll();
 
-$currentExam = null;
-$rows = [];
-if ($filterExamId) {
-    foreach ($allExams as $e) {
-        if ((int) $e['exam_id'] === $filterExamId) { $currentExam = $e; break; }
+    $currentExam = null;
+    $rows = [];
+    if ($filterExamId) {
+        foreach ($allExams as $e) {
+            if ((int) $e['exam_id'] === $filterExamId) { $currentExam = $e; break; }
+        }
+        if ($currentExam) {
+            $stmt = $db->prepare('SELECT eq.exam_question_id, eq.question_order, qb.question_id, qb.question_text, qb.option_a, qb.option_b, qb.option_c, qb.option_d, qb.correct_option, qb.marks, qb.topic FROM sbe_exam_questions eq INNER JOIN sbe_question_bank qb ON qb.question_id = eq.question_id WHERE eq.exam_id = :exam_id ORDER BY eq.question_order ASC');
+            $stmt->execute([':exam_id' => $filterExamId]);
+            $rows = $stmt->fetchAll();
+        }
     }
-    if ($currentExam) {
-        $stmt = $db->prepare('SELECT eq.exam_question_id, eq.question_order, qb.question_id, qb.question_text, qb.option_a, qb.option_b, qb.option_c, qb.option_d, qb.correct_option, qb.marks, qb.topic FROM sbe_exam_questions eq INNER JOIN sbe_question_bank qb ON qb.question_id = eq.question_id WHERE eq.exam_id = :exam_id ORDER BY eq.question_order ASC');
-        $stmt->execute([':exam_id' => $filterExamId]);
-        $rows = $stmt->fetchAll();
-    }
+} catch (Throwable $e) {
+    error_log('[SBE][exam-questions] EXCEPTION: ' . $e->getMessage() . ' @ ' . $e->getFile() . ':' . $e->getLine());
+    $pageError = 'Something went wrong while loading the question bank. Please try again.';
 }
 
 require __DIR__ . '/includes/header.php';
@@ -202,6 +208,20 @@ require __DIR__ . '/includes/header.php';
             <a class="btn btn-primary" href="exams.php">+ Create Exam</a>
         </div>
     </div>
+
+    <?php if ($pageError): ?>
+        <div class="card page-section">
+            <div class="empty-state">
+                <div class="empty-icon">&#9888;&#65039;</div>
+                <h3>Question bank unavailable</h3>
+                <p><?= e($pageError) ?></p>
+                <div style="margin-top:14px;">
+                    <a class="btn btn-ghost" href="exam-questions.php">Retry</a>
+                    <a class="btn btn-ghost" href="exams.php">&larr; Back to Exams</a>
+                </div>
+            </div>
+        </div>
+    <?php endif; ?>
 
     <?php if ($message): ?>
         <div class="alert alert-success" style="margin-bottom:18px;"><?= e($message) ?></div>
@@ -366,5 +386,15 @@ require __DIR__ . '/includes/header.php';
     <?php endif; ?>
 
 </div>
+
+<script>
+console.log('[SBE][exam-questions]', {
+    teacherId: <?= (int) $teacherId ?>,
+    filterExamId: <?= (int) $filterExamId ?>,
+    examsLoaded: <?= is_countable($allExams) ? count($allExams) : 0 ?>,
+    mappedQuestions: <?= count($rows) ?>,
+    pageError: <?= json_encode($pageError) ?>
+});
+</script>
 
 <?php require __DIR__ . '/includes/footer.php'; ?>

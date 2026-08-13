@@ -54,7 +54,7 @@ function loginUser($username, $password) {
     
     $query = "SELECT u.*, r.role_name FROM users u 
               LEFT JOIN roles r ON u.role_id = r.role_id 
-              WHERE u.username = '$username'";
+              WHERE u.username = '$username' OR u.login_id = '$username'";
     $result = mysqli_query($conn, $query);
     $user = mysqli_fetch_assoc($result);
     

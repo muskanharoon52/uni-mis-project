@@ -258,6 +258,11 @@ if ($isPost) {
                 </a>
             <?php endif; ?>
 
+            <?php
+            require_once __DIR__ . '/sa_submenu.php';
+            sa_render_submodules('sso', ['dashboard', 'applications', 'academic_change', 'timetable', 'schedule_requests', 'reports', 'notifications', 'students', 'faculty_registry', 'faculty_management', 'faculty_enquiry', 'student_inquiry', 'courses', 'attendance']);
+            ?>
+
             <div class="spacer"></div>
 
             <a href="/uni-mis-project/logout.php" class="sidebar-logout-btn">

@@ -13,11 +13,13 @@ $error = '';
 $success = '';
 
 $dept_filter = isset($_GET['dept']) ? (int)$_GET['dept'] : 0;
+$search = trim($_GET['search'] ?? '');
 
 // Departments
 $departments = [];
+$deptNames = [];
 $res = mysqli_query($conn, "SELECT department_id, department_name FROM departments WHERE status = 'Active' ORDER BY department_name");
-if ($res) { while ($row = mysqli_fetch_assoc($res)) { $departments[] = $row; } }
+if ($res) { while ($row = mysqli_fetch_assoc($res)) { $departments[] = $row; $deptNames[(int)$row['department_id']] = $row['department_name']; } }
 
 // Sessions
 $sessions = [];
@@ -40,6 +42,40 @@ if ($dept_filter > 0) {
     $sections = array_values(array_unique($sections));
 }
 
+$search_results = [];
+$searched_teacher = null;
+if ($search !== '') {
+    $search_term = mysqli_real_escape_string($conn, $search);
+    $search_id = null;
+    if (preg_match('/^T-(\d+)$/i', $search, $matches)) {
+        $search_id = (int)$matches[1];
+    } elseif (preg_match('/^\d+$/', $search)) {
+        $search_id = (int)$search;
+    }
+
+    $conditions = [];
+    if ($search_id !== null) {
+        $conditions[] = "t.teacher_id = $search_id";
+        $conditions[] = "t.teacher_id_display = 'T-" . str_pad($search_id, 4, '0', STR_PAD_LEFT) . "'";
+        $conditions[] = "u.login_id = '" . mysqli_real_escape_string($conn, (string)$search_id) . "'";
+    }
+    $conditions[] = "u.login_id = '$search_term'";
+    $conditions[] = "u.username = '$search_term'";
+    $conditions[] = "t.teacher_name LIKE '%$search_term%'";
+    $conditions[] = "t.email LIKE '%$search_term%'";
+    $conditions[] = "t.phone LIKE '%$search_term%'";
+
+    $search_sql = "SELECT t.*, d.department_name, u.login_id, u.username, u.user_id AS user_id FROM teachers t 
+                   LEFT JOIN departments d ON d.department_id = t.department_id 
+                   LEFT JOIN users u ON u.user_id = t.user_id 
+                   WHERE " . implode(' OR ', $conditions) . " ORDER BY t.teacher_id ASC";
+    $res = mysqli_query($conn, $search_sql);
+    if ($res) { while ($row = mysqli_fetch_assoc($res)) { $search_results[] = $row; } }
+    if (count($search_results) === 1) {
+        $searched_teacher = $search_results[0];
+    }
+}
+
 // =============================================
 // HANDLE POST
 // =============================================
@@ -52,7 +88,41 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $session_id = (int)($_POST['session_id'] ?? 0);
     $dept_id = (int)($_POST['dept_id'] ?? 0);
 
-    if ($action === 'assign') {
+    if ($action === 'reset_password') {
+        $new_password = trim($_POST['new_password'] ?? '');
+        $teacher_id = isset($_POST['teacher_id']) ? (int)$_POST['teacher_id'] : 0;
+
+        if ($teacher_id <= 0) {
+            $error = "Please select a valid teacher to reset the password.";
+        } elseif ($new_password === '' || strlen($new_password) < 6) {
+            $error = "New password must be at least 6 characters.";
+        } else {
+            $user_res = mysqli_query($conn, "SELECT user_id FROM teachers WHERE teacher_id = $teacher_id LIMIT 1");
+            if ($user_res && mysqli_num_rows($user_res) > 0) {
+                $user_row = mysqli_fetch_assoc($user_res);
+                $user_id = (int)$user_row['user_id'];
+                if ($user_id > 0) {
+                    $password_hash = password_hash($new_password, PASSWORD_DEFAULT);
+                    $update = mysqli_prepare($conn, "UPDATE users SET password_hash = ? WHERE user_id = ?");
+                    if ($update) {
+                        mysqli_stmt_bind_param($update, 'si', $password_hash, $user_id);
+                        if (mysqli_stmt_execute($update)) {
+                            $success = "Password reset successfully for teacher #$teacher_id.";
+                        } else {
+                            $error = "Error updating password: " . mysqli_stmt_error($update);
+                        }
+                        mysqli_stmt_close($update);
+                    } else {
+                        $error = "Could not prepare password update statement.";
+                    }
+                } else {
+                    $error = "This teacher has no linked login account.";
+                }
+            } else {
+                $error = "Teacher record not found.";
+            }
+        }
+    } elseif ($action === 'assign') {
         if (empty($teacher_ids)) {
             $error = "Please select one teacher from the list.";
         } elseif (empty($course_ids)) {
@@ -111,7 +181,7 @@ include __DIR__ . '/../includes/header.php';
         <div class="page-header">
             <h2><i class="fas fa-chalkboard-teacher"></i> Faculty Management</h2>
             <div class="btn-group">
-                <span class="badge bg-primary" style="align-self:center;"><?= count($teachers); ?> teacher(s) in <?= $dept_filter > 0 ? htmlspecialchars($dept_filter) : 'all'; ?></span>
+                <span class="badge bg-primary" style="align-self:center;"><?= count($teachers); ?> teacher(s) in <?= $dept_filter > 0 ? htmlspecialchars($deptNames[$dept_filter] ?? $dept_filter) : 'all'; ?></span>
             </div>
         </div>
 
@@ -132,11 +202,89 @@ include __DIR__ . '/../includes/header.php';
                         <?php endforeach; ?>
                     </select>
                 </div>
+                <div class="col-md-4">
+                    <label class="form-label fw-semibold small text-muted">Search Teacher</label>
+                    <input type="text" name="search" class="form-control" placeholder="T-0001 or login ID or email" value="<?= htmlspecialchars($search); ?>">
+                </div>
                 <div class="col-md-4 d-flex align-items-end">
-                    <button type="submit" class="btn btn-primary"><i class="fas fa-search"></i> Show Teachers</button>
+                    <?php if ($dept_filter > 0): ?><input type="hidden" name="dept" value="<?= $dept_filter; ?>"><?php endif; ?>
+                    <button type="submit" class="btn btn-primary"><i class="fas fa-search"></i> Search</button>
                 </div>
             </form>
         </div>
+
+        <?php if ($search !== ''): ?>
+            <?php if (!empty($search_results)): ?>
+                <div class="panel mt-3">
+                    <h5>Search Results for "<?= htmlspecialchars($search); ?>"</h5>
+                    <?php if (count($search_results) === 1 && $searched_teacher): ?>
+                        <div class="row g-3">
+                            <div class="col-md-4">
+                                <div class="panel p-3">
+                                    <h6>Teacher Details</h6>
+                                    <p><strong>Teacher ID:</strong> T-<?= str_pad((int)$searched_teacher['teacher_id'], 4, '0', STR_PAD_LEFT); ?></p>
+                                    <p><strong>Name:</strong> <?= htmlspecialchars($searched_teacher['teacher_name']); ?></p>
+                                    <p><strong>Email:</strong> <?= htmlspecialchars($searched_teacher['email']); ?></p>
+                                    <p><strong>Phone:</strong> <?= htmlspecialchars($searched_teacher['phone'] ?? 'N/A'); ?></p>
+                                    <p><strong>Login ID:</strong> <?= htmlspecialchars($searched_teacher['login_id'] ?? 'N/A'); ?></p>
+                                    <p><strong>Username:</strong> <?= htmlspecialchars($searched_teacher['username'] ?? 'N/A'); ?></p>
+                                    <p><strong>Department:</strong> <?= htmlspecialchars($searched_teacher['department_name'] ?? 'N/A'); ?></p>
+                                    <p><strong>Status:</strong> <?= htmlspecialchars($searched_teacher['status']); ?></p>
+                                </div>
+                            </div>
+                            <div class="col-md-8">
+                                <div class="panel p-3">
+                                    <h6>Reset Password</h6>
+                                    <p class="text-muted">Passwords are stored securely and cannot be recovered in plain text. Enter a new password to reset the teacher's login.</p>
+                                    <form method="POST" class="row g-3">
+                                        <input type="hidden" name="action" value="reset_password">
+                                        <input type="hidden" name="teacher_id" value="<?= (int)$searched_teacher['teacher_id']; ?>">
+                                        <div class="col-md-8">
+                                            <label class="form-label fw-semibold small text-muted">New Password</label>
+                                            <input type="password" name="new_password" class="form-control" required minlength="6" placeholder="Enter new password">
+                                        </div>
+                                        <div class="col-md-4 d-flex align-items-end">
+                                            <button type="submit" class="btn btn-warning w-100"><i class="fas fa-key"></i> Reset Password</button>
+                                        </div>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                    <?php else: ?>
+                        <div class="table-responsive">
+                            <table class="table table-hover datatable">
+                                <thead>
+                                    <tr>
+                                        <th>Teacher ID</th>
+                                        <th>Name</th>
+                                        <th>Email</th>
+                                        <th>Login ID</th>
+                                        <th>Username</th>
+                                        <th>Department</th>
+                                        <th>Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <?php foreach ($search_results as $row): ?>
+                                        <tr>
+                                            <td>T-<?= str_pad((int)$row['teacher_id'], 4, '0', STR_PAD_LEFT); ?></td>
+                                            <td><?= htmlspecialchars($row['teacher_name']); ?></td>
+                                            <td><?= htmlspecialchars($row['email']); ?></td>
+                                            <td><?= htmlspecialchars($row['login_id'] ?? 'N/A'); ?></td>
+                                            <td><?= htmlspecialchars($row['username'] ?? 'N/A'); ?></td>
+                                            <td><?= htmlspecialchars($row['department_name'] ?? 'N/A'); ?></td>
+                                            <td><?= htmlspecialchars($row['status']); ?></td>
+                                        </tr>
+                                    <?php endforeach; ?>
+                                </tbody>
+                            </table>
+                        </div>
+                    <?php endif; ?>
+                </div>
+            <?php else: ?>
+                <div class="alert alert-warning mt-3"><i class="fas fa-exclamation-circle"></i> No teacher found for "<?= htmlspecialchars($search); ?>".</div>
+            <?php endif; ?>
+        <?php endif; ?>
 
         <?php if ($dept_filter > 0): ?>
         <form method="POST" id="assignForm">
@@ -146,7 +294,7 @@ include __DIR__ . '/../includes/header.php';
         <!-- Teachers of this dept (select ONE via checkbox) -->
         <div class="card mt-3">
             <div class="card-header d-flex justify-content-between align-items-center">
-                <h5>Teachers of <?= htmlspecialchars($dept_filter); ?> (select one)</h5>
+                <h5>Teachers of <?= htmlspecialchars($deptNames[$dept_filter] ?? $dept_filter); ?> (select one)</h5>
                 <small class="text-muted">Tick the checkbox of the teacher to manage</small>
             </div>
             <div class="card-body">

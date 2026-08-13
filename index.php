@@ -63,6 +63,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         .btn-loading::after { content: ''; width: 18px; height: 18px; border: 2px solid rgba(255,255,255,0.3); border-top-color: #fff; border-radius: 50%; display: inline-block; animation: spin .6s linear infinite; margin-left: 8px; vertical-align: middle; }
         @keyframes spin { to { transform: rotate(360deg); } }
         .alert-error { padding: 10px 14px; border-radius: 8px; background: rgba(239,68,68,0.12); border: 1px solid rgba(239,68,68,0.25); color: #f87171; font-size: .84rem; margin-bottom: 18px; }
+        .remember-row { display: flex; align-items: center; gap: 8px; margin-bottom: 18px; }
+        .remember-row input[type="checkbox"] { accent-color: #6366f1; width: 16px; height: 16px; cursor: pointer; }
+        .remember-row label { font-size: .82rem; color: rgba(255,255,255,0.7); cursor: pointer; }
+        .remember-wrap { margin-bottom: 18px; }
+        .remember-wrap select { width: 100%; padding: 10px 12px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.12); background: rgba(255,255,255,0.06); color: #fff; font-size: .88rem; font-family: inherit; outline: none; cursor: pointer; }
+        .remember-wrap select:focus { border-color: #6366f1; }
+        .remember-wrap select option { background: #1e293b; color: #fff; }
+        .remember-actions { display: flex; justify-content: space-between; margin-top: 6px; }
+        .remember-actions button, .remember-actions a { background: none; border: none; color: #818cf8; font-size: .75rem; cursor: pointer; text-decoration: none; padding: 0; }
+        .remember-actions a:hover, .remember-actions button:hover { text-decoration: underline; }
         .credential-hints { margin-top: 28px; padding-top: 20px; border-top: 1px solid rgba(255,255,255,0.06); }
         .credential-hints p { font-size: .75rem; color: rgba(255,255,255,0.35); margin-bottom: 10px; text-transform: uppercase; letter-spacing: .05em; font-weight: 600; }
         .hint-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
@@ -107,14 +117,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <?php endif; ?>
 
             <form method="post" onsubmit="setLoading(this)">
+                <div class="remember-wrap" id="remember-wrap" style="display:none;">
+                    <label style="font-size:.82rem;font-weight:600;color:rgba(255,255,255,0.8);display:block;margin-bottom:6px;">Recent Logins</label>
+                    <select id="remember-select" onchange="onRememberPick()"></select>
+                    <div class="remember-actions">
+                        <button type="button" onclick="removeSelected()">Remove selected</button>
+                        <a href="javascript:void(0)" onclick="clearRemember()">Clear all</a>
+                    </div>
+                </div>
                 <div class="field">
-                    <label>Username</label>
-                    <input type="text" name="username" required placeholder="Enter your username" autocomplete="username">
+                    <label>Username / Login ID</label>
+                    <input type="text" name="username" id="username-field" required placeholder="Enter your username or login ID" autocomplete="username">
                 </div>
                 <div class="field password-field">
                     <label>Password</label>
                     <input type="password" name="password" id="pass-field" required placeholder="Enter password" autocomplete="current-password">
                     <button class="password-toggle" type="button" onclick="togglePass()">&#128065;</button>
+                </div>
+                <div class="remember-row">
+                    <input type="checkbox" id="remember-check">
+                    <label for="remember-check">Remember me for next login</label>
                 </div>
                 <button class="btn-login" type="submit">Sign In</button>
             </form>
@@ -146,6 +168,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     </div>
 
     <script>
+    var RM_KEY = 'uni_mis_remembered';
+
     function togglePass() {
         var input = document.getElementById('pass-field');
         input.type = input.type === 'password' ? 'text' : 'password';
@@ -155,6 +179,97 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         btn.classList.add('btn-loading');
         btn.disabled = true;
     }
+    function getRemembered() {
+        try { return JSON.parse(localStorage.getItem(RM_KEY) || '[]'); } catch (e) { return []; }
+    }
+    function saveRemembered(list) {
+        try { localStorage.setItem(RM_KEY, JSON.stringify(list)); } catch (e) {}
+    }
+    function renderRemember() {
+        var list = getRemembered();
+        var wrap = document.getElementById('remember-wrap');
+        var sel = document.getElementById('remember-select');
+        if (!wrap || !sel) return;
+        sel.innerHTML = '';
+        if (!list.length) { wrap.style.display = 'none'; return; }
+        var ph = document.createElement('option');
+        ph.value = '';
+        ph.textContent = 'Recent logins \u2014 pick one to autofill';
+        sel.appendChild(ph);
+        list.forEach(function (entry) {
+            var o = document.createElement('option');
+            o.value = entry.id;
+            o.textContent = entry.id;
+            o.setAttribute('data-pw', entry.password);
+            sel.appendChild(o);
+        });
+        wrap.style.display = 'block';
+    }
+    function onRememberPick() {
+        var sel = document.getElementById('remember-select');
+        var opt = sel.options[sel.selectedIndex];
+        if (!opt || !opt.value) return;
+        var id = opt.value, pw = opt.getAttribute('data-pw');
+        var u = document.getElementById('username-field');
+        var p = document.getElementById('pass-field');
+        if (u) u.value = id;
+        if (p && pw) { p.value = pw; p.type = 'password'; }
+    }
+    function rememberCurrent(id, password) {
+        var list = getRemembered().filter(function (e) { return e.id !== id; });
+        list.unshift({ id: id, password: password });
+        saveRemembered(list.slice(0, 5));
+        renderRemember();
+    }
+    function removeSelected() {
+        var sel = document.getElementById('remember-select');
+        var opt = sel.options[sel.selectedIndex];
+        if (!opt || !opt.value) return;
+        saveRemembered(getRemembered().filter(function (e) { return e.id !== opt.value; }));
+        renderRemember();
+    }
+    function clearRemember() {
+        saveRemembered([]);
+        renderRemember();
+    }
+    document.addEventListener('DOMContentLoaded', function () {
+        renderRemember();
+        var form = document.querySelector('form');
+        if (form) form.addEventListener('submit', function (e) {
+            var remember = document.getElementById('remember-check');
+            if (!remember || !remember.checked) return;
+            e.preventDefault();
+            var username = document.getElementById('username-field').value.trim();
+            var password = document.getElementById('pass-field').value;
+            var btn = form.querySelector('.btn-login');
+            btn.classList.add('btn-loading');
+            btn.disabled = true;
+            var body = new URLSearchParams();
+            body.append('username', username);
+            body.append('password', password);
+            fetch('modules/sso/validate_login.php', {
+                method: 'POST',
+                body: body,
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+            })
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+                if (data.success) {
+                    rememberCurrent(username, password);
+                    form.submit();
+                } else {
+                    btn.classList.remove('btn-loading');
+                    btn.disabled = false;
+                    alert('Invalid username or password.');
+                }
+            })
+            .catch(function () {
+                btn.classList.remove('btn-loading');
+                btn.disabled = false;
+                form.submit();
+            });
+        });
+    });
     </script>
 </body>
 </html>

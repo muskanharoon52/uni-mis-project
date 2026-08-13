@@ -3,7 +3,7 @@ $pageTitle = 'New Admissions';
 include_once __DIR__ . '/../includes/header.php';
 
 if (!isset($_SESSION['user_id'])) { header('Location: /uni-mis-project/'); exit(); }
-if ($_SESSION['role_id'] != 3 && $_SESSION['role_id'] != 1) { header('Location: /uni-mis-project/'); exit(); }
+if ($_SESSION['role_id'] != 3 && $_SESSION['role_id'] != 1 && $_SESSION['role_id'] != 7) { header('Location: /uni-mis-project/'); exit(); }
 
 $error = '';
 $success = '';
@@ -20,19 +20,115 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['mark_paid'])) {
         mysqli_begin_transaction($conn);
         try {
             $now = date('Y-m-d H:i:s');
-            
-            // =============================================
-            // CHANGE: ONLY MARK FEE AS PAID. NO STUDENT CREATION.
-            // =============================================
+
+            // Mark the admission fee as paid
             mysqli_query($conn, "UPDATE admission_students SET fee_paid = 1, fee_paid_at = '$now' WHERE id = '$adm_id'");
 
-            // Update the application status to waiting for enrollment
-            if (!empty($adm['application_id'])) {
-                mysqli_query($conn, "UPDATE admission_applications SET application_status = 'Fee Paid' WHERE application_id = '{$adm['application_id']}'");
+            $generated_credentials = null;
+            $app_id = (int) ($adm['application_id'] ?? 0);
+
+            if ($app_id > 0) {
+                // Update the application status to waiting for enrollment
+                mysqli_query($conn, "UPDATE admission_applications SET application_status = 'Fee Paid' WHERE application_id = '$app_id'");
+
+                // =============================================
+                // GENERATE LMS LOGIN CREDENTIALS
+                // The student account (users + students) is created
+                // here, right after fee confirmation, so the new
+                // student can log in to the portal / LMS.
+                // =============================================
+                $existing = mysqli_query($conn, "SELECT user_id FROM students WHERE application_id = $app_id LIMIT 1");
+                if ($existing && mysqli_num_rows($existing) === 0) {
+                    $det = mysqli_query($conn, "
+                        SELECT aa.email, aa.contact_no, aa.address, aa.father_name, aa.cnic_or_bform,
+                               aa.dob, aa.gender, aa.session_id, aa.applied_semester_id,
+                               asd.program_id, asd.full_name, asd.department_id
+                        FROM admission_applications aa
+                        JOIN admission_students asd ON asd.application_id = aa.application_id
+                        WHERE aa.application_id = $app_id LIMIT 1
+                    ");
+                    $detRow = ($det && mysqli_num_rows($det) > 0) ? mysqli_fetch_assoc($det) : [];
+
+                    $full_name = $detRow['full_name'] ?? $adm['full_name'] ?? 'Student';
+                    $email = $detRow['email'] ?? $adm['email'] ?? '';
+                    $phone = $detRow['contact_no'] ?? $adm['contact_no'] ?? '';
+                    $program_id = (int) ($detRow['program_id'] ?? $adm['program_id'] ?? 1);
+
+                    // Next numeric login id (keeps the same sequence as previous enrollments)
+                    $login_row = mysqli_fetch_assoc(mysqli_query($conn, "SELECT MAX(CAST(login_id AS UNSIGNED)) AS max_login FROM users"));
+                    $login_id = (int) ($login_row['max_login'] ?? 9000) + 1;
+                    $username = strtolower(preg_replace('/[^a-zA-Z0-9]/', '', (string) (explode(' ', $full_name)[0] ?? 'student'))) . $login_id;
+                    $password_hash = password_hash('student123', PASSWORD_DEFAULT);
+
+                    // Roll number (unique per program + year)
+                    $seq = (int) (mysqli_fetch_assoc(mysqli_query($conn, "SELECT COUNT(*) AS c FROM students WHERE program_id = $program_id"))['c'] ?? 0) + 1;
+                    $roll_no = '';
+                    do {
+                        $roll_no = date('Y') . '-' . $program_id . '-' . str_pad($seq, 3, '0', STR_PAD_LEFT);
+                        $seq++;
+                        $roll_chk = mysqli_query($conn, "SELECT roll_no FROM students WHERE roll_no = '$roll_no' LIMIT 1");
+                    } while ($roll_chk && mysqli_num_rows($roll_chk) > 0);
+
+                    $prog = mysqli_query($conn, "SELECT department_id FROM programs WHERE program_id = $program_id LIMIT 1");
+                    $dept_id = ($prog && mysqli_num_rows($prog) > 0) ? (int) mysqli_fetch_assoc($prog)['department_id'] : null;
+
+                    // Create the user login (role 4 = Student)
+                    $stmt = $conn->prepare("INSERT INTO users (full_name, username, login_id, email, phone, password_hash, role_id, department_id, status) VALUES (?, ?, ?, ?, ?, ?, 4, ?, 'Active')");
+                    $stmt->bind_param('ssisssi', $full_name, $username, $login_id, $email, $phone, $password_hash, $dept_id);
+                    if (!$stmt->execute()) {
+                        throw new Exception("Failed to create user account: " . $conn->error);
+                    }
+                    $new_user_id = (int) $conn->insert_id;
+                    $stmt->close();
+
+                    // Create the students registry row (required for LMS access)
+                    $session_val = (int) ($detRow['session_id'] ?? 1);
+                    $semester_val = (int) ($detRow['applied_semester_id'] ?? 1);
+                    $father = $detRow['father_name'] ?? '';
+                    $cnic = $detRow['cnic_or_bform'] ?? $adm['cnic_or_bform'] ?? '';
+                    $dob = $detRow['dob'] ?? $adm['dob'] ?? null;
+                    $gender = $detRow['gender'] ?? $adm['gender'] ?? 'Male';
+                    $address = $detRow['address'] ?? $adm['address'] ?? '';
+
+                    $stmt = $conn->prepare("INSERT INTO students (
+                        application_id, roll_no, full_name, father_name, cnic_or_bform,
+                        dob, gender, contact_no, email, address, program_id,
+                        admission_session_id, current_session_id, current_semester_id,
+                        batch_year, admission_date, status, user_id
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'Active', ?)");
+                    $batch_year = (int) date('Y');
+                    $admission_date = date('Y-m-d');
+                    $stmt->bind_param(
+                        'isssssssssiiiiisi',
+                        $app_id, $roll_no, $full_name, $father, $cnic,
+                        $dob, $gender, $phone, $email, $address, $program_id,
+                        $session_val, $session_val, $semester_val,
+                        $batch_year, $admission_date, $new_user_id
+                    );
+                    if (!$stmt->execute()) {
+                        throw new Exception("Failed to create student record: " . $conn->error);
+                    }
+                    $stmt->close();
+
+                    // Mark as fully activated / admitted (link SSO account to admission record)
+                    mysqli_query($conn, "UPDATE admission_students SET is_activated = 1, user_id = $new_user_id WHERE id = $adm_id");
+                    mysqli_query($conn, "UPDATE admission_applications SET application_status = 'Admitted', status = 'admitted' WHERE application_id = $app_id");
+
+                    $generated_credentials = ['username' => $username, 'password' => 'student123'];
+                }
             }
 
             mysqli_commit($conn);
-            $success = "Admission fee of 20,000 PKR marked as paid for <strong>{$adm['full_name']}</strong>. The student is now ready for enrollment in the Section module.";
+
+            $success = "Admission fee of 20,000 PKR marked as paid for <strong>" . htmlspecialchars($adm['full_name']) . "</strong>.";
+            if ($generated_credentials) {
+                $success .= "<br><br><strong>Student LMS login generated!</strong><br>"
+                    . "Login ID: <code>" . htmlspecialchars($generated_credentials['username']) . "</code><br>"
+                    . "Password: <code>" . htmlspecialchars($generated_credentials['password']) . "</code><br>"
+                    . "<em>The student can now log in to the LMS portal using these credentials.</em>";
+            } else {
+                $success .= "<br>The student's login account already exists.";
+            }
         } catch (Exception $e) {
             mysqli_rollback($conn);
             $error = "Error: " . $e->getMessage();

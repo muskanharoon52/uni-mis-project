@@ -5,7 +5,24 @@ declare(strict_types=1);
 if (!function_exists('current_user')) {
     function current_user(): ?array
     {
-        return $_SESSION['auth_user'] ?? null;
+        if (isset($_SESSION['auth_user'])) {
+            return $_SESSION['auth_user'];
+        }
+
+        // Allow the portal Super Admin to view SBE dashboards without a separate SBE login.
+        if (!empty($_SESSION['user_id']) && strtolower((string) ($_SESSION['role_name'] ?? '')) === 'super admin') {
+            return [
+                'auth_id'     => (int) $_SESSION['user_id'],
+                'role'        => 'super admin',
+                'login_id'    => (string) ($_SESSION['username'] ?? ''),
+                'display_name'=> (string) ($_SESSION['full_name'] ?? 'Super Admin'),
+                'teacher_id'  => 0,
+                'student_id'  => 0,
+                'status'      => 'Active',
+            ];
+        }
+
+        return null;
     }
 }
 
@@ -34,6 +51,14 @@ if (!function_exists('auth_logout')) {
     }
 }
 
+if (!function_exists('is_portal_super_admin')) {
+    function is_portal_super_admin(): bool
+    {
+        return (int) ($_SESSION['role_id'] ?? 0) === 7
+            || strtolower((string) ($_SESSION['role_name'] ?? '')) === 'super admin';
+    }
+}
+
 if (!function_exists('require_login')) {
     function require_login(array $roles = []): void
     {
@@ -44,9 +69,23 @@ if (!function_exists('require_login')) {
             exit;
         }
 
-        if ($roles && !in_array($user['role'], $roles, true)) {
+        if ($roles && !is_portal_super_admin() && !in_array($user['role'], $roles, true)) {
             header('Location: index.php');
             exit;
+        }
+
+        // Portal Super Admin: take on the page's role so the SBE side panel
+        // renders the matching links for the dashboard they entered from.
+        if (is_portal_super_admin() && $roles) {
+            $_SESSION['auth_user'] = [
+                'auth_id'      => (int) $user['auth_id'],
+                'role'         => $roles[0],
+                'login_id'     => (string) ($user['login_id'] ?? ''),
+                'display_name' => (string) ($user['display_name'] ?? 'Super Admin'),
+                'teacher_id'   => 0,
+                'student_id'   => 0,
+                'status'       => 'Active',
+            ];
         }
     }
 }

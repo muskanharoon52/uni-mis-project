@@ -17,9 +17,12 @@ $fee_heads = [];
 $departments = mysqli_query($conn, "SELECT * FROM departments WHERE status = 'Active' ORDER BY department_name");
 $sessions = mysqli_query($conn, "SELECT * FROM sessions WHERE status = 'Active' ORDER BY session_name");
 
+$mode = isset($_GET['mode']) && $_GET['mode'] === 'individual' ? 'individual' : 'bulk';
 $selected_dept = isset($_GET['dept_id']) ? intval($_GET['dept_id']) : 0;
 $selected_session = isset($_GET['session_id']) ? intval($_GET['session_id']) : 0;
 $selected_semester = isset($_GET['semester_id']) ? intval($_GET['semester_id']) : 0;
+$selected_student_id = isset($_GET['student_id']) ? intval($_GET['student_id']) : 0;
+$selected_student = null;
 
 // =============================================
 // AUTO-DETECT THE PRICE COLUMN 
@@ -45,7 +48,7 @@ if (!$found_column) {
 // =============================================
 // LOAD STUDENTS AND FEE HEADS
 // =============================================
-if ($selected_dept > 0 && $selected_session > 0 && $found_column) {
+if ($found_column) {
     // 1. Fetch Fee Heads
     $sql = "SELECT fee_head_id, fee_head_name, $price_column, description FROM fee_heads WHERE status = 'Active'";
     $fh_result = mysqli_query($conn, $sql);
@@ -53,26 +56,38 @@ if ($selected_dept > 0 && $selected_session > 0 && $found_column) {
         $fee_heads[] = $row;
     }
 
-    // 2. Fetch Students in this Department 
-    $prog_result = mysqli_query($conn, "SELECT program_id FROM programs WHERE department_id = '$selected_dept' AND status = 'Active'");
-    $program_ids = [];
-    while ($p = mysqli_fetch_assoc($prog_result)) { $program_ids[] = $p['program_id']; }
+    if ($mode === 'bulk' && $selected_dept > 0 && $selected_session > 0 && $selected_semester > 0) {
+        $prog_result = mysqli_query($conn, "SELECT program_id FROM programs WHERE department_id = '$selected_dept' AND status = 'Active'");
+        $program_ids = [];
+        while ($p = mysqli_fetch_assoc($prog_result)) { $program_ids[] = $p['program_id']; }
 
-    if (!empty($program_ids)) {
-        $prog_list = implode(',', $program_ids);
-        
-        // =============== UPDATED SQL QUERY ===============
-        // Added s.student_id to the SELECT clause
+        if (!empty($program_ids)) {
+            $prog_list = implode(',', $program_ids);
+
+            $stu_result = mysqli_query($conn, "
+                SELECT s.student_id, s.full_name, s.roll_no, s.program_id, p.program_name
+                FROM students s
+                JOIN programs p ON p.program_id = s.program_id
+                WHERE s.program_id IN ($prog_list) AND s.status = 'Active'
+                ORDER BY s.full_name
+            ");
+
+            while ($row = mysqli_fetch_assoc($stu_result)) {
+                $fee_check = mysqli_query($conn, "SELECT student_fee_id FROM student_fee
+                    WHERE student_id = '{$row['student_id']}' AND session_id = '$selected_session' AND semester_id = '$selected_semester'");
+                $row['fee_exists'] = (mysqli_num_rows($fee_check) > 0);
+                $students[] = $row;
+            }
+        }
+    } elseif ($mode === 'individual' && $selected_student_id > 0 && $selected_session > 0 && $selected_semester > 0) {
         $stu_result = mysqli_query($conn, "
             SELECT s.student_id, s.full_name, s.roll_no, s.program_id, p.program_name
             FROM students s
             JOIN programs p ON p.program_id = s.program_id
-            WHERE s.program_id IN ($prog_list) AND s.status = 'Active'
-            ORDER BY s.full_name
+            WHERE s.student_id = '$selected_student_id' AND s.status = 'Active'
+            LIMIT 1
         ");
-        // =================================================
-
-        while ($row = mysqli_fetch_assoc($stu_result)) {
+        if ($stu_result && ($row = mysqli_fetch_assoc($stu_result))) {
             $fee_check = mysqli_query($conn, "SELECT student_fee_id FROM student_fee
                 WHERE student_id = '{$row['student_id']}' AND session_id = '$selected_session' AND semester_id = '$selected_semester'");
             $row['fee_exists'] = (mysqli_num_rows($fee_check) > 0);
@@ -82,13 +97,14 @@ if ($selected_dept > 0 && $selected_session > 0 && $found_column) {
 }
 
 // =============================================
-// HANDLE BULK GENERATION SUBMISSION
+// HANDLE BULK/INDIVIDUAL GENERATION SUBMISSION
 // =============================================
-if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['generate_bulk']) && $found_column) {
+if ($_SERVER['REQUEST_METHOD'] == 'POST' && $found_column) {
+    $post_mode = isset($_POST['mode']) && $_POST['mode'] === 'individual' ? 'individual' : 'bulk';
     $selected_session = intval($_POST['session_id']);
     $selected_semester = intval($_POST['semester_id']);
     $selected_dept = intval($_POST['dept_id']);
-    $student_ids = isset($_POST['student_ids']) ? $_POST['student_ids'] : [];
+    $selected_student_id = intval($_POST['student_id']);
     $selected_fee_ids = isset($_POST['fee_head_ids']) ? $_POST['fee_head_ids'] : [];
     $generated_by = $_SESSION['user_id'] ?? 1;
     $due_date = date('Y-m-d', strtotime('+30 days'));
@@ -108,12 +124,23 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['generate_bulk']) && $f
 
     if ($fee_total == 0) {
         $error = "Please select at least one fee head to generate.";
-    } elseif (empty($student_ids)) {
-        $error = "No students selected.";
+    } elseif ($selected_session <= 0 || $selected_semester <= 0) {
+        $error = "Please select session and semester.";
+    } elseif ($post_mode === 'bulk' && empty($_POST['student_ids'])) {
+        $error = "No students selected for bulk generation.";
+    } elseif ($post_mode === 'individual' && $selected_student_id <= 0) {
+        $error = "Please provide a valid student ID for individual generation.";
     } else {
         mysqli_begin_transaction($conn);
         try {
-            foreach ($student_ids as $sid) {
+            $student_list = [];
+            if ($post_mode === 'bulk') {
+                $student_list = array_map('intval', $_POST['student_ids']);
+            } else {
+                $student_list = [$selected_student_id];
+            }
+
+            foreach ($student_list as $sid) {
                 $sid = intval($sid);
                 $check = mysqli_query($conn, "SELECT student_fee_id FROM student_fee WHERE student_id = '$sid' AND session_id = '$selected_session' AND semester_id = '$selected_semester'");
                 if (mysqli_num_rows($check) > 0) {
@@ -147,6 +174,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['generate_bulk']) && $f
     $selected_dept = 0;
     $selected_session = 0;
     $selected_semester = 0;
+    $selected_student_id = 0;
     $students = [];
     $fee_heads = [];
 }
@@ -160,10 +188,17 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['generate_bulk']) && $f
         <h3>Fee Generation</h3>
     </div>
     <form method="GET" style="padding:18px 22px;">
-        <div class="inline-form-row" style="grid-template-columns:1fr 1fr 1fr;">
+        <div class="inline-form-row" style="grid-template-columns:1fr 1fr 1fr 1fr; gap:12px;">
+            <div class="field" style="margin-bottom:0;">
+                <label>Mode <span style="color:var(--danger);">*</span></label>
+                <select name="mode" required onchange="this.form.submit()">
+                    <option value="bulk" <?= $mode === 'bulk' ? 'selected' : '' ?>>Bulk</option>
+                    <option value="individual" <?= $mode === 'individual' ? 'selected' : '' ?>>Individual</option>
+                </select>
+            </div>
             <div class="field" style="margin-bottom:0;">
                 <label>Department <span style="color:var(--danger);">*</span></label>
-                <select name="dept_id" required onchange="this.form.submit()">
+                <select name="dept_id" <?= $mode === 'bulk' ? 'required' : '' ?> onchange="this.form.submit()">
                     <option value="">Select Department</option>
                     <?php while ($d = mysqli_fetch_assoc($departments)): ?>
                         <option value="<?= $d['department_id'] ?>" <?= $selected_dept == $d['department_id'] ? 'selected' : '' ?>><?= htmlspecialchars($d['department_name']) ?></option>
@@ -172,7 +207,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['generate_bulk']) && $f
             </div>
             <div class="field" style="margin-bottom:0;">
                 <label>Session <span style="color:var(--danger);">*</span></label>
-                <select name="session_id" required onchange="this.form.submit()">
+                <select name="session_id" <?= $mode === 'bulk' || $mode === 'individual' ? 'required' : '' ?> onchange="this.form.submit()">
                     <option value="">Select Session</option>
                     <?php while ($s = mysqli_fetch_assoc($sessions)): ?>
                         <option value="<?= $s['session_id'] ?>" <?= $selected_session == $s['session_id'] ? 'selected' : '' ?>><?= htmlspecialchars($s['session_name']) ?></option>
@@ -181,7 +216,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['generate_bulk']) && $f
             </div>
             <div class="field" style="margin-bottom:0;">
                 <label>Semester <span style="color:var(--danger);">*</span></label>
-                <select name="semester_id" required onchange="this.form.submit()">
+                <select name="semester_id" <?= $mode === 'bulk' || $mode === 'individual' ? 'required' : '' ?> onchange="this.form.submit()">
                     <option value="">Select Semester</option>
                     <?php
                     $semesters = mysqli_query($conn, "SELECT * FROM semesters GROUP BY semester_name ORDER BY CAST(SUBSTRING_INDEX(semester_name, ' ', -1) AS UNSIGNED)");
@@ -190,6 +225,10 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['generate_bulk']) && $f
                         <option value="<?= $sem['semester_id'] ?>" <?= $selected_semester == $sem['semester_id'] ? 'selected' : '' ?>><?= htmlspecialchars($sem['semester_name']) ?></option>
                     <?php endwhile; ?>
                 </select>
+            </div>
+            <div class="field" style="margin-bottom:0;">
+                <label>Student ID</label>
+                <input type="text" name="student_id" value="<?= $selected_student_id > 0 ? $selected_student_id : '' ?>" placeholder="Individual only" onchange="this.form.submit()">
             </div>
         </div>
         <?php if ($selected_dept > 0 || $selected_session > 0 || $selected_semester > 0): ?>
@@ -202,9 +241,11 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['generate_bulk']) && $f
 
 <?php if (!empty($students) && $found_column): ?>
 <form method="POST">
+    <input type="hidden" name="mode" value="<?= htmlspecialchars($mode) ?>">
     <input type="hidden" name="dept_id" value="<?= $selected_dept ?>">
     <input type="hidden" name="session_id" value="<?= $selected_session ?>">
     <input type="hidden" name="semester_id" value="<?= $selected_semester ?>">
+    <input type="hidden" name="student_id" value="<?= $selected_student_id ?>">
     
     <div class="card" style="margin-top:18px;">
         <div class="card-header">
@@ -283,7 +324,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['generate_bulk']) && $f
         </div>
         <div style="padding:16px 22px;border-top:1px solid var(--border);">
             <button type="submit" name="generate_bulk" class="btn btn-primary" onclick="return confirm('Generate fee for all selected students with the selected fee heads?')">
-                <i class="fas fa-bolt"></i> Generate Fee for Selected
+                <i class="fas fa-bolt"></i> <?= $mode === 'individual' ? 'Generate Fee for Student' : 'Generate Fee for Selected' ?>
             </button>
             <span class="muted" style="margin-left:12px;font-size:.82rem;">
                 <span id="selected_count"><?= count($students) ?></span> student(s) selected

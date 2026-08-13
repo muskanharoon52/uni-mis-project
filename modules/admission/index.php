@@ -69,7 +69,7 @@ if ($flash): ?>
         <h1 style="font-size:1.6rem;font-weight:800;color:#fff;margin:0 0 6px;"><?= $greeting ?>, <?= htmlspecialchars($firstName) ?>! 👋</h1>
         <p style="margin:0 0 16px;font-size:.88rem;color:rgba(255,255,255,0.65);">Here's your admissions overview for today. You have <strong style="color:#fff;"><?= $stats['pending'] ?> pending</strong> applications awaiting review.</p>
         <div style="display:flex;gap:10px;flex-wrap:wrap;">
-            <a href="applications/add.php" class="btn btn-ghost" style="background:#fff;color:var(--accent);"><i class="fas fa-plus"></i> New Application</a>
+            <a href="register.php" target="_blank" class="btn btn-ghost" style="background:#fff;color:var(--accent);"><i class="fas fa-globe"></i> Public Registration</a>
             <a href="applications/index.php" class="btn btn-ghost" style="background:rgba(255,255,255,0.14);color:#fff;border:1px solid rgba(255,255,255,0.22);"><i class="fas fa-list"></i> All Applications</a>
         </div>
     </div>

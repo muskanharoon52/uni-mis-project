@@ -42,31 +42,92 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } elseif (empty($email)) {
             $error = "Email is required.";
         } else {
-            if ($teacher_id > 0) {
-                $stmt = mysqli_prepare($conn, "UPDATE teachers SET teacher_name=?, designation=?, salary=?, department_id=?, email=?, phone=?, status=? WHERE teacher_id=?");
-                mysqli_stmt_bind_param($stmt, 'ssdisssi', $teacher_name, $designation, $salary, $department_id, $email, $phone, $status, $teacher_id);
-                if (mysqli_stmt_execute($stmt)) {
-                    $success = "Teacher #$teacher_id updated successfully.";
-                } else {
-                    $error = "Error updating teacher: " . mysqli_stmt_error($stmt);
+            // Check if email already exists in teachers table
+            $check_teacher_email = mysqli_query($conn, "SELECT teacher_id FROM teachers WHERE email = '$email'");
+            if ($teacher_id == 0 && mysqli_num_rows($check_teacher_email) > 0) {
+                $error = "A teacher with this email already exists.";
+            } elseif ($teacher_id > 0 && mysqli_num_rows($check_teacher_email) > 0) {
+                $existing = mysqli_fetch_assoc($check_teacher_email);
+                if ($existing['teacher_id'] != $teacher_id) {
+                    $error = "Another teacher with this email already exists.";
                 }
-                mysqli_stmt_close($stmt);
             } else {
-                $stmt = mysqli_prepare($conn, "INSERT INTO teachers (teacher_name, designation, salary, department_id, email, phone, status) VALUES (?, ?, ?, ?, ?, ?, ?)");
-                mysqli_stmt_bind_param($stmt, 'ssdisss', $teacher_name, $designation, $salary, $department_id, $email, $phone, $status);
-                if (mysqli_stmt_execute($stmt)) {
-                    $new_id = mysqli_insert_id($conn);
-                    $success = "Teacher added successfully. Teacher ID: $new_id";
+                if ($teacher_id > 0) {
+                    // Update existing teacher
+                    $stmt = mysqli_prepare($conn, "UPDATE teachers SET teacher_name=?, designation=?, salary=?, department_id=?, email=?, phone=?, status=? WHERE teacher_id=?");
+                    mysqli_stmt_bind_param($stmt, 'ssdisssi', $teacher_name, $designation, $salary, $department_id, $email, $phone, $status, $teacher_id);
+                    if (mysqli_stmt_execute($stmt)) {
+                        $success = "Teacher #$teacher_id updated successfully.";
+                    } else {
+                        $error = "Error updating teacher: " . mysqli_stmt_error($stmt);
+                    }
+                    mysqli_stmt_close($stmt);
                 } else {
-                    $error = "Error adding teacher: " . mysqli_stmt_error($stmt);
+                    // Generate new teacher ID
+                    $result = mysqli_query($conn, "SELECT MAX(teacher_id) as max_id FROM teachers");
+                    $row = mysqli_fetch_assoc($result);
+                    $next_id = ($row['max_id'] ?? 0) + 1;
+                    $teacher_id_formatted = str_pad($next_id, 4, '0', STR_PAD_LEFT);
+
+                    // Insert teacher
+                    $stmt = mysqli_prepare($conn, "INSERT INTO teachers (teacher_name, designation, salary, department_id, email, phone, status, teacher_id_display) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+                    mysqli_stmt_bind_param($stmt, 'ssdissss', $teacher_name, $designation, $salary, $department_id, $email, $phone, $status, $teacher_id_formatted);
+                    
+                    if (mysqli_stmt_execute($stmt)) {
+                        $new_id = mysqli_insert_id($conn);
+                        
+                        // Create user account for teacher with default password
+                        $default_password = 'password123';
+                        $hashed_password = password_hash($default_password, PASSWORD_DEFAULT);
+                        $teacher_login_id = 'T-' . $teacher_id_formatted;
+                        $teacher_username = strtolower(str_replace(' ', '.', preg_replace('/[^a-zA-Z0-9\s]/', '', $teacher_name))) . '.' . $teacher_id_formatted;
+
+                        // Check if user already exists with this email in users table
+                        $check_user = mysqli_query($conn, "SELECT user_id FROM users WHERE email = '" . mysqli_real_escape_string($conn, $email) . "'");
+                        if (mysqli_num_rows($check_user) == 0) {
+                            $stmt_user = mysqli_prepare($conn, "INSERT INTO users (full_name, username, login_id, email, phone, password_hash, role_id, department_id, status, created_at) VALUES (?, ?, ?, ?, ?, ?, 2, ?, 'Active', NOW())");
+                            if ($stmt_user) {
+                                mysqli_stmt_bind_param($stmt_user, 'ssssssi', $teacher_name, $teacher_username, $teacher_login_id, $email, $phone, $hashed_password, $department_id);
+                                if (mysqli_stmt_execute($stmt_user)) {
+                                    $user_id = mysqli_insert_id($conn);
+                                    mysqli_query($conn, "UPDATE teachers SET user_id = $user_id WHERE teacher_id = $new_id");
+                                    $success = "Teacher added successfully. Teacher ID: T-$teacher_id_formatted | Login ID: $teacher_login_id | Password: $default_password";
+                                } else {
+                                    $error = "Error creating teacher login: " . mysqli_stmt_error($stmt_user);
+                                }
+                                mysqli_stmt_close($stmt_user);
+                            } else {
+                                $error = "Error preparing teacher login creation statement.";
+                            }
+                        } else {
+                            // User already exists, link teacher to existing user.
+                            $user_data = mysqli_fetch_assoc($check_user);
+                            mysqli_query($conn, "UPDATE teachers SET user_id = " . (int)$user_data['user_id'] . " WHERE teacher_id = $new_id");
+                            $success = "Teacher added successfully. Teacher ID: T-$teacher_id_formatted (Linked to existing user account)";
+                        }
+                    } else {
+                        $error = "Error adding teacher: " . mysqli_stmt_error($stmt);
+                    }
+                    mysqli_stmt_close($stmt);
                 }
-                mysqli_stmt_close($stmt);
             }
         }
     } elseif ($action === 'delete') {
         if ($teacher_id > 0) {
+            // Get user_id before deleting
+            $get_user = mysqli_query($conn, "SELECT user_id FROM teachers WHERE teacher_id = $teacher_id");
+            $teacher_data = mysqli_fetch_assoc($get_user);
+            
             mysqli_query($conn, "DELETE FROM teacher_courses WHERE teacher_id = $teacher_id");
             if (mysqli_query($conn, "DELETE FROM teachers WHERE teacher_id = $teacher_id")) {
+                // Delete associated user account if exists and not linked to other teachers
+                if ($teacher_data && $teacher_data['user_id']) {
+                    // Check if this user is linked to any other teacher
+                    $check_other_teachers = mysqli_query($conn, "SELECT teacher_id FROM teachers WHERE user_id = " . $teacher_data['user_id']);
+                    if (mysqli_num_rows($check_other_teachers) == 0) {
+                        mysqli_query($conn, "DELETE FROM users WHERE user_id = " . $teacher_data['user_id']);
+                    }
+                }
                 $success = "Teacher #$teacher_id deleted.";
             } else {
                 $error = "Error deleting teacher: " . mysqli_error($conn);
@@ -196,7 +257,7 @@ include __DIR__ . '/../includes/header.php';
                             <tbody>
                                 <?php foreach ($teachers as $t): ?>
                                     <tr>
-                                        <td style="font-weight:600;">T-<?= str_pad((int)$t['teacher_id'], 4, '0', STR_PAD_LEFT); ?></td>
+                                        <td style="font-weight:600;">T-<?= htmlspecialchars($t['teacher_id_display'] ?? str_pad((int)$t['teacher_id'], 4, '0', STR_PAD_LEFT)); ?></td>
                                         <td><?= htmlspecialchars($t['teacher_name']); ?></td>
                                         <td><?= htmlspecialchars($t['designation'] ?? 'N/A'); ?></td>
                                         <td>

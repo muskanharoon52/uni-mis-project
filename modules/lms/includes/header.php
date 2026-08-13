@@ -107,6 +107,11 @@ $links = $role === 'teacher' ? $teacherLinks : ($role === 'student' ? $studentLi
                 <a class="<?= $active === 'applications' ? 'active' : '' ?>" href="<?= app_url('teacher/applications.php') ?>">
                     <span class="nav-icon">&#128203;</span> Applications
                 </a>
+
+                <?php
+                require_once __DIR__ . '/../../../includes/sa_submenu.php';
+                sa_render_submodules('lms', ['teacher_dashboard', 'teacher_courses', 'teacher_attendance', 'assignments', 'grading', 'internal_marks', 'timetable', 'announcements', 'messages', 'queries', 'applications', 'student_dashboard', 'student_courses', 'marks', 'submissions', 'transcripts']);
+                ?>
             <?php elseif ($role === 'student'): ?>
                 <span class="nav-section-label">Overview</span>
                 <a class="<?= $active === 'dashboard' ? 'active' : '' ?>" href="<?= app_url('student/dashboard.php') ?>">
@@ -145,6 +150,11 @@ $links = $role === 'teacher' ? $teacherLinks : ($role === 'student' ? $studentLi
                 <a class="<?= $active === 'applications' ? 'active' : '' ?>" href="<?= app_url('student/applications.php') ?>">
                     <span class="nav-icon">&#128203;</span> Applications
                 </a>
+
+                <?php
+                require_once __DIR__ . '/../../../includes/sa_submenu.php';
+                sa_render_submodules('lms', ['student_dashboard', 'student_courses', 'marks', 'timetable', 'announcements', 'messages', 'queries', 'applications', 'profile', 'teacher_dashboard', 'teacher_courses', 'teacher_attendance', 'assignments', 'grading', 'internal_marks', 'course_materials', 'quizzes', 'academic_calendar', 'datesheet', 'teacher_examination', 'reports']);
+                ?>
              <?php endif; ?>
          </nav>
 

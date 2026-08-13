@@ -10,7 +10,7 @@ if (!isset($_SESSION['user_id'])) {
     exit();
 }
 
-if ($_SESSION['role_id'] != 3 && $_SESSION['role_id'] != 1) {
+if ($_SESSION['role_id'] != 3 && $_SESSION['role_id'] != 1 && $_SESSION['role_id'] != 7) {
     header('Location: /uni-mis-project/');
     exit();
 }
@@ -75,6 +75,11 @@ $userInitial = strtoupper(substr($userName, 0, 1));
             <a class="<?= $current_folder === 'logs' ? 'active' : '' ?>" href="/uni-mis-project/modules/finance/logs/index.php">
                 <span class="nav-icon">&#128336;</span> Activity Logs
             </a>
+
+            <?php
+            require_once __DIR__ . '/../../../includes/sa_submenu.php';
+            sa_render_submodules('finance', ['dashboard', 'fee_heads', 'fee_structure', 'fee_generate', 'fee_receive', 'logs', 'new_admission']);
+            ?>
 
             <div class="spacer"></div>
 

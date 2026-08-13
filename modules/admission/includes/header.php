@@ -64,6 +64,11 @@ $userInitial = strtoupper(substr($userName, 0, 1));
                 Settings
             </a>
 
+            <?php
+            require_once __DIR__ . '/../../../includes/sa_submenu.php';
+            sa_render_submodules('admission', ['dashboard', 'applications', 'students', 'scholarships', 'reports', 'settings']);
+            ?>
+
             <div class="spacer"></div>
 
             <a href="/uni-mis-project/logout.php" class="sidebar-logout-btn">

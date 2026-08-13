@@ -83,27 +83,6 @@ if (!$recent_schedules) {
     $recent_schedules->num_rows = 0;
 }
 
-// Recent Results - Using full_name from students table
-$recent_results = $conn->query("
-    SELECT er.*, 
-           s.student_id,
-           s.full_name as student_name,
-           c.course_name, 
-           c.course_code, 
-           es.exam_type
-    FROM exam_results er
-    JOIN students s ON er.student_id = s.student_id
-    JOIN exam_schedules es ON er.exam_id = es.exam_id
-    JOIN courses c ON es.course_id = c.course_id
-    ORDER BY er.result_id DESC
-    LIMIT 5
-");
-
-if (!$recent_results) {
-    $recent_results = new stdClass();
-    $recent_results->num_rows = 0;
-}
-
 // Top Performing Students - Using full_name
 $top_students = $conn->query("
     SELECT s.student_id,
@@ -287,44 +266,6 @@ $conn->close();
                 </div>
             </div>
 
-            <!-- Recent Results -->
-            <div class="card">
-                <div class="card-header">
-                    <h5 style="margin:0;"><i class="bi bi-bar-chart"></i> Recent Results</h5>
-                    <a href="results/index.php" class="btn btn-outline" style="padding:4px 12px;font-size:12px;">View All</a>
-                </div>
-                <div class="card-content">
-                    <?php if ($recent_results && $recent_results->num_rows > 0): ?>
-                        <?php $result_count = 0; ?>
-                        <?php while($result = $recent_results->fetch_assoc()): ?>
-                            <?php $result_count++; ?>
-                            <div style="padding:12px 0;<?php if($result_count < $recent_results->num_rows) echo 'border-bottom:1px solid var(--border);'; ?>">
-                                <div style="display:flex;justify-content:space-between;align-items:center;">
-                                    <div>
-                                        <div style="font-weight:600;margin-bottom:2px;"><?php echo $result['student_name']; ?></div>
-                                        <span class="muted" style="font-size:12px;">
-                                            <?php echo $result['course_code']; ?> - <?php echo ucfirst($result['exam_type']); ?>
-                                        </span>
-                                    </div>
-                                    <div style="text-align:right;">
-                                        <span style="display:inline-block;padding:2px 8px;border-radius:4px;font-size:12px;font-weight:600;background:var(--success-bg);color:var(--success);border:1px solid var(--success-border);">
-                                            <?php echo $result['grade']; ?>
-                                        </span>
-                                        <div style="font-size:12px;color:var(--text-secondary);margin-top:4px;">
-                                            <?php echo $result['marks_obtained']; ?>/<?php echo $result['total_marks']; ?>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        <?php endwhile; ?>
-                    <?php else: ?>
-                        <div class="empty-state">
-                            <div class="empty-state-icon"><i class="bi bi-file-bar-graph"></i></div>
-                            <p class="empty-state-text">No results recorded yet</p>
-                        </div>
-                    <?php endif; ?>
-                </div>
-            </div>
         </div>
 
         <!-- Top Students -->
@@ -383,33 +324,6 @@ $conn->close();
             </div>
         </div>
         <?php endif; ?>
-
-        <!-- Quick Actions -->
-        <div class="card" style="margin-bottom:24px;">
-            <div class="card-header">
-                <h5 style="margin:0;"><i class="bi bi-lightning"></i> Quick Actions</h5>
-            </div>
-            <div class="card-content">
-                <div class="grid-4">
-                    <a href="schedule/index.php" class="btn btn-primary" style="display:flex;flex-direction:column;align-items:center;gap:8px;padding:20px;">
-                        <i class="bi bi-calendar-plus" style="font-size:1.5rem;"></i>
-                        Schedule Exam
-                    </a>
-                    <a href="results/index.php" class="btn btn-primary" style="display:flex;flex-direction:column;align-items:center;gap:8px;padding:20px;background:var(--success);border-color:var(--success);">
-                        <i class="bi bi-pencil-square" style="font-size:1.5rem;"></i>
-                        Exam Results
-                    </a>
-                    <a href="../result_publish_applications/index.php" class="btn btn-primary" style="display:flex;flex-direction:column;align-items:center;gap:8px;padding:20px;background:var(--accent);border-color:var(--accent);">
-                        <i class="bi bi-cloud-upload" style="font-size:1.5rem;"></i>
-                        SSO Publish Requests
-                    </a>
-                    <a href="promote/index.php" class="btn btn-primary" style="display:flex;flex-direction:column;align-items:center;gap:8px;padding:20px;background:var(--warning);border-color:var(--warning);">
-                        <i class="bi bi-arrow-up-circle" style="font-size:1.5rem;"></i>
-                        Promote Students
-                    </a>
-                </div>
-            </div>
-        </div>
     </div>
 
 <?php include 'includes/footer.php'; ?>

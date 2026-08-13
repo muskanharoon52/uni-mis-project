@@ -47,9 +47,13 @@ if (isset($_GET['new_pw']) && !empty($_GET['new_pw'])) {
 // FETCH STUDENT DATA
 // =============================================
 $stmt = $pdo->prepare("
-    SELECT s.*, d.department_name 
+    SELECT s.*, d.department_name, p.program_name,
+           aa.previous_degree, aa.program AS applied_program, aa.obtained_marks,
+           aa.total_marks, aa.percentage, aa.submitted_at AS application_date
     FROM admission_students s 
-    LEFT JOIN departments d ON s.program_id = d.department_id 
+    LEFT JOIN departments d ON s.program_id = d.department_id
+    LEFT JOIN programs p ON p.program_id = s.program_id
+    LEFT JOIN admission_applications aa ON aa.application_id = s.application_id
     WHERE s.id = ?
 ");
 $stmt->execute([$id]);
@@ -143,7 +147,31 @@ if ($flash): ?>
         <div class="card-content">
             <div class="detail-row">
                 <div class="detail-label">Department</div>
-                <div class="detail-value"><?= htmlspecialchars($student['department_name'] ?? 'N/A') ?></div>
+                <div class="detail-value"><?= htmlspecialchars($student['department_name'] ?? $student['applied_program'] ?? 'N/A') ?></div>
+            </div>
+            <div class="detail-row">
+                <div class="detail-label">Applied Program</div>
+                <div class="detail-value"><?= htmlspecialchars($student['applied_program'] ?? $student['program_name'] ?? 'N/A') ?></div>
+            </div>
+            <div class="detail-row">
+                <div class="detail-label">Previous Degree</div>
+                <div class="detail-value"><?= htmlspecialchars($student['previous_degree'] ?? 'N/A') ?></div>
+            </div>
+            <div class="detail-row">
+                <div class="detail-label">Obtained Marks</div>
+                <div class="detail-value"><?= isset($student['obtained_marks']) ? number_format((float)$student['obtained_marks'], 2) : 'N/A' ?></div>
+            </div>
+            <div class="detail-row">
+                <div class="detail-label">Total Marks</div>
+                <div class="detail-value"><?= isset($student['total_marks']) ? number_format((float)$student['total_marks'], 2) : 'N/A' ?></div>
+            </div>
+            <div class="detail-row">
+                <div class="detail-label">Percentage</div>
+                <div class="detail-value"><?= isset($student['percentage']) ? number_format((float)$student['percentage'], 2) . '%' : 'N/A' ?></div>
+            </div>
+            <div class="detail-row">
+                <div class="detail-label">Application Date</div>
+                <div class="detail-value"><?= !empty($student['application_date']) ? date('d M Y', strtotime($student['application_date'])) : 'N/A' ?></div>
             </div>
             <div class="detail-row">
                 <div class="detail-label">Status</div>
@@ -192,9 +220,15 @@ if ($flash): ?>
             <!-- PASSWORD SECTION WITH ACTUAL PLAIN TEXT -->
             <!-- ============================================= -->
             <?php 
-            $user_sql = "SELECT user_id, login_id, username FROM users WHERE login_id = ? OR email = ?";
-            $user_stmt = $pdo->prepare($user_sql);
-            $user_stmt->execute([$student['student_id'], $student['email']]);
+            if (!empty($student['user_id'])) {
+                $user_sql = "SELECT user_id, login_id, username FROM users WHERE user_id = ?";
+                $user_stmt = $pdo->prepare($user_sql);
+                $user_stmt->execute([$student['user_id']]);
+            } else {
+                $user_sql = "SELECT user_id, login_id, username FROM users WHERE email = ?";
+                $user_stmt = $pdo->prepare($user_sql);
+                $user_stmt->execute([$student['email']]);
+            }
             $user_data = $user_stmt->fetch();
             
             if ($user_data): 
@@ -205,8 +239,8 @@ if ($flash): ?>
                 
                 <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:12px;">
                     <div>
-                        <div style="font-size:12px;color:#6b7280;">Login ID:</div>
-                        <div style="font-weight:600;"><?= htmlspecialchars($user_data['login_id']) ?></div>
+                        <div style="font-size:12px;color:#6b7280;">Login ID / Username:</div>
+                        <div style="font-weight:600;"><?= htmlspecialchars($user_data['username'] ?? $user_data['login_id']) ?></div>
                     </div>
                     
                     <!-- THIS IS WHERE THE PASSWORD DISPLAYS -->

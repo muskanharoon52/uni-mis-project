@@ -53,12 +53,9 @@ include __DIR__ . '/includes/header.php';
   <div class="module-grid">
     <?php while ($m = mysqli_fetch_assoc($modules)): ?>
     <div class="mod-card" style="--mc:<?= sa_es($m['module_color'] ?? '#6366f1') ?>">
-      <div class="m-top">
-        <div class="m-ic"><?= sa_es($m['module_icon'] ?: '◫') ?></div>
-        <div>
-          <div class="m-name"><?= sa_es($m['module_name']) ?></div>
-          <div class="m-key"><?= sa_es($m['module_key']) ?></div>
-        </div>
+      <div>
+        <div class="m-name"><?= sa_es($m['module_name']) ?></div>
+        <div class="m-key"><?= sa_es($m['module_key']) ?></div>
       </div>
       <div class="m-stats">
         <span><b><?= (int)$m['sub_count'] ?></b> submodules</span>
@@ -67,7 +64,6 @@ include __DIR__ . '/includes/header.php';
       </div>
       <div class="m-actions">
         <a class="btn btn-sm" href="submodules.php?module_id=<?= (int)$m['module_id'] ?>">Submodules</a>
-        <a class="btn btn-sm btn-primary" href="permissions.php?module_id=<?= (int)$m['module_id'] ?>">Permissions</a>
         <a class="btn btn-sm btn-ghost" href="modules.php?edit=<?= (int)$m['module_id'] ?>">Edit</a>
       </div>
     </div>

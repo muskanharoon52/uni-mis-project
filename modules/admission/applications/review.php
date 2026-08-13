@@ -111,7 +111,7 @@ if (!$app) {
 }
 
 // =============================================
-// GET SESSIONS - FIXED
+// GET SESSIONS - FIXED WITH DISTINCT
 // =============================================
 $sessions = [];
 try {
@@ -162,7 +162,7 @@ try {
             $order_by .= "session_id DESC";
         }
         
-        $session_sql = "SELECT $session_select FROM sessions $where_clause $order_by";
+        $session_sql = "SELECT DISTINCT $session_select FROM sessions $where_clause $order_by";
         $session_stmt = $pdo->query($session_sql);
         $sessions = $session_stmt->fetchAll();
     }
@@ -172,13 +172,23 @@ try {
 }
 
 // =============================================
-// GET SEMESTERS
+// GET SEMESTERS - FIXED TO REMOVE DUPLICATES
 // =============================================
 $semesters = [];
 try {
-    $semester_stmt = $pdo->query("SELECT semester_id, semester_name, semester_number FROM semesters ORDER BY semester_number ASC");
+    // Use GROUP BY on semester_name to remove duplicates
+    // Get the minimum semester_id for each semester_name to avoid duplicates
+    $semester_stmt = $pdo->query("
+        SELECT MIN(semester_id) as semester_id, 
+               semester_name, 
+               MIN(semester_number) as semester_number 
+        FROM semesters 
+        GROUP BY semester_name 
+        ORDER BY MIN(semester_number) ASC
+    ");
     $semesters = $semester_stmt->fetchAll();
 } catch (PDOException $e) {
+    error_log("Semester query error: " . $e->getMessage());
     $semesters = [];
 }
 

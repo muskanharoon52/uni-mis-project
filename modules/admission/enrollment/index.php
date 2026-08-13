@@ -74,7 +74,7 @@ if ($selected_dept > 0) {
             JOIN admission_applications aa ON aa.application_id = asd.application_id
             JOIN programs p ON p.program_id = asd.program_id
             JOIN departments d ON d.department_id = p.department_id
-            WHERE asd.fee_paid = 1
+            WHERE asd.fee_paid = 1 AND asd.is_activated = 0
             AND p.department_id = ?
         ";
 
@@ -145,6 +145,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['activate_selected']))
                     continue; 
                 }
 
+                // Skip if an account was already created (defensive - the list above already filters these)
+                $dup = $pdo->query("SELECT user_id FROM students WHERE application_id = " . (int) $row['application_id'] . " LIMIT 1");
+                if ($dup && $dup->fetch()) {
+                    $pdo->prepare("UPDATE admission_students SET is_activated = 1 WHERE id = ?")->execute([$adm_id]);
+                    continue;
+                }
+
                 $app_id_val = $row['application_id'];
                 $login_id = $next_login++;
                 $username = strtolower(preg_replace('/[^a-zA-Z0-9]/', '', explode(' ', $row['full_name'])[0])) . $login_id;
@@ -205,8 +212,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['activate_selected']))
                     WHERE application_id = ?
                 ")->execute([$app_id_val]);
 
-                // Mark as processed in admission_students (optional)
-                $pdo->prepare("UPDATE admission_students SET is_activated = 1 WHERE id = ?")->execute([$adm_id]);
+                // Mark as processed in admission_students (link SSO account)
+                $pdo->prepare("UPDATE admission_students SET is_activated = 1, user_id = ? WHERE id = ?")->execute([$new_user_id, $adm_id]);
                 
                 $activated++;
             }

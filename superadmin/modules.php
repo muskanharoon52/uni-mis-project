@@ -8,6 +8,9 @@ $me = (int)($_SESSION['user_id'] ?? 0);
 
 $msg = ''; $err = '';
 
+// Update SSO module name to "Student Services Office"
+mysqli_query($conn, "UPDATE sa_modules SET module_name = 'Student Services Office (SSO)' WHERE module_key = 'sso' AND module_name = 'Single Sign-On (SSO)'");
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = $_POST['action'] ?? '';
 
@@ -92,7 +95,6 @@ include __DIR__ . '/includes/header.php';
   <?php while ($m = mysqli_fetch_assoc($modules)): ?>
   <div class="mod-card" style="--mc:<?= sa_es($m['module_color'] ?? '#6366f1') ?>">
     <div class="m-top">
-      <div class="m-ic"><?= sa_es($m['module_icon'] ?: '◫') ?></div>
       <div style="flex:1">
         <div class="m-name"><?= sa_es($m['module_name']) ?></div>
         <div class="m-key"><?= sa_es($m['module_key']) ?></div>
@@ -105,7 +107,7 @@ include __DIR__ . '/includes/header.php';
       <span>#<?= (int)$m['module_id'] ?></span>
     </div>
     <div class="m-actions">
-      <a class="btn btn-sm btn-primary" href="submodules.php?module_id=<?= (int)$m['module_id'] ?>">Submodules</a>
+      <a class="btn btn-sm btn-primary" href="submodules.php">Submodules</a>
       <a class="btn btn-sm" href="modules.php?edit=<?= (int)$m['module_id'] ?>">Edit</a>
       <form method="post" onsubmit="return confirm('Delete this module? Submodules & rules must be empty.')" style="margin:0">
         <input type="hidden" name="action" value="delete_module">

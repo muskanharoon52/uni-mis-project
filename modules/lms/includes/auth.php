@@ -121,16 +121,29 @@ function require_login(): array
     return $user;
 }
 
+function is_portal_super_admin(): bool
+{
+    return (int) ($_SESSION['role_id'] ?? 0) === 7
+        || strtolower((string) ($_SESSION['role_name'] ?? '')) === 'super admin';
+}
+
 function require_role(string $role): array
 {
     $user = require_login();
 
-    if (strtolower($user['role']) !== strtolower($role)) {
+    if (!is_portal_super_admin() && strtolower($user['role']) !== strtolower($role)) {
         $redirect = $user['role'] === 'teacher'
             ? app_url('teacher/dashboard.php')
             : app_url('student/dashboard.php');
         header('Location: ' . $redirect);
         exit;
+    }
+
+    // Portal Super Admin: take on the page's role so the LMS side panel
+    // renders the matching links for the dashboard they entered from.
+    if (is_portal_super_admin()) {
+        $user['role'] = strtolower($role);
+        $_SESSION['lms_auth_user'] = $user;
     }
 
     return $user;

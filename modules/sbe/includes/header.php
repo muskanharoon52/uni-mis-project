@@ -13,6 +13,15 @@ $activePage = $activePage ?? 'dashboard';
 $user = current_user();
 $userRole = $user['role'] ?? 'guest';
 $userInitial = strtoupper(substr($user['display_name'] ?? 'G', 0, 1));
+// Base URL for this module pages (absolute path). When the config value is empty,
+// derive it from the currently executing script so every sidebar link resolves to
+// this module's folder regardless of where the project is installed.
+$baseUrl = trim((string) ($config['base_url'] ?? ''));
+if ($baseUrl === '') {
+    $scriptDir = rtrim(str_replace('\\', '/', dirname((string) ($_SERVER['SCRIPT_NAME'] ?? '/uni-mis-project/modules/sbe/'))), '/');
+    $baseUrl = ($scriptDir !== '' && $scriptDir !== '/') ? $scriptDir . '/' : '/uni-mis-project/modules/sbe/';
+}
+$basePath = rtrim($baseUrl, '/') . '/';
 ?>
 <!doctype html>
 <html lang="en">
@@ -43,35 +52,40 @@ $userInitial = strtoupper(substr($user['display_name'] ?? 'G', 0, 1));
         <nav class="nav">
             <?php if ($userRole === 'guest'): ?>
                 <span class="nav-section-label">Portal</span>
-                <a class="<?= $activePage === 'dashboard' ? 'active' : '' ?>" href="index.php">Dashboard</a>
-                <a class="<?= $activePage === 'login' ? 'active' : '' ?>" href="login.php">Sign In</a>
+                <a class="<?= $activePage === 'dashboard' ? 'active' : '' ?>" href="<?= $basePath ?>index.php">Dashboard</a>
+                <a class="<?= $activePage === 'login' ? 'active' : '' ?>" href="<?= $basePath ?>login.php">Sign In</a>
             <?php elseif ($userRole === 'Teacher'): ?>
                 <span class="nav-section-label">Overview</span>
-                <a class="<?= $activePage === 'dashboard' ? 'active' : '' ?>" href="teacher-home.php">Dashboard</a>
+                <a class="<?= $activePage === 'dashboard' ? 'active' : '' ?>" href="<?= $basePath ?>teacher-home.php">Dashboard</a>
                 
                 <span class="nav-section-label">Exam Builder</span>
-                <a class="<?= $activePage === 'exams' ? 'active' : '' ?>" href="exams.php">Create Exam</a>
+                <a class="<?= $activePage === 'exams' ? 'active' : '' ?>" href="<?= $basePath ?>exams.php">Create Exam</a>
 
                 <span class="nav-section-label">Scheduling</span>
-                <a class="<?= $activePage === 'exam_schedule' ? 'active' : '' ?>" href="schedule.php">Schedule</a>
-                <a class="<?= $activePage === 'datesheets' ? 'active' : '' ?>" href="datesheets.php">Datesheets</a>
+                <a class="<?= $activePage === 'exam_schedule' ? 'active' : '' ?>" href="<?= $basePath ?>schedule.php">Schedule</a>
+                <a class="<?= $activePage === 'datesheets' ? 'active' : '' ?>" href="<?= $basePath ?>datesheets.php">Datesheets</a>
 
                 <span class="nav-section-label">Results</span>
-                <a class="<?= $activePage === 'view_results' ? 'active' : '' ?>" href="view-results.php">View Results</a>
+                <a class="<?= $activePage === 'view_results' ? 'active' : '' ?>" href="<?= $basePath ?>view-results.php">View Results</a>
+
+                <?php
+                require_once __DIR__ . '/../../../includes/sa_submenu.php';
+                sa_render_submodules('sbe', ['teacher_home', 'exam_schedule', 'datesheets', 'exam_results', 'student_home', 'student_exams']);
+                ?>
             <?php elseif ($userRole === 'Student'): ?>
-                <span class="nav-section-label">Student</span>
-                <a class="<?= $activePage === 'dashboard' ? 'active' : '' ?>" href="student-home.php">My Dashboard</a>
-                <a class="<?= $activePage === 'student_start_exam' ? 'active' : '' ?>" href="student-start-exam.php">Start Exam</a>
+                <?php
+                require_once __DIR__ . '/../../../includes/sa_submenu.php';
+                sa_render_submodules('sbe', ['teacher_home', 'exam_schedule', 'datesheets', 'question_bank', 'exam_results']);
+                ?>
             <?php endif; ?>
         </nav>
 
         <div class="sidebar-logout">
-            <a class="sidebar-logout-btn" href="logout.php">
+                <a class="sidebar-logout-btn" href="<?= $basePath ?>logout.php">
                 <i class="fas fa-sign-out-alt"></i> Logout
             </a>
         </div>
 
-        <div class="sidebar-user">
             <?php if ($user): ?>
                 <div class="user-strip">
                     <div class="user-strip-avatar"><?= e($userInitial) ?></div>
@@ -81,8 +95,8 @@ $userInitial = strtoupper(substr($user['display_name'] ?? 'G', 0, 1));
                     </div>
                 </div>
                 <div class="actions">
-                    <a class="btn btn-ghost btn-sm" href="profile.php">&#9881; Profile</a>
-                    <a class="btn btn-ghost btn-sm" href="logout.php">&#x2192; Logout</a>
+                    <a class="btn btn-ghost btn-sm" href="<?= $basePath ?>profile.php">&#9881; Profile</a>
+                    <a class="btn btn-ghost btn-sm" href="<?= $basePath ?>logout.php">&#x2192; Logout</a>
                 </div>
             <?php else: ?>
                 <div class="user-strip">
@@ -92,9 +106,8 @@ $userInitial = strtoupper(substr($user['display_name'] ?? 'G', 0, 1));
                         <span class="user-strip-role">guest</span>
                     </div>
                 </div>
-                <a class="btn btn-primary" href="login.php" style="width:100%; justify-content:center;">Sign In</a>
+                <a class="btn btn-primary" href="<?= $basePath ?>login.php" style="width:100%; justify-content:center;">Sign In</a>
             <?php endif; ?>
-        </div>
     </aside>
 
     <main class="content">
@@ -108,7 +121,7 @@ $userInitial = strtoupper(substr($user['display_name'] ?? 'G', 0, 1));
                     <span class="badge badge-<?= e(strtolower($user['role'])) ?>"><?= e($user['role']) ?></span>
                     <span class="topbar-user"><?= e($user['display_name']) ?></span>
                 <?php else: ?>
-                    <a class="btn btn-ghost btn-sm" href="login.php">Sign In</a>
+                    <a class="btn btn-ghost btn-sm" href="<?= $basePath ?>login.php">Sign In</a>
                 <?php endif; ?>
             </div>
         </div>

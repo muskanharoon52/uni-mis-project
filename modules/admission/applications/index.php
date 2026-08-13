@@ -97,9 +97,6 @@ if ($flash): ?>
         <a href="../register.php" target="_blank" style="display:inline-flex;align-items:center;gap:6px;background:#10b981;color:#fff;padding:8px 18px;border-radius:8px;text-decoration:none;font-size:14px;font-weight:500;transition:all 0.3s;border:none;">
             <i class="fas fa-globe"></i> Public Registration
         </a>
-        <a href="add.php" style="display:inline-flex;align-items:center;gap:6px;background:#2563eb;color:#fff;padding:8px 18px;border-radius:8px;text-decoration:none;font-size:14px;font-weight:500;transition:all 0.3s;border:none;">
-            <i class="fas fa-plus"></i> New Application
-        </a>
     </div>
 </div>
 
@@ -128,11 +125,8 @@ if ($flash): ?>
             <div class="empty-state" style="text-align:center;padding:60px 20px;">
                 <i class="fas fa-inbox" style="font-size:48px;color:#d1d5db;margin-bottom:16px;"></i>
                 <h5 style="color:#4b5563;margin-bottom:8px;">No Applications Found</h5>
-                <p style="color:#6b7280;font-size:14px;">Start by adding a new student admission application.</p>
+                <p style="color:#6b7280;font-size:14px;">New applications can only be submitted through public registration.</p>
                 <div style="margin-top:16px;display:flex;gap:10px;justify-content:center;">
-                    <a href="add.php" class="btn btn-primary" style="background:#2563eb;color:#fff;padding:10px 24px;border-radius:8px;text-decoration:none;">
-                        <i class="fas fa-plus"></i> New Application
-                    </a>
                     <!-- ============================================= -->
                     <!-- CORRECT PATH: ../register.php                   -->
                     <!-- ============================================= -->
@@ -244,9 +238,6 @@ if ($flash): ?>
                     <!-- ============================================= -->
                     <button class="btn btn-sm btn-outline" onclick="window.location.href='../register.php'" style="padding:4px 14px;border:1px solid #e2e8f0;background:transparent;border-radius:6px;cursor:pointer;font-size:12px;">
                         <i class="fas fa-globe"></i> Public Form
-                    </button>
-                    <button class="btn btn-sm btn-primary" onclick="window.location.href='add.php'" style="padding:4px 14px;background:#2563eb;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:12px;">
-                        <i class="fas fa-plus"></i> Add New
                     </button>
                 </div>
             </div>

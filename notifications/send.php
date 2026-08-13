@@ -78,6 +78,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 }
                 mysqli_stmt_close($stmtR);
 
+                // Mirror into lms_notifications so the message also appears in the
+                // teacher/student LMS Messages page (keyed by users.user_id).
+                $lmsIns = mysqli_prepare($conn, "INSERT INTO lms_notifications (recipient_user_id, sender_user_id, category, title, body) VALUES (?, ?, 'message', ?, ?)");
+                $senderUid = (int) $_SESSION['user_id'];
+                $lmsDelivered = 0;
+                if ($lmsIns) {
+                    foreach ($result['faculty'] as $fid) {
+                        $tq = mysqli_query($conn, "SELECT user_id FROM teachers WHERE teacher_id = " . (int)$fid . " AND user_id IS NOT NULL AND user_id > 0 LIMIT 1");
+                        if ($tq && $row = mysqli_fetch_assoc($tq)) {
+                            mysqli_stmt_bind_param($lmsIns, 'iiss', $row['user_id'], $senderUid, $form['title'], $form['message']);
+                            mysqli_stmt_execute($lmsIns);
+                            $lmsDelivered++;
+                        }
+                    }
+                    foreach ($result['students'] as $sid) {
+                        $sq = mysqli_query($conn, "SELECT user_id FROM students WHERE student_id = " . (int)$sid . " AND user_id IS NOT NULL AND user_id > 0 LIMIT 1");
+                        if ($sq && $row = mysqli_fetch_assoc($sq)) {
+                            mysqli_stmt_bind_param($lmsIns, 'iiss', $row['user_id'], $senderUid, $form['title'], $form['message']);
+                            mysqli_stmt_execute($lmsIns);
+                            $lmsDelivered++;
+                        }
+                    }
+                    mysqli_stmt_close($lmsIns);
+                }
+
                 mysqli_commit($conn);
 
                 log_activity('Notifications', 'Notification Sent', 'notifications', $notificationId,
@@ -86,7 +111,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     . ' | Faculty: ' . $result['faculty_count']
                     . ' | Students: ' . $result['student_count']);
 
-                $success = 'Notification sent to ' . $result['total'] . ' recipient(s) (' . $result['faculty_count'] . ' faculty, ' . $result['student_count'] . ' students).';
+                $success = 'Notification sent to ' . $result['total'] . ' recipient(s) (' . $result['faculty_count'] . ' faculty, ' . $result['student_count'] . ' students). Delivered to ' . $lmsDelivered . ' LMS account(s).';
                 $form = [
                     'title' => '', 'message' => '', 'audience' => 'Both',
                     'faculty_scope' => 'All', 'faculty_depts' => [], 'faculty_batches' => [],
